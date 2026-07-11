@@ -1,6 +1,6 @@
 # ShinaYuu Music 1.4.24
 
-Bản này tiếp tục trực tiếp từ nhánh **ShinaYuu Music 1.4.5 → 1.4.7**, nhưng khôi phục đúng kiến trúc chạy và build của repo Mineradio gốc.
+Bản này tiếp tục trực tiếp từ nhánh **MineRadio 1.1.0 → ShinaYuu Music 1.4.24**, nhưng khôi phục đúng kiến trúc chạy và build của repo Mineradio gốc.
 
 
 ## Đồng bộ lyrics theo từng bài 1.4.24
