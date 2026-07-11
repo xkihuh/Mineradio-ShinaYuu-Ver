@@ -3,14 +3,14 @@
 Bản này tiếp tục trực tiếp từ nhánh **MineRadio 1.1.0 → ShinaYuu Music 1.4.24**, nhưng khôi phục đúng kiến trúc chạy và build của repo Mineradio gốc.
 
 
-## Đồng bộ lyrics theo từng bài 1.4.24
+## Đồng bộ lyrics theo từng bài 
 
 - Tự sửa sai lệch tiến triển do bản lyrics và bản âm thanh có thời lượng hơi khác nhau.
 - Lưu độ trễ riêng cho từng bài, nguồn Spotify/YouTube và nguồn lyrics gốc/tùy chỉnh.
 - Trong bảng Visual Effects, dùng mục **Căn lời cho bài hiện tại**: lời chạy nhanh thì tăng `+`; lời chạy chậm thì giảm `−`.
 
 
-## Sửa Discord UI và cấu hình 1.4.22
+## Sửa Discord UI và cấu hình 
 
 - Lyrics đồng bộ theo thời gian phát đã bù độ trễ âm thanh mặc định `+0.35 giây`.
 - Hỗ trợ đúng thẻ LRC `[offset:+/-milliseconds]`.
@@ -30,8 +30,6 @@ npm start
    └─ Spotify WebView2 host chạy ẩn, không có cửa sổ và không hiện trên Taskbar
 ```
 
-Không còn `launcher-main.js`, `native-shell.js` hoặc cửa sổ WebView2 trắng phủ lên giao diện.
-
 ## Chạy source
 
 ```powershell
@@ -45,8 +43,6 @@ Lệnh này giống repo gốc:
 start = electron .
 main  = desktop/main.js
 ```
-
-PowerShell chỉ dùng để hiển thị log trong chế độ phát triển. Cửa sổ ứng dụng là Electron, không phải trình duyệt hoặc cửa sổ Node riêng.
 
 ## Tạo bản chạy thử EXE
 
@@ -75,9 +71,7 @@ dist\ShinaYuu-Music-1.4.24-Setup.exe
 Bộ cài dùng `electron-builder + NSIS`, giống repo Mineradio gốc, gồm shortcut Desktop, shortcut Start Menu và trình gỡ cài đặt.
 
 
-## Spotify Login 1.4.17
-
-Bản này được sửa trực tiếp từ source **1.4.8** đã tải lên. Luồng OAuth không còn dùng `/api/login/status` để gọi Spotify `/me` liên tục trong lúc chờ trình duyệt.
+## Spotify Login
 
 ```text
 Mở Spotify OAuth ngay
@@ -85,15 +79,6 @@ Mở Spotify OAuth ngay
 → gọi /me một lần
 → cache tên, avatar và gói tài khoản vào spotify-token.json
 → UI chỉ poll trạng thái nội bộ, không tạo thêm request Spotify
-```
-
-Khi Spotify trả HTTP 429, ứng dụng đọc `Retry-After`, đợi đúng thời gian rồi thử lại một lần theo lịch. Trong thời gian chờ, token không bị xóa và OAuth không bị mở lại.
-
-Để thử đăng nhập hoàn toàn sạch:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\RESET_SPOTIFY_LOGIN.ps1
-npm start
 ```
 
 ## Spotify và YouTube
@@ -117,7 +102,7 @@ http://127.0.0.1:43821/api/spotify/callback
 - Spotify Premium để phát Spotify.
 - Microsoft Edge WebView2 Runtime.
 
-## Tua nhạc và hiệu ứng real-time 1.4.17
+## Tua nhạc và hiệu ứng real-time 
 
 - Khi kéo thanh thời gian, ứng dụng chỉ xem trước vị trí; lệnh tua chỉ được gửi khi thả chuột.
 - Spotify chờ bộ phát xác nhận vị trí mới và bỏ qua state cũ trong lúc seek.
@@ -127,7 +112,7 @@ http://127.0.0.1:43821/api/spotify/callback
 - Không sử dụng BPM cố định, nhịp theo timeline hoặc beat-map dự phòng cho hai nguồn trực tuyến.
 
 
-## Discord Profile + Rich Presence 1.4.19
+## Discord Profile + Rich Presence 
 
 Trang chủ có thêm thẻ hồ sơ Discord theo phong cách ShinaYuu. Tích hợp dùng Discord RPC cục bộ nên không yêu cầu Bot Token và không mở trang đăng nhập OAuth.
 
