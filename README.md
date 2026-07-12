@@ -32,7 +32,7 @@ The core goal of version 1.1.1 is to clean up and reorganize Mineradio into a cl
 * **Instant Out-of-the-Box Experience:** Ships with a built-in "Default Test" visual user profile so the software's default look matches this preset perfectly on its first launch.
 
 
-## Chạy source
+## Development 
 
 ```powershell
 npm install
@@ -51,7 +51,7 @@ Mở:
 dist\win-unpacked\ShinaYuuMusic.exe
 ```
 
-## Build bộ cài Windows
+## Build Setup
 
 ```powershell
 npm run build:win
