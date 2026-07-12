@@ -77,7 +77,7 @@ http://127.0.0.1:43821/api/spotify/callback
 1. Tạo Discord Application tên theo ý của bạn
 2. Sao chép **Application ID**.
 3. Mở Discord Desktop.
-4. Trong ứng dụng, mở **Thiết lập Discord**, nhập Application ID rồi bấm **Lưu & kết nối**.
+4. Trong ứng dụng ShinaYuu Music, mở **Thiết lập Discord**, nhập Application ID rồi bấm **Lưu & kết nối**.
 
 Không cần Bot Token, Client Secret hoặc OAuth trình duyệt.
 
