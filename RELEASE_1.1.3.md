@@ -1,4 +1,4 @@
-# ShinaYuu Music 1.1.3
+# ShinaYuu Music 1.1.3.2
 
 ShinaYuu Music 1.1.3 is the stable release promoted from the `1.1.2.4` patch line.
 
