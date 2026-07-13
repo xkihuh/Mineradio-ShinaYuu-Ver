@@ -2,7 +2,7 @@
 
 ShinaYuu Music 1.1.3 is the stable release promoted from the `1.1.2.4` patch line.
 
-## YouTube lyric coverage
+## YouTube lyric coverage & Spotify
 
 - Reads lyrics from the YouTube Music lyrics tab when video captions are unavailable.
 - Preserves exact YouTube caption timing when suitable caption tracks exist.
