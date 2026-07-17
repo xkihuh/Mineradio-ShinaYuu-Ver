@@ -1,0 +1,21 @@
+{
+  "name": "electron",
+  "version": "42.5.2+wvcus",
+  "description": "Castlabs Electron for Content Security runtime package for ShinaYuu Music",
+  "main": "index.js",
+  "bin": {
+    "electron": "cli.js",
+    "install-electron": "install.js"
+  },
+  "dependencies": {
+    "@electron-internal/extract-zip": "^1.0.1",
+    "@electron/get": "^5.0.0",
+    "@types/node": "^24.9.0"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "license": "MIT",
+  "author": "castLabs GmbH (based on work by the Electron Community)",
+  "repository": "https://github.com/castlabs/electron-releases"
+}
