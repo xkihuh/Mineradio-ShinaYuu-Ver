@@ -5,7 +5,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { spawn, execFileSync } = require('child_process');
 
-const UA = 'ShinaYuu Music/1.1.6.3';
+const UA = 'ShinaYuu Music/1.1.6.5';
 const CONFIG_FILE = process.env.MUSIC_SOURCE_CONFIG_FILE || path.join(__dirname, '.music-sources.json');
 const TOKEN_FILE = process.env.SPOTIFY_TOKEN_FILE || path.join(__dirname, '.spotify-token.json');
 const YOUTUBE_TOKEN_FILE = process.env.YOUTUBE_TOKEN_FILE || path.join(path.dirname(TOKEN_FILE), 'youtube-token.json');
@@ -1382,8 +1382,10 @@ function commandExists(command) {
 }
 
 function findNodeRuntime() {
+  const electronRuntime = process.versions && process.versions.electron ? process.execPath : '';
   const candidates = [
     process.env.SHINAYUU_NODE_PATH,
+    electronRuntime,
     process.env.npm_node_execpath,
     process.env.NODE,
     commandExists(process.platform === 'win32' ? 'node.exe' : 'node'),
@@ -1391,34 +1393,113 @@ function findNodeRuntime() {
   return candidates.find((value) => fs.existsSync(value)) || '';
 }
 
+function ytDlpRuntimeEnv(nodeRuntime = findNodeRuntime()) {
+  if (nodeRuntime && process.versions && process.versions.electron && path.resolve(nodeRuntime) === path.resolve(process.execPath)) {
+    return { ELECTRON_RUN_AS_NODE: '1' };
+  }
+  return {};
+}
+
+function userYtDlpPath() {
+  return path.join(youtubeToolsDir(), process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
+}
+
+function bundledYtDlpPath() {
+  return path.join(__dirname, 'vendor', process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
+}
+
+function uniqueExistingStrings(values) {
+  return Array.from(new Set(values.map((value) => String(value || '').trim()).filter(Boolean)));
+}
+
 function ytDlpCandidatePaths() {
   const name = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
-  return [
+  return uniqueExistingStrings([
     String(process.env.YTDLP_PATH || '').trim(),
-    path.join(youtubeToolsDir(), name),
+    userYtDlpPath(),
+    bundledYtDlpPath(),
     commandExists(name),
     commandExists('yt-dlp'),
-  ].filter(Boolean);
+  ]);
+}
+
+function safeUnlink(file) {
+  try { if (file && fs.existsSync(file)) fs.unlinkSync(file); } catch (_) {}
+}
+
+function copyFileAtomic(source, target) {
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  const partial = `${target}.restore`;
+  safeUnlink(partial);
+  fs.copyFileSync(source, partial);
+  if (process.platform === 'win32' && path.basename(source).toLowerCase() === 'yt-dlp.exe') {
+    const digest = sha256File(partial);
+    if (digest.toLowerCase() !== YTDLP_WINDOWS_SHA256.toLowerCase()) {
+      safeUnlink(partial);
+      const error = new Error('Bundled yt-dlp checksum verification failed');
+      error.code = 'YTDLP_BUNDLE_CHECKSUM_FAILED';
+      throw error;
+    }
+  }
+  safeUnlink(target);
+  fs.renameSync(partial, target);
+  return target;
+}
+
+async function fetchBinary(url, timeoutMs = 45000) {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  try {
+    const response = await fetch(url, {
+      redirect: 'follow',
+      headers: { 'User-Agent': UA, Accept: 'application/octet-stream' },
+      signal: controller ? controller.signal : undefined,
+    });
+    if (!response.ok) {
+      const error = new Error(`yt-dlp download HTTP ${response.status}`);
+      error.code = 'YTDLP_DOWNLOAD_HTTP';
+      throw error;
+    }
+    return Buffer.from(await response.arrayBuffer());
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 async function downloadYtDlpWindows(target) {
   fs.mkdirSync(path.dirname(target), { recursive: true });
   const partial = `${target}.download`;
-  const response = await fetch(YTDLP_WINDOWS_URL, {
-    redirect: 'follow',
-    headers: { 'User-Agent': UA, Accept: 'application/octet-stream' },
-  });
-  if (!response.ok) throw new Error(`yt-dlp download HTTP ${response.status}`);
-  const bytes = Buffer.from(await response.arrayBuffer());
-  fs.writeFileSync(partial, bytes);
-  const digest = sha256File(partial);
-  if (digest.toLowerCase() !== YTDLP_WINDOWS_SHA256.toLowerCase()) {
-    try { fs.unlinkSync(partial); } catch (_) {}
-    throw new Error('yt-dlp checksum verification failed');
+  let lastError = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    safeUnlink(partial);
+    try {
+      youtubeEngineLastStatus = {
+        ready: false,
+        repairing: true,
+        engine: 'yt-dlp',
+        message: 'downloading',
+        attempt,
+      };
+      const bytes = await fetchBinary(YTDLP_WINDOWS_URL, 45000);
+      fs.writeFileSync(partial, bytes);
+      const digest = sha256File(partial);
+      if (digest.toLowerCase() !== YTDLP_WINDOWS_SHA256.toLowerCase()) {
+        const error = new Error('yt-dlp checksum verification failed');
+        error.code = 'YTDLP_CHECKSUM_FAILED';
+        throw error;
+      }
+      safeUnlink(target);
+      fs.renameSync(partial, target);
+      return target;
+    } catch (error) {
+      lastError = error;
+      safeUnlink(partial);
+      if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 700 * attempt));
+    }
   }
-  try { if (fs.existsSync(target)) fs.unlinkSync(target); } catch (_) {}
-  fs.renameSync(partial, target);
-  return target;
+  const error = new Error(lastError && lastError.message || 'yt-dlp download failed');
+  error.code = lastError && lastError.code || 'YTDLP_DOWNLOAD_FAILED';
+  throw error;
 }
 
 function runChild(command, args, options = {}) {
@@ -1436,11 +1517,19 @@ function runChild(command, args, options = {}) {
     let stderr = '';
     const max = Number(options.maxOutput || 12 * 1024 * 1024);
     const timeoutMs = Number(options.timeoutMs || 45000);
-    const timer = setTimeout(() => {
+    let settled = false;
+    let timer = null;
+    const finishReject = (error) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      reject(error);
+    };
+    timer = setTimeout(() => {
       try { child.kill(); } catch (_) {}
       const error = new Error(`Process timed out after ${timeoutMs} ms`);
       error.code = 'PROCESS_TIMEOUT';
-      reject(error);
+      finishReject(error);
     }, timeoutMs);
     child.stdout.on('data', (chunk) => {
       stdout += chunk.toString('utf8');
@@ -1449,12 +1538,11 @@ function runChild(command, args, options = {}) {
       }
     });
     child.stderr.on('data', (chunk) => { stderr += chunk.toString('utf8'); });
-    child.once('error', (error) => {
-      clearTimeout(timer);
-      reject(error);
-    });
+    child.once('error', (error) => finishReject(error));
     child.once('close', (code) => {
-      clearTimeout(timer);
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
       if (code === 0) return resolve({ stdout, stderr, code });
       const error = new Error((stderr || stdout || `Process exited with ${code}`).trim());
       error.code = `PROCESS_EXIT_${code}`;
@@ -1465,37 +1553,133 @@ function runChild(command, args, options = {}) {
   });
 }
 
-async function prepareYouTubeEngine() {
+function ytDlpFailureCode(error) {
+  const code = String(error && error.code || '').toUpperCase();
+  const message = String(error && error.message || '').toLowerCase();
+  if (code === 'EACCES' || code === 'EPERM' || /access is denied|permission denied|operation not permitted/.test(message)) return 'YTDLP_BLOCKED_OR_PERMISSION';
+  if (code === 'ENOENT' || /not found|cannot find/.test(message)) return 'YTDLP_NOT_FOUND';
+  if (code === 'PROCESS_TIMEOUT' || /timed out/.test(message)) return 'YTDLP_START_TIMEOUT';
+  return code || 'YTDLP_START_FAILED';
+}
+
+async function inspectYtDlpExecutable(executable) {
+  const versionResult = await runChild(executable, ['--version'], { timeoutMs: 15000, maxOutput: 1024 * 64 });
+  const version = String(versionResult.stdout || '').trim();
+  if (!version) {
+    const error = new Error('yt-dlp did not report a version');
+    error.code = 'YTDLP_INVALID_EXECUTABLE';
+    throw error;
+  }
+  return version;
+}
+
+function ytDlpSourceForPath(executable) {
+  const normalized = path.resolve(executable);
+  if (normalized === path.resolve(userYtDlpPath())) return 'user-cache';
+  if (normalized === path.resolve(bundledYtDlpPath())) return 'bundled';
+  if (String(process.env.YTDLP_PATH || '').trim() && normalized === path.resolve(String(process.env.YTDLP_PATH).trim())) return 'custom';
+  return 'system';
+}
+
+async function prepareYouTubeEngine(options = {}) {
+  const force = !!options.force;
+  if (youtubeEnginePreparePromise && youtubeEngineLastStatus.ready) {
+    const current = String(youtubeEngineLastStatus.executable || '');
+    if (!current || !fs.existsSync(current)) youtubeEnginePreparePromise = null;
+  }
+  if (force) youtubeEnginePreparePromise = null;
   if (youtubeEnginePreparePromise) return youtubeEnginePreparePromise;
+
+  youtubeEngineLastStatus = {
+    ready: false,
+    repairing: true,
+    engine: 'yt-dlp',
+    message: options.reason === 'manual_repair' ? 'repairing' : 'preparing',
+  };
+
   youtubeEnginePreparePromise = (async () => {
-    let executable = ytDlpCandidatePaths().find((candidate) => {
-      try { return fs.existsSync(candidate) && fs.statSync(candidate).isFile(); } catch (_) { return false; }
-    });
-    if (!executable && process.platform === 'win32') {
-      executable = await downloadYtDlpWindows(path.join(youtubeToolsDir(), 'yt-dlp.exe'));
+    const failures = [];
+    const userTarget = userYtDlpPath();
+    let executable = '';
+    let version = '';
+    let source = '';
+
+    for (const candidate of ytDlpCandidatePaths()) {
+      try {
+        if (!fs.existsSync(candidate) || !fs.statSync(candidate).isFile()) continue;
+        version = await inspectYtDlpExecutable(candidate);
+        executable = candidate;
+        source = ytDlpSourceForPath(candidate);
+        if (source === 'bundled' && process.platform === 'win32') {
+          try {
+            const restored = copyFileAtomic(candidate, userTarget);
+            version = await inspectYtDlpExecutable(restored);
+            executable = restored;
+            source = 'bundled-restored';
+          } catch (restoreError) {
+            failures.push({ path: userTarget, code: ytDlpFailureCode(restoreError), message: restoreError.message });
+          }
+        }
+        break;
+      } catch (error) {
+        failures.push({ path: candidate, code: ytDlpFailureCode(error), message: error.message });
+        if (path.resolve(candidate) === path.resolve(userTarget)) {
+          safeUnlink(userTarget);
+          safeUnlink(`${userTarget}.download`);
+          safeUnlink(`${userTarget}.restore`);
+        }
+      }
     }
+
+    if (!executable && process.platform === 'win32') {
+      executable = await downloadYtDlpWindows(userTarget);
+      version = await inspectYtDlpExecutable(executable);
+      source = 'downloaded';
+    }
+
     if (!executable) {
-      const error = new Error('yt-dlp is not installed. Set YTDLP_PATH or install yt-dlp.');
+      const error = new Error('yt-dlp is not installed and could not be prepared automatically.');
       error.code = 'YTDLP_NOT_FOUND';
+      error.failures = failures;
       throw error;
     }
-    const versionResult = await runChild(executable, ['--version'], { timeoutMs: 15000, maxOutput: 1024 * 64 });
+
     const nodeRuntime = findNodeRuntime();
     youtubeEngineLastStatus = {
       ready: true,
+      repairing: false,
       engine: 'yt-dlp',
       executable,
-      version: String(versionResult.stdout || '').trim(),
+      version,
+      source,
       nodeRuntime,
+      failures,
       message: nodeRuntime ? 'ready' : 'ready_without_node_runtime',
     };
     return youtubeEngineLastStatus;
   })().catch((error) => {
-    youtubeEngineLastStatus = { ready: false, engine: 'yt-dlp', message: error.message, code: error.code || '' };
+    youtubeEngineLastStatus = {
+      ready: false,
+      repairing: false,
+      repairable: true,
+      engine: 'yt-dlp',
+      message: error.message,
+      code: ytDlpFailureCode(error),
+      failures: Array.isArray(error.failures) ? error.failures : [],
+    };
     youtubeEnginePreparePromise = null;
     throw error;
   });
   return youtubeEnginePreparePromise;
+}
+
+async function repairYouTubeEngine() {
+  youtubeEnginePreparePromise = null;
+  const target = userYtDlpPath();
+  safeUnlink(target);
+  safeUnlink(`${target}.download`);
+  safeUnlink(`${target}.restore`);
+  return prepareYouTubeEngine({ force: true, reason: 'manual_repair' });
 }
 
 function youtubeEngineStatus() {
@@ -1538,9 +1722,11 @@ async function youtubeInfoViaYtDlp(videoId) {
   const cached = cachedYouTubeYtDlpInfo(videoId);
   if (cached) return cached;
   const engine = await prepareYouTubeEngine();
+  const nodeRuntime = findNodeRuntime();
   const result = await runChild(engine.executable, ytDlpMetadataArgs(videoId), {
     timeoutMs: 60000,
     maxOutput: 24 * 1024 * 1024,
+    env: ytDlpRuntimeEnv(nodeRuntime),
   });
   let info;
   try { info = JSON.parse(result.stdout); }
@@ -1568,9 +1754,11 @@ function ytDlpArgs(videoId, quality = '') {
 
 async function youtubeAudioViaYtDlp(videoId, quality = '') {
   const engine = await prepareYouTubeEngine();
+  const nodeRuntime = findNodeRuntime();
   const result = await runChild(engine.executable, ytDlpArgs(videoId, quality), {
     timeoutMs: 70000,
     maxOutput: 18 * 1024 * 1024,
+    env: ytDlpRuntimeEnv(nodeRuntime),
   });
   let info;
   try { info = JSON.parse(result.stdout); }
@@ -3919,6 +4107,7 @@ module.exports = {
   songMetadata,
   spotifyRedirectUri,
   prepareYouTubeEngine,
+  repairYouTubeEngine,
   youtubeEngineStatus,
   getYouTubeStreamDescriptor,
   __testing: {

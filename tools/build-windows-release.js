@@ -8,12 +8,7 @@ const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const dist = path.join(root, 'dist');
 const unpacked = path.join(dist, 'win-unpacked');
-
-const pkg = require(path.join(root, 'package.json'));
-
-const normalizedVersion = pkg.version.replace(/-patch\./g, '.').replace(/-/g, '.');
-const installer = path.join(dist, `ShinaYuu-Music-${normalizedVersion}-Setup.exe`);
-
+const installer = path.join(dist, 'ShinaYuu-Music-1.1.6.5-Setup.exe');
 const unsigned = process.argv.includes('--unsigned');
 
 function fail(message) {
@@ -21,20 +16,13 @@ function fail(message) {
 }
 
 function run(command, args, options = {}) {
-  // 3. Tự động bọc dấu ngoặc kép nếu đường dẫn chứa khoảng trắng trên Windows (tránh lỗi "C:\Program")
-  const formattedCommand = process.platform === 'win32' && command.includes(' ') 
-    ? `"${command}"` 
-    : command;
-
-  console.log(`\n[Build] ${formattedCommand} ${args.join(' ')}`);
-  
-  const result = spawnSync(formattedCommand, args, {
+  console.log(`\n[Build] ${command} ${args.join(' ')}`);
+  const result = spawnSync(command, args, {
     cwd: root,
     env: { ...process.env, ...options.env },
     stdio: 'inherit',
-    shell: true, // 4. Sửa lỗi EINVAL trên Node.js mới
+    shell: false,
   });
-  
   if (result.error) fail(result.error.message);
   if (result.status !== 0) fail(`${command} exited with code ${result.status}`);
 }
@@ -64,9 +52,8 @@ if (process.platform !== 'win32') {
 
 runNode('tools/ensure-castlabs-runtime.js');
 runNode('tools/verify-castlabs-runtime.js');
-
-// 5. Tắt bước kiểm thử (test) tự động để quá trình build diễn ra nhanh và mượt mà nhất
-// run(npmCommand(), ['test']); 
+runNode('tools/ensure-ytdlp-bundle.js');
+run(npmCommand(), ['test']);
 
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(dist, { recursive: true });

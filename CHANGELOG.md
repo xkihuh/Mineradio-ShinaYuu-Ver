@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.1.6.5 — 2026-07-20
+
+- Added a verified yt-dlp preparation step to Windows release builds so the installer can include the YouTube engine.
+- Added automatic cached-engine validation, atomic restoration from the packaged copy, checksum verification, and three-attempt download recovery.
+- Added an internal repair endpoint and one automatic playback retry while keeping the selected track in place.
+- Uses packaged Castlabs Electron as yt-dlp's Node-compatible JavaScript runtime, avoiding a separate Node.js installation for end users.
+- Replaced Terminal-oriented error instructions with automatic repair progress and a simple Windows Security fallback message.
+- Preserved the 1.1.6.4 window, Spotify, CPU optimization, UI/UX, renderer, effects, lyrics, and wallpaper behavior.
+
+## 1.1.6.4 — 2026-07-20
+
+- Added a small CPU-only optimization pass without changing window, playback, audio analysis, rendering quality, GPU behavior, timers, or background lifecycle.
+- Coalesced bottom-control pointer hit testing to one layout read per display frame on high-polling-rate mice.
+- Reused a single cursor auto-hide timer instead of clearing and recreating it for every pointer event.
+- Removed the duplicate mousemove cursor-activity hook because Electron Chromium already emits pointermove for mouse input.
+- Added a fast event-target path for UI pointer detection while retaining the original hit-test fallback.
+- Reduced runtime cache-pressure checks from every rendered frame to once every four seconds; cache thresholds and cleanup behavior are unchanged.
+- Preserved all 1.1.6.3 wallpaper-library tuning and all established window/playback behavior.
+
 ## 1.1.6.3 — 2026-07-20
 
 ### Conservative optimization

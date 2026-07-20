@@ -3569,6 +3569,21 @@ async function handleModernMusicRoute(req, res, url, pn) {
     return true;
   }
 
+  if (pn === '/api/youtube/engine/repair' && req.method === 'POST') {
+    try {
+      const engine = await musicProviders.repairYouTubeEngine();
+      sendJSON(res, { ok: true, repaired: true, ...engine });
+    } catch (error) {
+      sendJSON(res, {
+        ok: false,
+        repaired: false,
+        ...musicProviders.youtubeEngineStatus(),
+        message: error.message || 'YouTube playback engine could not be repaired automatically.',
+      }, 503);
+    }
+    return true;
+  }
+
   if (pn === '/api/spotify/login/start') {
     try { sendJSON(res, musicProviders.beginSpotifyLogin(baseUrl)); }
     catch (error) { modernProviderError(res, error, 400); }

@@ -1,19 +1,24 @@
-ShinaYuu Music 1.1.6.3 - Modification Report
+ShinaYuu Music 1.1.6.5 - Modification Report
 
-Base source:
-- ShinaYuu Music 1.1.6.1
+BASE
+- Built directly from ShinaYuu Music 1.1.6.4.
 
-Changes:
-- Applied only modest wallpaper-folder scan and progressive-rendering adjustments.
-- Preserved wallpaper file names, relative paths, media type, file size, thumbnails, and hover previews.
-- Rejected the broader 1.1.6.2 lifecycle changes.
+CHANGES
+- Added a verified yt-dlp bundle preparation step to both Windows build paths.
+- Added packaged-engine detection, checksum validation, atomic restore, and three-attempt download recovery.
+- Added automatic invalid-cache cleanup and shared preparation promises.
+- Added the internal YouTube engine repair API.
+- Added one automatic playback retry after successful repair.
+- Replaced Terminal-oriented error text with normal user-facing automatic recovery status.
+- Added Castlabs Electron as the packaged Node-compatible JavaScript runtime for yt-dlp.
+- Added release notices and regression coverage for the recovery pipeline.
 
-Explicitly unchanged:
-- Main-window behavior and Chromium background settings.
-- Playback timers, provider logic, Spotify realtime analysis, and audio behavior.
-- Three.js render loop, UI/UX, animation, Liquid Glass, and quality settings.
+PRESERVATION
+- No main-window or startup-shell changes.
+- No Spotify playback or authentication changes.
+- No UI/UX, animation, Three.js, GSAP, Liquid Glass, lyrics, GPU, CPU optimization, or wallpaper changes.
 
-Version:
-- Package: 1.1.6-patch.3
-- Display/build: 1.1.6.3
-- Installer: ShinaYuu-Music-1.1.6.3-Setup.exe
+VERSION
+- Package: 1.1.6-patch.5
+- Display/build: 1.1.6.5
+- Installer: ShinaYuu-Music-1.1.6.5-Setup.exe

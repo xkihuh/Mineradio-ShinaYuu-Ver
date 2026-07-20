@@ -1,0 +1,14 @@
+yt-dlp redistribution notice
+============================
+
+ShinaYuu Music 1.1.6.5 packages the official Windows x64 yt-dlp executable so
+end users do not need to install or download the playback engine manually.
+
+Upstream project: https://github.com/yt-dlp/yt-dlp
+Pinned release: 2026.07.04
+File: yt-dlp.exe
+SHA-256: 52fe3c26dcf71fbdc85b528589020bb0b8e383155cfa81b64dd447bbe35e24b8
+
+The upstream standalone Windows executable is distributed under GPLv3+ as a
+combined work and includes third-party components. Refer to the upstream
+release and THIRD_PARTY_LICENSES.txt for the corresponding notices.
