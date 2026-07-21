@@ -94,7 +94,7 @@ npm run build:win:unsigned
 Installer output:
 
 ```text
-dist\ShinaYuu-Music-1.1.5-Setup.exe
+dist\ShinaYuu-Music-1.1.6.x-Setup.exe
 ```
 
 
