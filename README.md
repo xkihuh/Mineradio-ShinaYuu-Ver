@@ -6,7 +6,7 @@ This project is a modified work based on the original **Mineradio** repository b
 
 ## Release focus
 
-ShinaYuu Music `1.1.5` is the official stable promotion of the completed `1.1.4.6` update line. It preserves the existing renderer, UI, UX, Three.js scenes, GSAP transitions, visualizer, Desktop Lyrics, and effects while shipping the transparent Liquid Glass Home surface, system-browser YouTube account authorization and supported playlist synchronization, the persistent local music library, and preloaded track transitions.
+ShinaYuu Music `1.1.6` is the official stable promotion of the completed `1.1.5` update line. It preserves the existing renderer, UI, UX, Three.js scenes, GSAP transitions, visualizer, Desktop Lyrics, and effects while shipping the transparent Liquid Glass Home surface, system-browser YouTube account authorization and supported playlist synchronization, the persistent local music library, and preloaded track transitions.
 
 The stable release is documented in `RELEASE_1.1.5.md`.
 
