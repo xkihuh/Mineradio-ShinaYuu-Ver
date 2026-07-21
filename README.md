@@ -1,4 +1,4 @@
-# ShinaYuu Music 1.1.6.8
+# ShinaYuu Music 1.1.6.10
 
 ShinaYuu Music is a Windows desktop visual music player with Spotify and YouTube playback, synchronized lyrics, Desktop Lyrics, real-time visual effects, Discord Rich Presence, and a unified in-app master volume control.
 
@@ -6,11 +6,11 @@ This project is a modified work based on the original **Mineradio** repository b
 
 ## Release focus
 
-ShinaYuu Music `1.1.6.8` is a playback-responsiveness patch built directly on the stable `1.1.6.6` source. It reduces track-switch and seek latency without changing the window, audio quality, UI/UX, Three.js, GSAP, Liquid Glass, lyrics, wallpaper, or CPU optimization behavior.
+ShinaYuu Music `1.1.6.10` is a playback-responsiveness patch built directly on the stable `1.1.6.10` source. It reduces track-switch and seek latency without changing the window, audio quality, UI/UX, Three.js, GSAP, Liquid Glass, lyrics, wallpaper, or CPU optimization behavior.
 
-YouTube stream descriptors are prefetched and reused for a short safe window, secondary beat-map work starts after audible playback, and Spotify uses the exact Track ID/URI already present in playlist data. See `RELEASE_1.1.6.8.md` for the exact patch scope.
+YouTube stream descriptors are prefetched and reused for a short safe window, secondary beat-map work starts after audible playback, and Spotify uses the exact Track ID/URI already present in playlist data. See `RELEASE_1.1.6.10.md` for the exact patch scope.
 
-The Windows release build now prepares a verified `yt-dlp` executable for the installer. At runtime the app validates the cached engine, restores it from the packaged copy when it is missing or damaged, retries the official download when necessary, and automatically retries the selected YouTube track once after repair. Packaged Castlabs Electron is also exposed to `yt-dlp` as its Node-compatible JavaScript runtime, so ordinary users do not need a separate Node.js installation. See `RELEASE_1.1.6.8.md` for the exact patch scope.
+The Windows release build now prepares a verified `yt-dlp` executable for the installer. At runtime the app validates the cached engine, restores it from the packaged copy when it is missing or damaged, retries the official download when necessary, and automatically retries the selected YouTube track once after repair. Packaged Castlabs Electron is also exposed to `yt-dlp` as its Node-compatible JavaScript runtime, so ordinary users do not need a separate Node.js installation. See `RELEASE_1.1.6.10.md` for the exact patch scope.
 
 ## Runtime architecture
 
