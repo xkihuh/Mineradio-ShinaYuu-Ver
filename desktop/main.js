@@ -34,6 +34,12 @@ let mainWindowRevealTimer = null;
 let mainWindowLoadRetryCount = 0;
 let mainAppUrl = '';
 const registeredGlobalHotkeys = new Map();
+let pendingUpdateInstallerPath = '';
+let updateInstallerLaunchInProgress = false;
+
+const SAFE_OPAQUE_WINDOW = process.argv.includes('--safe-opaque-window')
+  || process.env.SHINAYUU_SAFE_OPAQUE_WINDOW === '1';
+const USE_ROUNDED_TRANSPARENT_WINDOW = process.platform === 'win32' && !SAFE_OPAQUE_WINDOW;
 
 const WINDOWED_ASPECT = 16 / 9;
 const WINDOWED_SCALE = 3 / 4;
@@ -1475,6 +1481,7 @@ function createDesktopLyricsWindow(payload = {}) {
       nodeIntegration: false,
       sandbox: false,
       backgroundThrottling: false,
+      additionalArguments: [USE_ROUNDED_TRANSPARENT_WINDOW ? '--shinayuu-window-style=rounded-transparent' : '--shinayuu-window-style=safe-opaque'],
     },
   });
   try {
@@ -1752,18 +1759,68 @@ ipcMain.handle('shinayuu-local-music-remove', async (_event, sourceId) => {
   catch (error) { return { ok: false, error: error.message || 'LOCAL_SOURCE_REMOVE_FAILED' }; }
 });
 
+function validatedUpdateInstallerPath(filePath) {
+  const target = path.resolve(String(filePath || ''));
+  const updateDir = path.resolve(getUpdateDownloadDir());
+  if (!target || !target.startsWith(updateDir + path.sep)) {
+    const error = new Error('INVALID_UPDATE_PATH');
+    error.code = 'INVALID_UPDATE_PATH';
+    throw error;
+  }
+  if (!fs.existsSync(target) || !/\.exe$/i.test(target)) {
+    const error = new Error('UPDATE_FILE_MISSING');
+    error.code = 'UPDATE_FILE_MISSING';
+    throw error;
+  }
+  return target;
+}
+
+function launchUpdateInstaller(filePath) {
+  const target = validatedUpdateInstallerPath(filePath);
+  if (updateInstallerLaunchInProgress) return target;
+  updateInstallerLaunchInProgress = true;
+  pendingUpdateInstallerPath = '';
+  const child = spawn(target, [], {
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: false,
+    cwd: path.dirname(target),
+  });
+  child.once('error', (error) => {
+    updateInstallerLaunchInProgress = false;
+    console.error('[Updater] Installer launch failed:', error.message || error);
+  });
+  child.unref();
+  return target;
+}
+
 ipcMain.handle('mineradio-open-update-installer', async (_event, filePath) => {
   try {
-    const target = path.resolve(String(filePath || ''));
-    const updateDir = path.resolve(getUpdateDownloadDir());
-    if (!target || !target.startsWith(updateDir + path.sep)) {
-      return { ok: false, error: 'INVALID_UPDATE_PATH' };
-    }
-    if (!fs.existsSync(target)) return { ok: false, error: 'UPDATE_FILE_MISSING' };
+    const target = validatedUpdateInstallerPath(filePath);
     const error = await shell.openPath(target);
     return error ? { ok: false, error } : { ok: true };
   } catch (e) {
     return { ok: false, error: e.message || 'OPEN_UPDATE_FAILED' };
+  }
+});
+
+ipcMain.handle('mineradio-install-update-installer', async (_event, filePath) => {
+  try {
+    launchUpdateInstaller(filePath);
+    setTimeout(() => app.quit(), 220);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message || 'INSTALL_UPDATE_FAILED' };
+  }
+});
+
+ipcMain.handle('mineradio-schedule-update-installer', async (_event, filePath) => {
+  try {
+    pendingUpdateInstallerPath = validatedUpdateInstallerPath(filePath);
+    return { ok: true };
+  } catch (e) {
+    pendingUpdateInstallerPath = '';
+    return { ok: false, error: e.message || 'SCHEDULE_UPDATE_FAILED' };
   }
 });
 
@@ -2062,7 +2119,7 @@ ipcMain.handle('shinayuu-runtime-get-status', async () => {
 function mainWindowStatusUrl(title, detail, failed = false) {
   const safeTitle = String(title || 'ShinaYuu Music');
   const safeDetail = String(detail || 'Đang chuẩn bị ứng dụng...');
-  const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${APP_NAME}</title><style>*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;background:#080a0f;color:#fff;font-family:Inter,"Segoe UI",sans-serif}body{display:grid;place-items:center;overflow:hidden}.card{width:min(520px,86vw);padding:34px 36px;border-radius:24px;background:linear-gradient(145deg,rgba(255,255,255,.085),rgba(255,255,255,.025));border:1px solid rgba(255,255,255,.12);box-shadow:0 24px 80px rgba(0,0,0,.42)}.brand{font-size:11px;letter-spacing:.28em;color:rgba(255,255,255,.42);margin-bottom:14px}.row{display:flex;gap:14px;align-items:center}.dot{width:14px;height:14px;border-radius:50%;flex:0 0 auto;background:${failed ? '#ff758f' : '#7ce7d7'};box-shadow:0 0 24px ${failed ? 'rgba(255,117,143,.5)' : 'rgba(124,231,215,.5)'};${failed ? '' : 'animation:pulse 1.15s ease-in-out infinite'}}h1{font-size:22px;margin:0;font-weight:650}p{font-size:13px;line-height:1.65;color:rgba(255,255,255,.62);margin:14px 0 0;white-space:pre-wrap}@keyframes pulse{50%{opacity:.42;transform:scale(.72)}}</style></head><body><div class="card"><div class="brand">SHINAYUU MUSIC</div><div class="row"><span class="dot"></span><h1></h1></div><p></p></div><script>document.querySelector('h1').textContent=${JSON.stringify(safeTitle)};document.querySelector('p').textContent=${JSON.stringify(safeDetail)};</script></body></html>`;
+  const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${APP_NAME}</title><style>*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;background:transparent;color:#fff;font-family:Inter,"Segoe UI",sans-serif}body{display:grid;place-items:center;overflow:hidden;border-radius:30px;-electron-corner-smoothing:system-ui;background:#080a0f}.card{width:min(520px,86vw);padding:34px 36px;border-radius:24px;background:linear-gradient(145deg,rgba(255,255,255,.085),rgba(255,255,255,.025));border:1px solid rgba(255,255,255,.12);box-shadow:0 24px 80px rgba(0,0,0,.42)}.brand{font-size:11px;letter-spacing:.28em;color:rgba(255,255,255,.42);margin-bottom:14px}.row{display:flex;gap:14px;align-items:center}.dot{width:14px;height:14px;border-radius:50%;flex:0 0 auto;background:${failed ? '#ff758f' : '#7ce7d7'};box-shadow:0 0 24px ${failed ? 'rgba(255,117,143,.5)' : 'rgba(124,231,215,.5)'};${failed ? '' : 'animation:pulse 1.15s ease-in-out infinite'}}h1{font-size:22px;margin:0;font-weight:650}p{font-size:13px;line-height:1.65;color:rgba(255,255,255,.62);margin:14px 0 0;white-space:pre-wrap}@keyframes pulse{50%{opacity:.42;transform:scale(.72)}}</style></head><body><div class="card"><div class="brand">SHINAYUU MUSIC</div><div class="row"><span class="dot"></span><h1></h1></div><p></p></div><script>document.querySelector('h1').textContent=${JSON.stringify(safeTitle)};document.querySelector('p').textContent=${JSON.stringify(safeDetail)};</script></body></html>`;
   return `data:text/html;charset=UTF-8,${encodeURIComponent(html)}`;
 }
 
@@ -2191,11 +2248,11 @@ function createMainWindowShell() {
     show: true,
     frame: false,
     fullscreen: false,
-    // Keep the native surface opaque for reliable startup on normal Windows PCs.
-    // Windows 11 clips the whole frameless window through the native rounded-corner
-    // compositor, so the renderer must not cut a second rounded rectangle inside it.
-    transparent: false,
-    backgroundColor: '#08090B',
+    // Restore the continuous rounded shell used by the earlier UI. The window is
+    // still shown immediately, so Widevine and the local server cannot block startup.
+    // --safe-opaque-window remains available as a compatibility fallback.
+    transparent: USE_ROUNDED_TRANSPARENT_WINDOW,
+    backgroundColor: USE_ROUNDED_TRANSPARENT_WINDOW ? '#00000000' : '#08090B',
     roundedCorners: true,
     hasShadow: true,
     autoHideMenuBar: true,
@@ -2325,6 +2382,10 @@ if (!gotSingleInstanceLock) {
   });
 
   app.on('before-quit', () => {
+    if (pendingUpdateInstallerPath && !updateInstallerLaunchInProgress) {
+      try { launchUpdateInstaller(pendingUpdateInstallerPath); }
+      catch (error) { console.error('[Updater] Scheduled installer failed:', error.message || error); }
+    }
     unregisterMineradioGlobalHotkeys();
     closeOverlayWindows();
     stopAudioSessionBridge();

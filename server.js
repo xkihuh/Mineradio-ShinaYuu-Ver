@@ -403,6 +403,9 @@ function readUpdateConfig(pkg) {
     preview: local.preview !== false,
     preferMirrors: local.preferMirrors !== false,
     mirrors: readUpdateMirrors(local),
+    checkDelayMs: Math.max(1000, Number(local.checkDelayMs || 10000) || 10000),
+    checkIntervalMs: Math.max(60000, Number(local.checkIntervalMs || 21600000) || 21600000),
+    autoPrompt: local.autoPrompt !== false,
     manifest: process.env.MINERADIO_UPDATE_MANIFEST
       || process.env.MINERADIO_UPDATE_MANIFEST_URL
       || process.env.MINERADIO_UPDATE_MANIFEST_FILE
@@ -828,8 +831,10 @@ function githubReleaseDownloadUrl(version, fileName) {
   return `https://github.com/${encodedOwner}/${encodedRepo}/releases/download/${tag}/${encodedName}`;
 }
 function parseLatestYmlUpdateInfo(text, reason) {
-  const latestVersion = normalizeVersion(yamlScalar(text, 'version') || APP_VERSION) || APP_VERSION;
-  const assetPath = yamlScalar(text, 'path') || yamlScalar(text, 'url') || `ShinaYuu-Music-${latestVersion}-Setup.exe`;
+  const metadataVersion = normalizeVersion(yamlScalar(text, 'version') || APP_VERSION) || APP_VERSION;
+  const assetPath = yamlScalar(text, 'path') || yamlScalar(text, 'url') || `ShinaYuu-Music-${metadataVersion}-Setup.exe`;
+  const displayMatch = String(assetPath).match(/ShinaYuu-Music-(\d+(?:\.\d+){3})-Setup\.exe/i);
+  const latestVersion = displayMatch ? normalizeVersion(displayMatch[1]) : metadataVersion;
   const sha512 = normalizeDigest(yamlScalar(text, 'sha512'), 'sha512');
   const size = Number(yamlScalar(text, 'size') || 0) || 0;
   const releaseDate = yamlScalar(text, 'releaseDate');

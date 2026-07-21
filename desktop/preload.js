@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld('desktopWindow', {
     return () => ipcRenderer.removeListener('shinayuu-local-music-changed', listener);
   },
   openUpdateInstaller: (filePath) => ipcRenderer.invoke('mineradio-open-update-installer', filePath),
+  installUpdateInstaller: (filePath) => ipcRenderer.invoke('mineradio-install-update-installer', filePath),
+  scheduleUpdateInstaller: (filePath) => ipcRenderer.invoke('mineradio-schedule-update-installer', filePath),
   restartApp: () => ipcRenderer.invoke('mineradio-restart-app'),
   configureGlobalHotkeys: (bindings) => ipcRenderer.invoke('mineradio-hotkeys-configure-global', bindings || []),
   exportJsonFile: (payload) => ipcRenderer.invoke('mineradio-export-json-file', payload || {}),
@@ -75,6 +77,10 @@ contextBridge.exposeInMainWorld('desktopWindow', {
 window.addEventListener('DOMContentLoaded', () => {
   document.documentElement.classList.add('desktop-shell-root');
   document.body.classList.add('desktop-shell');
+  const windowStyleArg = process.argv.find((arg) => String(arg).startsWith('--shinayuu-window-style=')) || '';
+  const windowStyle = windowStyleArg.split('=').slice(1).join('=');
+  document.documentElement.classList.add(windowStyle === 'rounded-transparent' ? 'desktop-rounded-window-root' : 'desktop-safe-opaque-root');
+  document.body.classList.add(windowStyle === 'rounded-transparent' ? 'desktop-rounded-window' : 'desktop-safe-opaque');
   document.body.classList.add('castlabs-electron-runtime');
   window.dispatchEvent(new CustomEvent('shinayuu-castlabs-runtime-ready'));
   window.dispatchEvent(new CustomEvent('shinayuu-native-runtime-ready'));

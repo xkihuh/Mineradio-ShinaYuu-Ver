@@ -29,6 +29,7 @@ try {
 html,body{font-family:var(--font-sans);background:#000;color:#fff;overflow:hidden;height:100vh;width:100vw;user-select:none;-webkit-font-smoothing:antialiased}
 body.cursor-hidden,body.cursor-hidden *{cursor:none!important}
 html.desktop-shell-root,html.desktop-shell-root body{background:transparent}
+html.desktop-rounded-window-root,html.desktop-rounded-window-root body{background:transparent!important}
 :root{--font-sans:"Noto Sans SC","PingFang SC","HarmonyOS Sans SC","Alibaba PuHuiTi","Inter",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;--font-mono:"JetBrains Mono","Geist Mono","SF Mono",ui-monospace,monospace;--fc-bg:#08090B;--fc-paper:#0E1014;--fc-ink:#E8ECEF;--fc-ink-2:#D2D7DC;--fc-muted:#8A9099;--fc-hair:#1A1D22;--fc-hair-2:#262A31;--fc-accent:#00F5D4;--fc-accent-hov:#00E0BE;--fc-accent-rgb:0,245,212;--fc-blue:#2442ff;--fc-warm:#f8f4ee;--chill-ink:#030608;--chill-deep:#061116;--chill-cyan:#8fe9ff;--chill-blue:#73a7ff;--chill-mint:#9cffdf;--chill-soft:rgba(214,248,255,.9);--champagne:#f4d28a;--champagne-deep:#9a6f2c;--home-accent:#00f5d4;--home-accent-rgb:0,245,212;--visual-tint:#9db8cf;--source-netease:#d95b67;--source-qq:#00F5D4;--source-local:#9db8cf}
 :root{--glass-bg:linear-gradient(112deg,rgba(72,74,76,.62),rgba(24,27,30,.70) 48%,rgba(8,12,14,.74));--glass-bg-focus:linear-gradient(112deg,rgba(88,91,92,.68),rgba(28,32,35,.76) 50%,rgba(8,13,15,.82));--glass-border:rgba(0,245,212,.30);--glass-border-soft:rgba(255,255,255,.095);--glass-shadow:0 22px 64px rgba(0,0,0,.30),0 0 34px rgba(0,245,212,.052),inset 0 1px 0 rgba(255,255,255,.16),inset 0 -24px 58px rgba(0,0,0,.16);--glass-shadow-focus:0 24px 72px rgba(0,0,0,.34),0 0 0 1px rgba(0,245,212,.13),0 0 42px rgba(0,245,212,.075),inset 0 1px 0 rgba(255,255,255,.20)}
 :root{--saved-panel-glass-bg:rgba(0,0,0,.10);--saved-panel-glass-filter:blur(12px) saturate(1.8) brightness(1.16);--saved-panel-glass-svg-filter:url(#mineradio-control-glass-filter) saturate(1);--saved-panel-glass-shadow:inset 0 0 2px 1px rgba(255,255,255,.35),inset 0 0 10px 4px rgba(255,255,255,.15),0 4px 16px rgba(17,17,26,.05),0 8px 24px rgba(17,17,26,.05),0 16px 56px rgba(17,17,26,.05),inset 0 4px 16px rgba(17,17,26,.05),inset 0 8px 24px rgba(17,17,26,.05),inset 0 16px 56px rgba(17,17,26,.05);--saved-panel-glass-radius:50px;--saved-button-glass-bg:rgba(0,0,0,.10);--saved-button-glass-filter:blur(12px) saturate(1.8) brightness(1.16);--saved-button-glass-svg-filter:url(#mineradio-control-glass-filter) saturate(1);--saved-button-glass-shadow:inset 0 0 2px 1px rgba(255,255,255,.34),inset 0 0 10px 4px rgba(255,255,255,.13),0 10px 30px rgba(0,0,0,.18);--saved-button-glass-hover-bg:rgba(255,255,255,.055);--saved-button-glass-hover-shadow:inset 0 0 2px 1px rgba(255,255,255,.42),inset 0 0 12px 5px rgba(255,255,255,.17),0 12px 34px rgba(0,0,0,.22),0 0 18px rgba(255,255,255,.06)}
@@ -45,6 +46,7 @@ body::after,#desktop-window-shell::after{content:none}
 #desktop-titlebar{display:none}
 body.desktop-shell{background:transparent}
 body.desktop-shell #desktop-window-shell{display:block;position:fixed;inset:0;overflow:hidden;border-radius:0;clip-path:none;background:#08090B;box-shadow:none;transform:translateZ(0)}
+body.desktop-shell.desktop-rounded-window #desktop-window-shell{border-radius:30px;clip-path:inset(0 round 30px);-electron-corner-smoothing:system-ui;box-shadow:inset 0 0 0 1px rgba(255,255,255,.10),0 22px 70px rgba(0,0,0,.42)}
 body.desktop-shell.desktop-maximized #desktop-window-shell,body.desktop-shell.desktop-fullscreen #desktop-window-shell,html:fullscreen body.desktop-shell #desktop-window-shell{border-radius:0!important;clip-path:none!important;box-shadow:none!important}
 body.desktop-shell #desktop-titlebar{position:fixed;z-index:500;top:0;left:0;right:0;height:44px;padding:0 12px 0 18px;display:flex;align-items:center;justify-content:space-between;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;-webkit-app-region:drag;pointer-events:none}
 body.desktop-shell #desktop-titlebar::after{content:none}
@@ -3319,7 +3321,7 @@ html.control-glass-svg-ok body.empty-home-active #empty-home .discord-home-card{
     <div class="update-panel-inner">
       <div class="update-panel-head">
         <div>
-          <div class="update-kicker">MINERADIO</div>
+          <div class="update-kicker">SHINAYUU MUSIC</div>
           <div id="update-modal-title" class="update-title">New release</div>
           <div id="update-modal-version" class="update-version">v1.0.10</div>
         </div>
@@ -3334,9 +3336,9 @@ html.control-glass-svg-ok body.empty-home-active #empty-home .discord-home-card{
           <span id="update-btn-fill" class="update-btn-fill"></span>
           <span id="update-btn-label" class="update-btn-label">Cập nhật ngay</span>
         </button>
-        <button class="update-secondary-btn" type="button" onclick="closeUpdatePanel()">Hủy</button>
+        <button class="update-secondary-btn" type="button" onclick="deferUpdatePanel()">Để sau</button>
       </div>
-      <div id="update-footnote" class="update-footnote">Bản xem trước chỉ mô phỏng trải nghiệm cập nhật, không thực sự tải hoặc cài đặt.</div>
+      <div id="update-footnote" class="update-footnote">Ứng dụng sẽ kiểm tra bản mới trong nền và chỉ cài đặt khi bạn xác nhận.</div>
     </div>
   </div>
 </div>
@@ -3982,6 +3984,9 @@ var updatePreviewState = {
   message: '',
   restartRequired: false,
   patchFallbackTried: false,
+  autoCheckTimer: null,
+  autoCheckStarted: false,
+  autoPromptedVersion: '',
   hero: '当前版本，更新检测已就绪。',
   notes: [
     '安装包文字对比修复',
@@ -25495,10 +25500,15 @@ function updateProgressDetailText() {
   if (updatePreviewState.etaSeconds > 0 && updatePreviewState.etaSeconds < 3600) parts.push('约 ' + updatePreviewState.etaSeconds + ' 秒');
   return parts.join(' · ');
 }
+var UPDATE_CHECK_DELAY_MS = 10000;
+var UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 function initUpdatePreview() {
+  if (updatePreviewState.autoCheckStarted) return;
+  updatePreviewState.autoCheckStarted = true;
   renderUpdatePreviewPanel();
-  setUpdatePreviewVisible(true);
-  checkLatestUpdate();
+  setUpdatePreviewVisible(false);
+  setTimeout(function(){ checkLatestUpdate(true); }, UPDATE_CHECK_DELAY_MS);
+  updatePreviewState.autoCheckTimer = setInterval(function(){ checkLatestUpdate(true); }, UPDATE_CHECK_INTERVAL_MS);
   setTimeout(startUpdateIconBreathing, 760);
 }
 
@@ -25520,20 +25530,20 @@ function setUpdatePreviewVisible(visible) {
   }
 }
 
-async function checkLatestUpdate() {
+async function checkLatestUpdate(automatic) {
   try {
     var data = await apiJson('/api/update/latest?t=' + Date.now());
-    applyLatestUpdateInfo(data);
+    applyLatestUpdateInfo(data, !!automatic);
   } catch (e) {
-    updatePreviewState.preview = true;
+    updatePreviewState.preview = false;
     updatePreviewState.updateAvailable = false;
     updatePreviewState.hero = '当前版本，更新检测已就绪。';
     renderUpdatePreviewPanel();
-    setUpdatePreviewVisible(true);
+    setUpdatePreviewVisible(false);
   }
 }
 
-function applyLatestUpdateInfo(data) {
+function applyLatestUpdateInfo(data, automatic) {
   data = data || {};
   var release = data.release || {};
   updatePreviewState.currentVersion = data.currentVersion || updatePreviewState.currentVersion;
@@ -25552,6 +25562,18 @@ function applyLatestUpdateInfo(data) {
   }
   renderUpdatePreviewPanel();
   setUpdatePreviewVisible(updatePreviewState.updateAvailable || updatePreviewState.preview);
+  if (automatic && updatePreviewState.updateAvailable) {
+    var versionKey = String(updatePreviewState.version || 'unknown');
+    var dismissedKey = '';
+    try { dismissedKey = localStorage.getItem('shinayuu-update-dismissed-version') || ''; } catch (_) {}
+    if (dismissedKey !== versionKey && updatePreviewState.autoPromptedVersion !== versionKey) {
+      updatePreviewState.autoPromptedVersion = versionKey;
+      setTimeout(function(){
+        openUpdatePanel();
+        showToast('Có bản cập nhật ShinaYuu Music ' + versionKey);
+      }, 500);
+    }
+  }
 }
 
 function startUpdateIconBreathing() {
@@ -25625,7 +25647,7 @@ function syncUpdatePreviewStateClass() {
     else if (isReady && isPatch && updatePreviewState.restartRequired) label.textContent = '重启生效';
     else if (isReady && isPatch) label.textContent = '补丁已应用';
     else if (isReady && updatePreviewState.installerOpened) label.textContent = '安装包已打开';
-    else if (isReady && updatePreviewState.installerPath) label.textContent = updatePreviewState.cached ? '打开已下载安装包' : '打开安装包';
+    else if (isReady && updatePreviewState.installerPath) label.textContent = '立即安装';
     else if (isReady) label.textContent = updatePreviewState.configured ? '打开安装包' : '预览完成';
     else label.textContent = updatePreviewState.patchAvailable ? '安装快速补丁' : ((canDownloadUpdate || canOpenRelease) ? '下载完整安装包' : '立即更新');
   }
@@ -25635,7 +25657,7 @@ function syncUpdatePreviewStateClass() {
     if (isDownloading) foot.textContent = (updatePreviewState.message || (isPatch ? '正在下载快速补丁' : '正在下载完整安装包')) + (updateProgressDetailText() ? ' · ' + updateProgressDetailText() : '');
     else if (isError) foot.textContent = '下载失败：' + (updatePreviewState.errorReason || updatePreviewState.errorDetail || updatePreviewState.message || '请稍后重试') + (updatePreviewState.failedAttempts && updatePreviewState.failedAttempts.length ? ' · 已尝试 ' + updatePreviewState.failedAttempts.length + ' 条线路' : '');
     else if (isReady && isPatch) foot.textContent = updatePreviewState.restartRequired ? '快速补丁已应用，重启 ShinaYuu Music 后生效。' : '快速补丁已应用。';
-    else if (isReady) foot.textContent = updatePreviewState.cached ? '已复用上次校验通过的安装包，不会重复下载。' : '安装包已准备好，点击按钮后再打开安装。';
+    else if (isReady) foot.textContent = 'Bản cập nhật đã sẵn sàng. Ứng dụng sẽ đóng, mở bộ cài và hoàn tất cập nhật sau khi bạn xác nhận.';
     else if (updatePreviewState.patchAvailable) foot.textContent = '优先使用轻量补丁，只更新缺失或变更的资源文件；不适用时可下载完整安装包。';
     else foot.textContent = updatePreviewState.updateAvailable ? '没有可用快速补丁时会下载完整安装包。' : '当前版本已是最新。';
   }
@@ -25670,6 +25692,18 @@ function closeUpdatePanel() {
   closeGsapModal(document.getElementById('update-modal'), function(){
     updatePreviewState.open = false;
   });
+}
+
+function deferUpdatePanel() {
+  if (updatePreviewState.updateAvailable) {
+    try { localStorage.setItem('shinayuu-update-dismissed-version', String(updatePreviewState.version || '')); } catch (_) {}
+  }
+  if (updatePreviewState.status === 'ready' && updatePreviewState.installerPath && window.desktopWindow && window.desktopWindow.scheduleUpdateInstaller) {
+    window.desktopWindow.scheduleUpdateInstaller(updatePreviewState.installerPath).then(function(result){
+      if (result && result.ok) showToast('Bản cập nhật sẽ được cài khi bạn thoát ứng dụng');
+    }).catch(function(){});
+  }
+  closeUpdatePanel();
 }
 
 function animateUpdatePanelContents() {
@@ -25901,13 +25935,11 @@ async function openDownloadedUpdateInstaller(filePath) {
   updatePreviewState.status = 'opening';
   syncUpdatePreviewStateClass();
   try {
-    if (window.desktopWindow && window.desktopWindow.openUpdateInstaller) {
-      var result = await window.desktopWindow.openUpdateInstaller(filePath);
-      if (!result || result.ok === false) throw new Error((result && result.error) || 'OPEN_UPDATE_FAILED');
+    if (window.desktopWindow && window.desktopWindow.installUpdateInstaller) {
+      var result = await window.desktopWindow.installUpdateInstaller(filePath);
+      if (!result || result.ok === false) throw new Error((result && result.error) || 'INSTALL_UPDATE_FAILED');
       updatePreviewState.installerOpened = true;
-      updatePreviewState.status = 'ready';
-      syncUpdatePreviewStateClass();
-      showToast('安装包已打开');
+      showToast('Đang đóng ShinaYuu Music để cài đặt bản cập nhật…');
       return;
     }
     throw new Error('DESKTOP_BRIDGE_MISSING');
@@ -25915,7 +25947,7 @@ async function openDownloadedUpdateInstaller(filePath) {
     updatePreviewState.status = 'ready';
     syncUpdatePreviewStateClass();
     if (updatePreviewState.releaseUrl) openExternalUrl(updatePreviewState.releaseUrl);
-    showToast('无法自动打开安装包，已尝试打开更新页面');
+    showToast('Không thể mở bộ cài; đã thử mở trang cập nhật.');
   }
 }
 
@@ -30291,6 +30323,7 @@ function initHomeLiquidGlass() {
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initHomeLiquidGlass, {once:true}); else initHomeLiquidGlass();
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initializeBackgroundMediaLibrary, {once:true}); else initializeBackgroundMediaLibrary();
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initUpdatePreview, {once:true}); else initUpdatePreview();
 </script>
 
 </body>

@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1.6.7 — 2026-07-21
+## 1.1.6.8 — 2026-07-21
 
 - Reduced track-change latency by starting audio before optional beat-map disk reads and visual preparation.
 - Starts queue-item prefetch on pointer hover/down, reuses recently resolved YouTube stream descriptors, and starts next-track prefetch earlier.

@@ -8,7 +8,7 @@ const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const dist = path.join(root, 'dist');
 const unpacked = path.join(dist, 'win-unpacked');
-const installer = path.join(dist, 'ShinaYuu-Music-1.1.6.7-Setup.exe');
+const installer = path.join(dist, 'ShinaYuu-Music-1.1.6.8-Setup.exe');
 const unsigned = process.argv.includes('--unsigned');
 
 function fail(message) {
@@ -44,6 +44,27 @@ function writeSha256(file) {
   const checksumFile = `${file}.sha256.txt`;
   fs.writeFileSync(checksumFile, `${hash}  ${path.basename(file)}\n`, 'utf8');
   console.log(`[Build] SHA-256: ${checksumFile}`);
+}
+
+function writeLatestYml(file) {
+  const buffer = fs.readFileSync(file);
+  const sha512 = crypto.createHash('sha512').update(buffer).digest('base64');
+  const fileName = path.basename(file);
+  const metadata = [
+    'version: 1.1.6.8',
+    'files:',
+    `  - url: ${fileName}`,
+    `    sha512: ${sha512}`,
+    `    size: ${buffer.length}`,
+    `path: ${fileName}`,
+    `sha512: ${sha512}`,
+    `size: ${buffer.length}`,
+    `releaseDate: '${new Date().toISOString()}'`,
+    '',
+  ].join('\n');
+  const target = path.join(dist, 'latest.yml');
+  fs.writeFileSync(target, metadata, 'utf8');
+  console.log(`[Build] Update metadata: ${target}`);
 }
 
 if (process.platform !== 'win32') {
@@ -84,4 +105,5 @@ run(builder, ['--win', 'nsis', '--prepackaged', unpacked]);
 if (!fs.existsSync(installer)) fail(`Installer was not created: ${installer}`);
 
 writeSha256(installer);
+writeLatestYml(installer);
 console.log(`\n[Build] Installer created: ${installer}`);
