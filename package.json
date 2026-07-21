@@ -47,6 +47,7 @@
   "build": {
     "appId": "com.shinayuu.music",
     "productName": "ShinaYuu Music",
+    "afterSign": "build/evs-after-sign.js",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -106,8 +107,8 @@
   "mineradio": {
     "update": {
       "provider": "github",
-      "owner": "",
-      "repo": "",
+      "owner": "xkihuh",
+      "repo": "Mineradio-ShinaYuu-Ver",
       "preview": false,
       "preferMirrors": false,
       "mirrors": [],

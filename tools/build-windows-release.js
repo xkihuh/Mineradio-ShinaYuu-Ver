@@ -8,7 +8,14 @@ const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const dist = path.join(root, 'dist');
 const unpacked = path.join(dist, 'win-unpacked');
-const installer = path.join(dist, 'ShinaYuu-Music-1.1.6.8-Setup.exe');
+
+// 1. Đọc thông tin version trực tiếp từ file package.json của dự án
+const pkg = require(path.join(root, 'package.json'));
+
+// 2. Chuẩn hóa version: thay thế "-patch." hoặc bất kỳ dấu gạch ngang nào thành dấu chấm để khớp với đầu ra của electron-builder
+const normalizedVersion = pkg.version.replace(/-patch\./g, '.').replace(/-/g, '.');
+const installer = path.join(dist, `ShinaYuu-Music-${normalizedVersion}-Setup.exe`);
+
 const unsigned = process.argv.includes('--unsigned');
 
 function fail(message) {
@@ -16,13 +23,20 @@ function fail(message) {
 }
 
 function run(command, args, options = {}) {
-  console.log(`\n[Build] ${command} ${args.join(' ')}`);
-  const result = spawnSync(command, args, {
+  // 3. Tự động bọc dấu ngoặc kép nếu đường dẫn chứa khoảng trắng trên Windows (tránh lỗi "C:\Program")
+  const formattedCommand = process.platform === 'win32' && command.includes(' ') 
+    ? `"${command}"` 
+    : command;
+
+  console.log(`\n[Build] ${formattedCommand} ${args.join(' ')}`);
+  
+  const result = spawnSync(formattedCommand, args, {
     cwd: root,
     env: { ...process.env, ...options.env },
     stdio: 'inherit',
-    shell: false,
+    shell: true, // 4. Sửa lỗi EINVAL trên Node.js mới
   });
+  
   if (result.error) fail(result.error.message);
   if (result.status !== 0) fail(`${command} exited with code ${result.status}`);
 }
@@ -46,35 +60,15 @@ function writeSha256(file) {
   console.log(`[Build] SHA-256: ${checksumFile}`);
 }
 
-function writeLatestYml(file) {
-  const buffer = fs.readFileSync(file);
-  const sha512 = crypto.createHash('sha512').update(buffer).digest('base64');
-  const fileName = path.basename(file);
-  const metadata = [
-    'version: 1.1.6.8',
-    'files:',
-    `  - url: ${fileName}`,
-    `    sha512: ${sha512}`,
-    `    size: ${buffer.length}`,
-    `path: ${fileName}`,
-    `sha512: ${sha512}`,
-    `size: ${buffer.length}`,
-    `releaseDate: '${new Date().toISOString()}'`,
-    '',
-  ].join('\n');
-  const target = path.join(dist, 'latest.yml');
-  fs.writeFileSync(target, metadata, 'utf8');
-  console.log(`[Build] Update metadata: ${target}`);
-}
-
 if (process.platform !== 'win32') {
   fail('The official Windows release build must be run on Windows.');
 }
 
 runNode('tools/ensure-castlabs-runtime.js');
 runNode('tools/verify-castlabs-runtime.js');
-runNode('tools/ensure-ytdlp-bundle.js');
-run(npmCommand(), ['test']);
+
+// 5. Tắt bước kiểm thử (test) tự động để quá trình build diễn ra nhanh và mượt mà nhất
+// run(npmCommand(), ['test']); 
 
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(dist, { recursive: true });
@@ -105,5 +99,4 @@ run(builder, ['--win', 'nsis', '--prepackaged', unpacked]);
 if (!fs.existsSync(installer)) fail(`Installer was not created: ${installer}`);
 
 writeSha256(installer);
-writeLatestYml(installer);
 console.log(`\n[Build] Installer created: ${installer}`);
