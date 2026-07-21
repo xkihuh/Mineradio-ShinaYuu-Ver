@@ -1,4 +1,4 @@
-# ShinaYuu Music 1.1.6
+# ShinaYuu Music 1.1.6.8
 
 ShinaYuu Music is a Windows desktop visual music player with Spotify and YouTube playback, synchronized lyrics, Desktop Lyrics, real-time visual effects, Discord Rich Presence, and a unified in-app master volume control.
 
@@ -6,9 +6,11 @@ This project is a modified work based on the original **Mineradio** repository b
 
 ## Release focus
 
-ShinaYuu Music `1.1.6` is the official stable promotion of the completed `1.1.5` update line. It preserves the existing renderer, UI, UX, Three.js scenes, GSAP transitions, visualizer, Desktop Lyrics, and effects while shipping the transparent Liquid Glass Home surface, system-browser YouTube account authorization and supported playlist synchronization, the persistent local music library, and preloaded track transitions.
+ShinaYuu Music `1.1.6.8` is a playback-responsiveness patch built directly on the stable `1.1.6.6` source. It reduces track-switch and seek latency without changing the window, audio quality, UI/UX, Three.js, GSAP, Liquid Glass, lyrics, wallpaper, or CPU optimization behavior.
 
-The stable release is documented in `RELEASE_1.1.5.md`.
+YouTube stream descriptors are prefetched and reused for a short safe window, secondary beat-map work starts after audible playback, and Spotify uses the exact Track ID/URI already present in playlist data. See `RELEASE_1.1.6.8.md` for the exact patch scope.
+
+The Windows release build now prepares a verified `yt-dlp` executable for the installer. At runtime the app validates the cached engine, restores it from the packaged copy when it is missing or damaged, retries the official download when necessary, and automatically retries the selected YouTube track once after repair. Packaged Castlabs Electron is also exposed to `yt-dlp` as its Node-compatible JavaScript runtime, so ordinary users do not need a separate Node.js installation. See `RELEASE_1.1.6.8.md` for the exact patch scope.
 
 ## Runtime architecture
 
@@ -22,7 +24,7 @@ ShinaYuuMusic.exe
 └─ Native helpers for Discord, updater, tray, and Windows audio sessions
 ```
 
-Castlabs Electron installs and updates the Widevine CDM through its component updater. The application waits for the component service before creating the main window. Spotify playback then runs inside the same renderer as the visible ShinaYuu Music interface; there is no separate WebView2 host window or WebView2 installer step.
+Castlabs Electron installs and updates the Widevine CDM through its component updater. The native main window is created immediately while the Castlabs component service prepares Widevine in parallel. Spotify playback then runs inside the same renderer as the visible ShinaYuu Music interface; there is no separate WebView2 host window or WebView2 installer step.
 
 ## Highlights
 
@@ -35,10 +37,12 @@ Castlabs Electron installs and updates the Widevine CDM through its component up
 - Runtime-generated text, tooltips, placeholders, and accessibility labels are localized to Vietnamese or English.
 - YouTube subtitles/captions, YouTube Music lyrics, LRCLIB fallback, and optional local word alignment.
 - Existing 3D lyrics, Desktop Lyrics, glow, blur, slide, scale, particles, and beat-reactive visuals.
+- Three-mode stage text selector under the player: show only the current track title, show synchronized lyrics, or hide both; the selected mode is remembered across restarts.
 - Discord profile card and local Discord Rich Presence IPC.
 - One in-app master volume path for Spotify, YouTube, and local audio.
 - NSIS installer with the existing ShinaYuu Music branding.
-- Liquid-glass home cards with pointer-responsive refraction and preserved wallpaper visibility.
+- Liquid-glass Home cards with pointer-responsive refraction and preserved wallpaper visibility. The Visual Console includes a saved transparency slider that adjusts Home, panels, popovers, player glass, buttons, and media-library surfaces without fading content.
+- Folder-backed background media library: choose one folder, browse supported images and videos in a transparent Liquid Glass gallery, search/filter the results, and click any item to use it as the live background.
 - Persistent local libraries from watched folders or ZIP/RAR/7Z archives, including embedded metadata, artwork, sidecar lyrics, online lyric fallback, and automatic rescanning.
 - Playback descriptor prefetch and delayed source handoff to avoid a silent multi-second gap when selecting, skipping, or automatically advancing tracks.
 
@@ -94,7 +98,7 @@ npm run build:win:unsigned
 Installer output:
 
 ```text
-dist\ShinaYuu-Music-1.1.6.x-Setup.exe
+dist\ShinaYuu-Music-1.1.6.8-Setup.exe
 ```
 
 
@@ -118,7 +122,17 @@ Google account authorization is opened in the operating system default browser, 
 
 The application maintainer should create one Google OAuth Client ID with application type **Desktop app**, enable YouTube Data API v3, and place the Desktop OAuth Client ID and Client Secret in `shinayuu.youtube.oauthClientId` and `shinayuu.youtube.oauthClientSecret` inside `package.json` before building. End users then only press **Connect YouTube** and approve access in their normal browser. The same values can also be entered from the in-app **Advanced** panel for development builds.
 
-The supported YouTube Data API returns playlists owned by the authorized account. ShinaYuu Music also adds Liked videos and Uploads when YouTube exposes them. Playlists merely saved from another channel's library are not exposed by the official API and therefore cannot be guaranteed as an automatic sync source.
+The supported YouTube Data API returns playlists owned by the authorized account. ShinaYuu Music also adds Liked videos and Uploads when YouTube exposes them, using official playlist metadata or `playlistItems.pageInfo.totalResults` to display their account totals. Playlists merely saved from another channel's library are not exposed by the official API and therefore cannot be guaranteed as an automatic sync source.
+
+## Liquid Glass transparency
+
+Open **Visual Console → Interface** and use **Liquid Glass transparency**. Moving the slider to the right increases transparency; moving it to the left strengthens the glass fill. Blur, borders, reflections, accent light, text, icons, cover art, and video backgrounds remain active. The value is stored with the normal visual configuration and is also included in user visual archives.
+
+## Background media folder library
+
+In **Visual console → Interface → Background media**, choose a folder instead of a single file. ShinaYuu Music scans supported images and videos in that folder and its subfolders, then opens a transparent Liquid Glass gallery. Use search or the Image/Video filters and click a card to apply that file as the background.
+
+The desktop build remembers the selected folder and reloads it after restart. Files stay in their original folder; the app does not duplicate every image or video into its user-data directory. Supported image formats are JPG, JPEG, PNG, WebP, GIF, AVIF, and BMP. Supported video containers are MP4, WebM, MOV, and M4V, subject to Chromium codec support.
 
 ## Local music library
 
@@ -137,6 +151,12 @@ Spotify now runs in the same Castlabs Electron renderer as the application UI. T
 
 - `CASTLABS_ELECTRON.md` — Castlabs runtime, Widevine provisioning, and packaging notes.
 - `docs/WINDOWS_SIGNING_AND_BUILD.md` — detailed EVS/VMP signing and Windows installer build procedure.
+- `SETUP_SPOTIFY_YOUTUBE.md` — provider setup and playback architecture.
+- `DISCORD_SETUP.md` — Discord Rich Presence setup.
+- `PRIVACY.md` — local data and third-party services.
+- `SECURITY.md` — security reporting and credential handling.
+- `NOTICE.md` — attribution and third-party notices.
+- `CHANGELOG.md` — release history. build procedure.
 - `SETUP_SPOTIFY_YOUTUBE.md` — provider setup and playback architecture.
 - `DISCORD_SETUP.md` — Discord Rich Presence setup.
 - `PRIVACY.md` — local data and third-party services.
