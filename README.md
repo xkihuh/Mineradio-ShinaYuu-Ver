@@ -8,7 +8,7 @@ See `RELEASE_1.1.7.md` for the exact release scope.
 
 ## Release focus
 
-ShinaYuu Music `1.1.7` introduces the raw video-only **Playing MV** background and universal YouTube video search while preserving the established playback, lyrics, visual effects and desktop architecture. See `RELEASE_1.1.7.md` for the exact scope.
+ShinaYuu Music `1.1.7.2` keeps the raw video-only **Playing MV** background while restoring **YouTube Music** as a separate music source and exposing normal **YouTube Video** as an additional source. Playback, lyrics, visual effects and the desktop architecture remain independent from the MV background.
 
 ## Runtime architecture
 
@@ -28,7 +28,8 @@ Castlabs Electron installs and updates the Widevine CDM through its component up
 
 - Spotify Premium playback through the Spotify Web Playback SDK inside Castlabs Electron.
 - YouTube playback through `yt-dlp` with `youtubei.js` fallback support.
-- Universal YouTube video search for public uploads, MVs, tutorials, gameplay, podcasts, Shorts, and live video results.
+- Separate YouTube Music song search and normal YouTube Video search, with distinct source identity, recommendations and lyric handling.
+- An All search view that keeps Spotify, YouTube Music and YouTube Video in separate sections.
 - Secure YouTube account connection through the system browser using OAuth 2.0 PKCE and a desktop loopback callback; owned playlists, Liked videos, and Uploads are synchronized through YouTube Data API v3.
 - Spotify-native synchronized lyrics when available.
 - Spotify market-relinked tracks keep their live SDK metadata, progress, cover, and lyrics synchronized.
