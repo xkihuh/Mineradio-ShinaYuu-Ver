@@ -96,3 +96,12 @@ WHISPER_THREADS
 ```
 
 These variables are optional and are not required for normal installed users.
+## YouTube source separation
+
+The application exposes two independent YouTube surfaces:
+
+- **YouTube Music** for song search, music metadata, music recommendations and the original music lyric flow.
+- **YouTube Video** for normal public video search and exact-video caption/alignment behavior.
+
+The Playing MV feature is only a muted background renderer. It does not change a track's source from YouTube Music to YouTube Video.
+

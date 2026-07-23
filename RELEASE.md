@@ -1,8 +1,16 @@
+## 1.1.7.2
+
+- Restored the original YouTube Music song-search and metadata pipeline while keeping YouTube Video separate.
+- Added progressive multi-provider search and a lightweight search-only YouTube client.
+- Fixed exact YouTube captions/forced alignment being treated as external lyrics.
+- Changed the default lyrics offset to 0.00 seconds and migrated the legacy +0.35-second default.
+- Reduced automatic prefetch pressure immediately after search results appear.
+
 # ShinaYuu Music 1.1.7
 
 ## Release summary
 
-Version `1.1.7` adds a raw video-only **Playing MV** background, expands YouTube search beyond music-only results, prevents Spotify and YouTube from remaining audible at the same time, and keeps title/lyrics controls visible above the MV.
+Version `1.1.7.1` keeps the raw video-only **Playing MV** background while restoring YouTube Music as an independent music source. Spotify, YouTube Music and normal YouTube Video now remain separate in search, recommendations, history and lyrics.
 
 ## Playing MV
 
@@ -37,13 +45,13 @@ Version `1.1.7` adds a raw video-only **Playing MV** background, expands YouTube
 - The switch invalidates any in-flight Spotify start command and verifies the Spotify SDK state, including delayed checks for a stale command that completes after the user changes provider.
 - The Playing MV element remains permanently muted; only the selected provider's established master player can produce audible output.
 
-## Universal YouTube search
+## Separate YouTube Music and YouTube Video sources
 
-- The primary YouTube search now requests universal video results rather than YouTube Music song-only results.
-- Results may include normal uploads, music videos, gameplay, tutorials, podcasts, Shorts and public live videos.
-- Exact video IDs, channel names, duration, thumbnails, content type and direct YouTube URLs are preserved.
-- Nested YouTube thumbnail response shapes are normalized, and every result has a canonical thumbnail fallback generated from its exact video ID.
-- YouTube Music song search remains a compatibility fallback only when universal search fails.
+- **YouTube Music** again uses `yt.music.search(..., { type: 'song' })` and keeps the original music-oriented metadata, playlist behavior, recommendations and lyrics pipeline.
+- **YouTube Video** uses normal YouTube video search and is displayed as a separate source for MVs, uploads, live videos and other public video results.
+- The **All** tab shows Spotify, YouTube Music and YouTube Video as separate sections instead of merging both YouTube surfaces into one ambiguous provider.
+- Source identity is preserved when adding tracks to the queue, restoring recent playback, prefetching playback and extending recommendation sessions.
+- Playing MV uses the exact selected video only as a muted background layer and never converts a YouTube Music track into a YouTube Video track.
 
 ## Performance and compatibility
 
@@ -61,3 +69,38 @@ The release keeps the established Electron/Castlabs architecture, UI/UX, Liquid 
 - `ShinaYuu-Music-1.1.7-Setup.exe`
 - `ShinaYuu-Music-1.1.7-Setup.exe.blockmap`
 - `latest.yml`
+
+
+## 1.1.7.1
+- Reworked YouTube search playback to build a stable genre-matched queue from the selected track.
+- Detects styles such as Phonk, Funk, EDM, House, Dubstep, US/UK, K-Pop, J-Pop, V-Pop, Rock, Metal, Lo-fi and related genres from track metadata.
+- The detected genre is locked for the current recommendation session so later queue expansion stays in the same style.
+- When the final track is reached, the app appends another same-genre batch instead of replacing the current playlist.
+- Removed the redundant gray stage floor under the 3D Stage playlist shelf.
+- Updated build metadata to 1.1.7.1 and added an optional --skip-tests build mode.
+
+- Removed the duplicate MV-only title/lyrics HTML overlay; the original ShinaYuu 3D/UI lyrics layer is now the only visible text layer.
+- Regular YouTube videos now resolve a separately scored YouTube Music song reference for lyrics while retaining the original YouTube video for playback and MV wallpaper.
+- Automatic video captions are now a last-resort fallback after YouTube Music and LRCLIB.
+- Tightened genre recommendation queries to YouTube Music song search and stronger same-style filtering.
+
+
+### Separate-source correction and exact-video lyrics
+
+- Replaced the temporary mixed YouTube result model with separate YouTube Music and YouTube Video sources.
+- YouTube Music returns only music-surface song results and keeps its original metadata, recommendation and lyric behavior.
+- Normal YouTube Video keeps exact-caption and per-video alignment behavior without overwriting YouTube Music tracks.
+- When exact video captions are unavailable, external lyric text is used only as transcription input and timestamps are regenerated from that exact video's audio.
+- While exact-video alignment is processing, the original title fallback remains visible instead of showing falsely synchronized estimated lyrics.
+
+
+## 1.1.7.2 — YouTube Video A/V synchronization maintenance
+
+- Kept the public version at 1.1.7.2 as requested.
+- Added a strict synchronization path only for the separate YouTube Video source.
+- Added an independent 180 ms A/V watchdog so synchronization continues even when Chromium stops emitting video-frame callbacks during a brief decoder stall.
+- Audio remains the authoritative playback clock; the muted MV is automatically realigned after audio buffering, video buffering, dropped frames, or a decoder hitch.
+- Added bounded soft playback-rate correction for small drift and fast hard resynchronization for persistent or large drift.
+- Added decoder recovery for cases where the video frame freezes while its media clock appears to continue.
+- Preserved the gentler synchronization behavior for YouTube Music and all existing Spotify, lyrics, playlist, visual, and UI/UX behavior.
+- Added YouTube Video A/V resynchronization regression coverage.

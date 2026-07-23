@@ -1,3 +1,26 @@
+## 1.1.7.2
+
+- Restored the original YouTube Music song-search and metadata pipeline while keeping YouTube Video separate.
+- Added progressive multi-provider search and a lightweight search-only YouTube client.
+- Fixed exact YouTube captions/forced alignment being treated as external lyrics.
+- Changed the default lyrics offset to 0.00 seconds and migrated the legacy +0.35-second default.
+- Reduced automatic prefetch pressure immediately after search results appear.
+
+# Final 1.1.7.1 source separation correction
+
+## Restored architecture
+
+- Spotify remains the Spotify music source.
+- YouTube Music is restored as the dedicated YouTube music source used by music search, music recommendations, music metadata and the original YouTube Music lyric pipeline.
+- YouTube Video is a separate source used only when the user selects normal YouTube video search/results.
+- Playing MV is a visual-only muted stream tied to the selected item; it does not redefine the playback provider or lyric provider.
+
+## Persistence and queue correctness
+
+- Queue recommendations inherit the source of the seed track: Music stays Music, Video stays Video.
+- Playback prefetch and descriptor keys include the YouTube source type.
+- Listening-history snapshots preserve the source type so reopening a normal video does not silently convert it into a YouTube Music item, and vice versa.
+
 # Modification Report — ShinaYuu Music 1.1.7
 
 ## Requested behavior
@@ -119,3 +142,38 @@
 - Regression tests for the DOM title/lyrics overlay, selectable Full HD/2K/4K tiers and stalled-frame recovery
 - Regression tests for universal YouTube result mapping
 - Existing project tests excluding the local archive test when its optional `node-7z` dependency is absent from the supplied source package
+
+
+## 1.1.7.1
+- Reworked YouTube search playback to build a stable genre-matched queue from the selected track.
+- Detects styles such as Phonk, Funk, EDM, House, Dubstep, US/UK, K-Pop, J-Pop, V-Pop, Rock, Metal, Lo-fi and related genres from track metadata.
+- The detected genre is locked for the current recommendation session so later queue expansion stays in the same style.
+- When the final track is reached, the app appends another same-genre batch instead of replacing the current playlist.
+- Removed the redundant gray stage floor under the 3D Stage playlist shelf.
+- Updated build metadata to 1.1.7.1 and added an optional --skip-tests build mode.
+
+- Removed the duplicate MV-only title/lyrics HTML overlay; the original ShinaYuu 3D/UI lyrics layer is now the only visible text layer.
+- Regular YouTube videos now resolve a separately scored YouTube Music song reference for lyrics while retaining the original YouTube video for playback and MV wallpaper.
+- Automatic video captions are now a last-resort fallback after YouTube Music and LRCLIB.
+- Tightened genre recommendation queries to YouTube Music song search and stronger same-style filtering.
+
+
+### Separate-source correction and exact-video lyrics
+
+- Replaced the temporary mixed YouTube result model with separate YouTube Music and YouTube Video sources.
+- YouTube Music returns only music-surface song results and keeps its original metadata, recommendation and lyric behavior.
+- Normal YouTube Video keeps exact-caption and per-video alignment behavior without overwriting YouTube Music tracks.
+- When exact video captions are unavailable, external lyric text is used only as transcription input and timestamps are regenerated from that exact video's audio.
+- While exact-video alignment is processing, the original title fallback remains visible instead of showing falsely synchronized estimated lyrics.
+
+
+## 1.1.7.2 — YouTube Video A/V synchronization maintenance
+
+- Kept the public version at 1.1.7.2 as requested.
+- Added a strict synchronization path only for the separate YouTube Video source.
+- Added an independent 180 ms A/V watchdog so synchronization continues even when Chromium stops emitting video-frame callbacks during a brief decoder stall.
+- Audio remains the authoritative playback clock; the muted MV is automatically realigned after audio buffering, video buffering, dropped frames, or a decoder hitch.
+- Added bounded soft playback-rate correction for small drift and fast hard resynchronization for persistent or large drift.
+- Added decoder recovery for cases where the video frame freezes while its media clock appears to continue.
+- Preserved the gentler synchronization behavior for YouTube Music and all existing Spotify, lyrics, playlist, visual, and UI/UX behavior.
+- Added YouTube Video A/V resynchronization regression coverage.

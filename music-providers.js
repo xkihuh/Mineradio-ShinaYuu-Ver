@@ -5,7 +5,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { spawn, execFileSync } = require('child_process');
 
-const UA = 'ShinaYuu Music/1.1.7';
+const UA = 'ShinaYuu Music/1.1.7.2';
 const CONFIG_FILE = process.env.MUSIC_SOURCE_CONFIG_FILE || path.join(__dirname, '.music-sources.json');
 const TOKEN_FILE = process.env.SPOTIFY_TOKEN_FILE || path.join(__dirname, '.spotify-token.json');
 const YOUTUBE_TOKEN_FILE = process.env.YOUTUBE_TOKEN_FILE || path.join(path.dirname(TOKEN_FILE), 'youtube-token.json');
@@ -24,6 +24,8 @@ const spotifyTrackCache = new Map();
 const youtubePodcastCache = new Map();
 const youtubeTrackCache = new Map();
 const youtubeSearchCache = new Map();
+const youtubeRecommendCache = new Map();
+const youtubeMusicReferenceCache = new Map();
 const spotifyAuthRequests = new Map();
 const spotifyAuthResults = new Map();
 const youtubeAuthRequests = new Map();
@@ -47,6 +49,7 @@ const youtubeForcedAlignmentService = youtubeForcedAligner.createProvider({
   userAgent: UA,
 });
 let youtubeClientPromise = null;
+let youtubeSearchClientPromise = null;
 let youtubeAccountClientPromise = null;
 let youtubeAccountClientKey = '';
 let youtubeCookieProvider = null;
@@ -1002,7 +1005,7 @@ function youtubeTrackFromDeviceNode(item) {
     id: videoId, mid: videoId, songmid: videoId, youtubeId: videoId, videoId,
     name: title, title, artist, artists: [{ id: '', name: artist }], artistId: '', album: 'YouTube',
     cover: youtubeNodeThumbnail(item.thumbnails || item.thumbnail || item.content_image || item.image), duration: durationMs, durationMs,
-    playable: item.is_playable !== false, fee: 0, lyricsMetadataProvider: 'youtube',
+    playable: item.is_playable !== false, fee: 0, youtubeSourceType: 'music', youtubeSurface: 'music', isYouTubeMusicResult: true, lyricsMetadataProvider: 'youtube-music',
   };
 }
 
@@ -1057,7 +1060,7 @@ async function youtubeDeviceDataApiPlaylistTracks(playlistId, limit = 200) {
       artistId: snippet.videoOwnerChannelId || snippet.channelId || '', album: 'YouTube',
       cover: (thumbs.maxres || thumbs.standard || thumbs.high || thumbs.medium || thumbs.default || {}).url || '',
       duration: durationMs, durationMs, playable: detail.status ? detail.status.embeddable !== false : true,
-      fee: 0, lyricsMetadataProvider: 'youtube',
+      fee: 0, youtubeSourceType: 'music', youtubeSurface: 'music', isYouTubeMusicResult: true, lyricsMetadataProvider: 'youtube-music',
     };
   }).filter(Boolean);
   return {
@@ -1314,7 +1317,7 @@ async function youtubeAccountPlaylistTracks(playlistId, limit = 200) {
       artistId: snippet.videoOwnerChannelId || snippet.channelId || '', album: 'YouTube',
       cover: (thumbs.high || thumbs.medium || thumbs.default || {}).url || '',
       duration: durationMs, durationMs, playable: detail.status ? detail.status.embeddable !== false : true,
-      fee: 0, lyricsMetadataProvider: 'youtube',
+      fee: 0, youtubeSourceType: 'music', youtubeSurface: 'music', isYouTubeMusicResult: true, lyricsMetadataProvider: 'youtube-music',
     };
   }).filter(Boolean);
   const playlists = await youtubeAccountPlaylists(50).catch(() => []);
@@ -3329,27 +3332,56 @@ async function spotifyAddSongToPlaylist(playlistId, trackId) {
   return true;
 }
 
+async function createYouTubeClient(retrievePlayer) {
+  const yt = await import('youtubei.js');
+  if (yt.Platform && yt.Platform.shim) {
+    yt.Platform.shim.eval = async (data) => new Function(data.output)();
+  }
+  return yt.Innertube.create({
+    lang: providerConfig().language === 'en' ? 'en' : 'vi',
+    location: providerConfig().spotifyMarket || 'VN',
+    retrieve_player: retrievePlayer !== false,
+    enable_session_cache: true,
+    generate_session_locally: false,
+    user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36',
+  });
+}
+
 async function getYouTubeClient() {
   if (!youtubeClientPromise) {
-    youtubeClientPromise = (async () => {
-      const yt = await import('youtubei.js');
-      if (yt.Platform && yt.Platform.shim) {
-        yt.Platform.shim.eval = async (data) => new Function(data.output)();
-      }
-      return yt.Innertube.create({
-        lang: providerConfig().language === 'en' ? 'en' : 'vi',
-        location: providerConfig().spotifyMarket || 'VN',
-        retrieve_player: true,
-        enable_session_cache: true,
-        generate_session_locally: false,
-        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36',
-      });
-    })().catch((error) => {
+    youtubeClientPromise = createYouTubeClient(true).catch((error) => {
       youtubeClientPromise = null;
       throw error;
     });
   }
   return youtubeClientPromise;
+}
+
+async function getYouTubeSearchClient() {
+  if (!youtubeSearchClientPromise) {
+    youtubeSearchClientPromise = createYouTubeClient(false).catch((error) => {
+      youtubeSearchClientPromise = null;
+      throw error;
+    });
+  }
+  return youtubeSearchClientPromise;
+}
+
+async function runYouTubeSearch(operation) {
+  try {
+    return await operation(await getYouTubeSearchClient());
+  } catch (lightError) {
+    // Search does not require player deciphering. If a YouTube revision rejects
+    // the lightweight client, fall back once to the full playback client while
+    // preserving the original YouTube Music behaviour.
+    youtubeSearchClientPromise = null;
+    try {
+      return await operation(await getYouTubeClient());
+    } catch (fullError) {
+      fullError.cause = fullError.cause || lightError;
+      throw fullError;
+    }
+  }
 }
 
 const YOUTUBE_MUSIC_LYRICS_CACHE_TTL = 30 * 60 * 1000;
@@ -3487,6 +3519,56 @@ function mapYouTubeMusicItem(item) {
   const title = youtubeText(item.title || item.name);
   if (!title) return null;
   const durationSeconds = youtubeDurationSeconds(item.duration);
+  const song = {
+    provider: 'qq',
+    realProvider: 'youtube',
+    source: 'qq',
+    type: 'qq',
+    playbackTransport: 'youtube',
+    contentType: 'song',
+    youtubeSurface: 'music',
+    youtubeSourceType: 'music',
+    isYouTubeMusicResult: true,
+    isYouTubeVideoResult: false,
+    isYouTubeVideo: false,
+    id,
+    mid: id,
+    songmid: id,
+    youtubeId: id,
+    videoId: id,
+    name: title,
+    title,
+    artist: artists.map((artist) => artist.name).join(' / ') || youtubeText(item.subtitle),
+    artists,
+    artistId: artists[0] && artists[0].id || '',
+    artistMid: artists[0] && artists[0].id || '',
+    album: youtubeText(item.album && (item.album.name || item.album)) || '',
+    albumId: String(item.album && (item.album.id || item.album.browse_id || item.album.browseId) || ''),
+    cover: youtubeThumbnail(item),
+    duration: durationSeconds * 1000,
+    durationMs: durationSeconds * 1000,
+    playable: true,
+    lyricsMetadataProvider: 'youtube-music',
+    externalUrl: `https://music.youtube.com/watch?v=${id}`,
+  };
+  youtubeTrackCache.set(id, song);
+  return song;
+}
+
+function mapYouTubeVideoItem(item) {
+  if (!item) return null;
+  const endpoint = item.endpoint && item.endpoint.payload || {};
+  const id = item.id || item.video_id || endpoint.videoId || endpoint.video_id || '';
+  if (!id) return null;
+  const artists = (Array.isArray(item.artists) ? item.artists : []).map((artist) => ({
+    id: artist.channel_id || artist.id || '',
+    name: youtubeText(artist.name || artist),
+  })).filter((artist) => artist.name);
+  const authorName = youtubeText(item.author && (item.author.name || item.author));
+  if (!artists.length && authorName) artists.push({ id: item.author && (item.author.channel_id || item.author.id) || '', name: authorName });
+  const title = youtubeText(item.title || item.name);
+  if (!title) return null;
+  const durationSeconds = youtubeDurationSeconds(item.duration);
   const isLive = !!(item.is_live || item.is_live_content || item.live_now);
   const isShort = !!(item.is_short || item.is_shorts);
   const song = {
@@ -3494,8 +3576,13 @@ function mapYouTubeMusicItem(item) {
     realProvider: 'youtube',
     source: 'qq',
     type: 'qq',
+    playbackTransport: 'youtube',
     contentType: isShort ? 'short' : (isLive ? 'live' : 'video'),
     isYouTubeVideo: true,
+    youtubeSurface: 'video',
+    youtubeSourceType: 'video',
+    isYouTubeMusicResult: false,
+    isYouTubeVideoResult: true,
     isLive,
     isShort,
     id,
@@ -3504,22 +3591,49 @@ function mapYouTubeMusicItem(item) {
     youtubeId: id,
     videoId: id,
     name: title,
+    title,
     artist: artists.map((artist) => artist.name).join(' / ') || youtubeText(item.subtitle),
     artists,
     artistId: artists[0] && artists[0].id || '',
     artistMid: artists[0] && artists[0].id || '',
-    album: '',
-    albumId: '',
+    album: youtubeText(item.album && (item.album.name || item.album)) || '',
+    albumId: String(item.album && (item.album.id || item.album.browse_id || item.album.browseId) || ''),
     cover: youtubeThumbnail(item),
     duration: durationSeconds * 1000,
+    durationMs: durationSeconds * 1000,
     playable: true,
+    lyricsMetadataProvider: 'youtube-video',
     externalUrl: `https://www.youtube.com/watch?v=${id}`,
   };
   youtubeTrackCache.set(id, song);
   return song;
 }
 
-function youtubeSearchItems(result) {
+function youtubeMusicSearchItems(result) {
+  const output = [];
+  const seen = new Set();
+  const shelves = result && result.contents ? Array.from(result.contents) : [];
+  shelves.forEach((shelf) => {
+    const items = shelf && shelf.contents ? Array.from(shelf.contents) : [];
+    items.forEach((item) => {
+      const mapped = mapYouTubeMusicItem(item);
+      if (!mapped || seen.has(mapped.videoId)) return;
+      seen.add(mapped.videoId);
+      output.push(mapped);
+    });
+  });
+  if (!output.length && result && result.results) {
+    Array.from(result.results).forEach((item) => {
+      const mapped = mapYouTubeMusicItem(item);
+      if (!mapped || seen.has(mapped.videoId)) return;
+      seen.add(mapped.videoId);
+      output.push(mapped);
+    });
+  }
+  return output;
+}
+
+function youtubeVideoSearchItems(result) {
   const candidates = [];
   if (result && result.results) candidates.push(...Array.from(result.results));
   const shelves = result && result.contents ? Array.from(result.contents) : [];
@@ -3530,7 +3644,7 @@ function youtubeSearchItems(result) {
   const output = [];
   const seen = new Set();
   candidates.forEach((item) => {
-    const mapped = mapYouTubeMusicItem(item);
+    const mapped = mapYouTubeVideoItem(item);
     if (!mapped || seen.has(mapped.videoId)) return;
     seen.add(mapped.videoId);
     output.push(mapped);
@@ -3538,26 +3652,329 @@ function youtubeSearchItems(result) {
   return output;
 }
 
-async function youtubeSearch(query, limit = 18) {
+// Compatibility alias retained for older internal callers that expect the
+// original YouTube Music song parser.
+function youtubeSearchItems(result) {
+  return youtubeMusicSearchItems(result);
+}
+
+const YOUTUBE_GENRE_PROFILES = [
+  { key: 'phonk', label: 'Phonk', query: 'phonk music', patterns: [/(?:^|\W)phonk(?:\W|$)/i, /drift\s+phonk/i, /brazilian\s+phonk/i, /cowbell\s+phonk/i] },
+  { key: 'funk', label: 'Funk', query: 'funk music', patterns: [/(?:^|\W)funk(?:y|\W|$)/i, /future\s+funk/i, /disco\s+funk/i, /nu[-\s]?disco/i, /brazilian\s+funk/i] },
+  { key: 'deep-house', label: 'Deep House', query: 'deep house music', patterns: [/deep\s+house/i] },
+  { key: 'slap-house', label: 'Slap House', query: 'slap house music', patterns: [/slap\s+house/i] },
+  { key: 'future-bass', label: 'Future Bass', query: 'future bass music', patterns: [/future\s+bass/i, /melodic\s+bass/i] },
+  { key: 'drum-bass', label: 'Drum & Bass', query: 'drum and bass music', patterns: [/drum\s*(?:and|&)\s*bass/i, /(?:^|\W)dnb(?:\W|$)/i, /liquid\s+dnb/i] },
+  { key: 'dubstep', label: 'Dubstep', query: 'dubstep music', patterns: [/(?:^|\W)dubstep(?:\W|$)/i, /melodic\s+dubstep/i] },
+  { key: 'hardstyle', label: 'Hardstyle', query: 'hardstyle music', patterns: [/(?:^|\W)hardstyle(?:\W|$)/i, /hardcore\s+edm/i] },
+  { key: 'techno', label: 'Techno', query: 'techno music', patterns: [/(?:^|\W)techno(?:\W|$)/i, /melodic\s+techno/i] },
+  { key: 'trance', label: 'Trance', query: 'trance music', patterns: [/(?:^|\W)trance(?:\W|$)/i, /psytrance/i] },
+  { key: 'house', label: 'House', query: 'house music', patterns: [/(?:^|\W)house\s+music(?:\W|$)/i, /progressive\s+house/i, /electro\s+house/i, /bass\s+house/i, /tropical\s+house/i] },
+  { key: 'edm', label: 'EDM', query: 'EDM electronic dance music', patterns: [/(?:^|\W)edm(?:\W|$)/i, /electronic\s+dance/i, /festival\s+(?:mix|anthem)/i, /big\s+room/i] },
+  { key: 'synthwave', label: 'Synthwave', query: 'synthwave music', patterns: [/(?:^|\W)synthwave(?:\W|$)/i, /retrowave/i, /vaporwave/i] },
+  { key: 'lofi', label: 'Lo-fi', query: 'lofi music', patterns: [/(?:^|\W)lo[-\s]?fi(?:\W|$)/i, /chillhop/i] },
+  { key: 'hip-hop', label: 'Hip-hop', query: 'hip hop music', patterns: [/hip[-\s]?hop/i, /(?:^|\W)rap(?:\W|$)/i, /boom\s+bap/i] },
+  { key: 'trap', label: 'Trap', query: 'trap music', patterns: [/(?:^|\W)trap(?:\W|$)/i, /melodic\s+trap/i] },
+  { key: 'rnb', label: 'R&B', query: 'R&B music', patterns: [/(?:^|\W)r\s*(?:&|and)\s*b(?:\W|$)/i, /rhythm\s+and\s+blues/i, /neo\s+soul/i] },
+  { key: 'rock', label: 'Rock', query: 'rock music', patterns: [/(?:^|\W)rock(?:\W|$)/i, /alternative\s+rock/i, /indie\s+rock/i, /punk\s+rock/i] },
+  { key: 'metal', label: 'Metal', query: 'metal music', patterns: [/(?:^|\W)metal(?:\W|$)/i, /metalcore/i, /deathcore/i] },
+  { key: 'jpop', label: 'J-Pop', query: 'J-pop music', patterns: [/(?:^|\W)j[-\s]?pop(?:\W|$)/i, /japanese\s+pop/i, /anime\s+(?:song|music|opening|ending)/i] },
+  { key: 'kpop', label: 'K-Pop', query: 'K-pop music', patterns: [/(?:^|\W)k[-\s]?pop(?:\W|$)/i, /korean\s+pop/i] },
+  { key: 'vpop', label: 'V-Pop', query: 'V-pop nhạc Việt', patterns: [/(?:^|\W)v[-\s]?pop(?:\W|$)/i, /nhạc\s+việt/i, /vietnamese\s+pop/i] },
+  { key: 'vinahouse', label: 'Vinahouse', query: 'Vinahouse remix', patterns: [/(?:^|\W)vinahouse(?:\W|$)/i, /vina\s+house/i] },
+  { key: 'bolero', label: 'Bolero', query: 'nhạc Bolero', patterns: [/(?:^|\W)bolero(?:\W|$)/i, /nhạc\s+trữ\s+tình/i] },
+  { key: 'ballad', label: 'Ballad', query: 'ballad music', patterns: [/(?:^|\W)ballad(?:\W|$)/i, /acoustic\s+ballad/i] },
+  { key: 'jazz', label: 'Jazz', query: 'jazz music', patterns: [/(?:^|\W)jazz(?:\W|$)/i, /smooth\s+jazz/i] },
+  { key: 'classical', label: 'Classical', query: 'classical music', patterns: [/(?:^|\W)classical(?:\W|$)/i, /orchestra/i, /symphony/i, /piano\s+concerto/i] },
+  { key: 'pop', label: 'Pop', query: 'pop music', patterns: [/(?:^|\W)pop\s+(?:music|song|hits?)(?:\W|$)/i, /dance\s+pop/i, /indie\s+pop/i, /electropop/i] },
+];
+
+function youtubeGenreProfileByKey(value) {
+  const key = String(value || '').trim().toLowerCase();
+  if (!key) return null;
+  const found = YOUTUBE_GENRE_PROFILES.find((profile) => profile.key === key);
+  if (found) return found;
+  if (key === 'usuk') return { key: 'usuk', label: 'US/UK', query: 'US UK music hits', patterns: [] };
+  if (key === 'similar') return { key: 'similar', label: 'Cùng phong cách', query: '', patterns: [] };
+  return null;
+}
+
+function normalizeYouTubeGenreText(value) {
+  if (Array.isArray(value)) return value.map(normalizeYouTubeGenreText).filter(Boolean).join(' ');
+  if (value && typeof value === 'object') {
+    return Object.values(value).map(normalizeYouTubeGenreText).filter(Boolean).join(' ');
+  }
+  return String(value || '')
+    .normalize('NFKC')
+    .replace(/[\u200b-\u200d\ufeff]/g, ' ')
+    .replace(/[_|]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function youtubeGenreMetadataText(track, info) {
+  track = track || {};
+  info = info || {};
+  return normalizeYouTubeGenreText([
+    track.name, track.title, track.artist, track.album,
+    info.title, info.track, info.artist, info.album, info.uploader, info.channel,
+    info.genre, info.genres, info.categories, info.tags,
+    String(info.description || '').slice(0, 1600),
+  ]).toLowerCase();
+}
+
+function youtubeTextLooksVietnamese(text) {
+  return /[ăâđêôơưáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ]/i.test(String(text || ''));
+}
+
+function youtubeTextLooksCjkOrKorean(text) {
+  return /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/u.test(String(text || ''));
+}
+
+function classifyYouTubeMusicGenre(track, info) {
+  const text = youtubeGenreMetadataText(track, info);
+  for (const profile of YOUTUBE_GENRE_PROFILES) {
+    if (profile.patterns.some((pattern) => pattern.test(text))) return profile;
+  }
+
+  const language = String(info && (info.language || info.audio_language || info.original_language) || '').toLowerCase();
+  const categoryText = normalizeYouTubeGenreText(info && info.categories).toLowerCase();
+  const musicLike = /music|âm nhạc|nhạc/i.test(categoryText) || /official\s+(?:music\s+)?video|official\s+audio|lyrics?|mv\b|audio\b/i.test(text);
+  if ((language === 'en' || language.startsWith('en-')) && musicLike) {
+    return { key: 'usuk', label: 'US/UK', query: 'US UK music hits', patterns: [] };
+  }
+  if (!youtubeTextLooksVietnamese(text) && !youtubeTextLooksCjkOrKorean(text) && /[a-z]{3,}/i.test(text) && musicLike) {
+    return { key: 'usuk', label: 'US/UK', query: 'US UK music hits', patterns: [] };
+  }
+
+  return { key: 'similar', label: 'Cùng phong cách', query: '', patterns: [] };
+}
+
+function canonicalMusicRecommendationTitle(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\([^)]*(official|lyrics?|audio|video|mv|remix|sped|slowed|nightcore|visualizer)[^)]*\)/gi, ' ')
+    .replace(/\[[^\]]*(official|lyrics?|audio|video|mv|remix|sped|slowed|nightcore|visualizer)[^\]]*\]/gi, ' ')
+    .replace(/\b(official|music|video|audio|lyrics?|lyric|mv|visualizer|hd|4k|remastered|topic)\b/gi, ' ')
+    .replace(/[^a-z0-9\u00c0-\u024f\u1e00-\u1eff]+/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function genreRecommendationCandidateScore(song, profile, index) {
+  const text = normalizeYouTubeGenreText([song && (song.name || song.title), song && song.artist]).toLowerCase();
+  let score = Math.max(0, 110 - index - Number(song && song.genreQueryRank || 0) * 14);
+  if (profile && profile.patterns && profile.patterns.some((pattern) => pattern.test(text))) score += 150;
+  else if (profile && profile.key !== 'similar' && profile.key !== 'usuk') score -= 18;
+  if (/official\s+(?:music\s+)?video|official\s+audio|lyrics?|visualizer|mv\b/i.test(text)) score += 18;
+  if (/mix|playlist|compilation|one\s+hour|1\s*hour|live\s+stream/i.test(text)) score -= 55;
+  if (/reaction|review|tutorial|how\s+to|gameplay|walkthrough|podcast|interview|documentary|trailer|movie\s+scene/i.test(text)) score -= 320;
+  if (profile && profile.key === 'usuk') {
+    if (youtubeTextLooksVietnamese(text) || youtubeTextLooksCjkOrKorean(text)) score -= 140;
+    else if (/[a-z]{4,}/i.test(text)) score += 24;
+  }
+  const durationMs = Number(song && (song.durationMs || song.duration) || 0);
+  if (durationMs > 0 && durationMs < 45 * 1000) score -= 35;
+  if (durationMs > 30 * 60 * 1000) score -= 22;
+  return score;
+}
+
+async function youtubeGenreSearch(profile, seedTrack, limit, sourceType = 'music') {
+  const yt = await getYouTubeSearchClient().catch(() => getYouTubeClient());
+  const seedTitle = String(seedTrack && (seedTrack.name || seedTrack.title) || '').trim();
+  const seedArtist = String(seedTrack && seedTrack.artist || '').trim();
+  const genreQuery = String(profile && profile.query || '').trim();
+  const queries = [];
+  const seenQueries = new Set();
+  const addQuery = (value) => {
+    const query = String(value || '').replace(/\s+/g, ' ').trim();
+    const key = normalizeLyricMatchText(query);
+    if (!query || !key || seenQueries.has(key)) return;
+    seenQueries.add(key);
+    queries.push(query);
+  };
+  if (genreQuery) {
+    addQuery(`${genreQuery} ${seedArtist}`);
+    addQuery(`${genreQuery} official audio`);
+    addQuery(`${genreQuery} songs`);
+  }
+  addQuery(`${seedArtist} ${seedTitle} similar songs`);
+  addQuery(`${seedArtist} radio`);
+
+  const candidates = [];
+  const seen = new Set();
+  function addResult(result, queryRank) {
+    const surface = sourceType === 'video' ? 'video' : 'music';
+    const parsedItems = surface === 'video' ? youtubeVideoSearchItems(result) : youtubeMusicSearchItems(result);
+    for (const item of markYouTubeSearchSurface(parsedItems, surface)) {
+      const id = String(item.videoId || item.id || '').trim();
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      candidates.push({ ...item, genreQueryRank: queryRank });
+    }
+  }
+  for (let i = 0; i < queries.length && candidates.length < Math.max(limit * 4, 48); i += 1) {
+    try {
+      const result = sourceType === 'video'
+        ? await yt.search(queries[i], { type: 'video' })
+        : await yt.music.search(queries[i], { type: 'song' });
+      addResult(result, i);
+    } catch (error) {
+      console.warn('[YouTubeGenreRecommend] source search failed:', error && error.message || error);
+    }
+  }
+  return candidates;
+}
+
+async function youtubeRecommendations(videoId, limit = 20, genreOverride = '', sourceType = 'music') {
+  const id = String(videoId || '').trim();
+  if (!id) throw Object.assign(new Error('YOUTUBE_VIDEO_ID_REQUIRED'), { status: 400 });
+  const cappedLimit = Math.max(1, Math.min(50, Number(limit) || 20));
+  sourceType = String(sourceType || '').toLowerCase() === 'video' ? 'video' : 'music';
+
+  const cachedTrack = youtubeTrackCache.get(id) || {};
+  let info = null;
+  let profile = youtubeGenreProfileByKey(genreOverride);
+  if (!profile) {
+    const quickProfile = classifyYouTubeMusicGenre(cachedTrack, null);
+    if (quickProfile.key !== 'similar') profile = quickProfile;
+  }
+  if (!profile || profile.key === 'similar') {
+    try {
+      info = await youtubeInfoViaYtDlp(id);
+    } catch (error) {
+      console.warn('[YouTubeGenreRecommend] metadata lookup failed:', error && error.message || error);
+    }
+  }
+  const seedTrack = {
+    ...cachedTrack,
+    id,
+    videoId: id,
+    youtubeId: id,
+    name: cachedTrack.name || cachedTrack.title || info && (info.track || info.title) || '',
+    artist: cachedTrack.artist || info && (info.artist || info.uploader || info.channel) || 'YouTube',
+  };
+  if (!profile || profile.key === 'similar') profile = classifyYouTubeMusicGenre(seedTrack, info);
+  const cacheKey = `genre|${sourceType}|${id}|${profile.key}|${cappedLimit}`;
+  const cached = youtubeRecommendCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < 10 * 60 * 1000) return cached.items.map((item) => ({ ...item }));
+
+  let candidates = [];
+  try {
+    candidates = await youtubeGenreSearch(profile, seedTrack, Math.max(cappedLimit * 3, 30), sourceType);
+  } catch (error) {
+    console.warn('[YouTubeGenreRecommend] genre search failed:', error && error.message || error);
+  }
+
+  const seedCanonical = canonicalMusicRecommendationTitle(seedTrack.name || seedTrack.title);
+  const seedArtistCanonical = canonicalMusicRecommendationTitle(seedTrack.artist);
+  const seenIds = new Set([id]);
+  const seenTitles = new Set();
+  const ranked = [];
+
+  candidates.forEach((item, index) => {
+    if (!item) return;
+    const candidateId = String(item.videoId || item.id || '').trim();
+    if (!candidateId || seenIds.has(candidateId)) return;
+    const titleCanonical = canonicalMusicRecommendationTitle(item.name || item.title);
+    const artistCanonical = canonicalMusicRecommendationTitle(item.artist);
+    if (titleCanonical && seedCanonical && titleCanonical === seedCanonical && (!seedArtistCanonical || !artistCanonical || artistCanonical === seedArtistCanonical)) return;
+    const titleKey = `${titleCanonical}|${artistCanonical}`;
+    if (titleKey !== '|' && seenTitles.has(titleKey)) return;
+    let score = genreRecommendationCandidateScore(item, profile, index);
+    if (seedArtistCanonical && artistCanonical) {
+      const artistOverlap = tokenOverlapScore(item.artist || '', seedTrack.artist || '');
+      if (artistOverlap >= 0.65) score += 32;
+      else if (artistOverlap > 0.15) score += 10;
+    }
+    if (score < 35) return;
+    seenIds.add(candidateId);
+    if (titleKey !== '|') seenTitles.add(titleKey);
+    ranked.push({ item, score, index });
+  });
+
+  ranked.sort((a, b) => b.score - a.score || a.index - b.index);
+  let items = ranked.slice(0, cappedLimit).map((entry) => ({
+    ...entry.item,
+    recommendationGenre: profile.key,
+    recommendationGenreLabel: profile.label,
+  }));
+
+  if (!items.length) {
+    const fallbackQuery = [seedTrack.artist, seedTrack.name || seedTrack.title, 'music'].filter(Boolean).join(' ');
+    items = (await (sourceType === 'video' ? youtubeVideoSearch(fallbackQuery, cappedLimit + 4) : youtubeMusicSearch(fallbackQuery, cappedLimit + 4)))
+      .filter((item) => String(item.videoId || item.id || '') !== id)
+      .slice(0, cappedLimit)
+      .map((item) => ({ ...item, recommendationGenre: profile.key, recommendationGenreLabel: profile.label }));
+  }
+
+  items = markYouTubeSearchSurface(items, sourceType);
+  youtubeRecommendCache.set(cacheKey, { at: Date.now(), items });
+  return items.map((item) => ({ ...item }));
+}
+
+function markYouTubeSearchSurface(items, surface) {
+  const sourceType = surface === 'video' ? 'video' : 'music';
+  return (Array.isArray(items) ? items : []).map((item) => {
+    const id = String(item && (item.videoId || item.youtubeId || item.id) || '').trim();
+    const marked = {
+      ...item,
+      provider: 'qq',
+      source: 'qq',
+      realProvider: 'youtube',
+      playbackTransport: 'youtube',
+      youtubeSurface: sourceType,
+      youtubeSourceType: sourceType,
+      isYouTubeMusicResult: sourceType === 'music',
+      isYouTubeVideoResult: sourceType === 'video',
+      contentType: sourceType === 'music' ? 'song' : (item && item.contentType || 'video'),
+      lyricsMetadataProvider: sourceType === 'music' ? 'youtube-music' : 'youtube-video',
+      externalUrl: id
+        ? (sourceType === 'music'
+          ? `https://music.youtube.com/watch?v=${id}`
+          : `https://www.youtube.com/watch?v=${id}`)
+        : String(item && item.externalUrl || ''),
+    };
+    if (id) youtubeTrackCache.set(id, marked);
+    return marked;
+  });
+}
+
+async function youtubeMusicSearch(query, limit = 18) {
   const normalizedQuery = String(query || '').trim();
-  const key = `all-videos|${normalizedQuery.toLowerCase()}|${limit}`;
+  const maxItems = Math.max(1, Math.min(50, Number(limit) || 18));
+  const key = `youtube-music|${normalizedQuery.toLowerCase()}|${maxItems}`;
   const cached = youtubeSearchCache.get(key);
   if (cached && Date.now() - cached.at < 5 * 60 * 1000) return cached.items.map((item) => ({ ...item }));
-  const yt = await getYouTubeClient();
-  let result;
-  try {
-    // Universal YouTube search, not YouTube Music song-only search. This
-    // includes normal uploads, MVs, gameplay, tutorials, podcasts, Shorts and
-    // public live videos whenever YouTube returns them as video results.
-    result = await yt.search(normalizedQuery, { type: 'video' });
-  } catch (searchError) {
-    console.warn('[YouTubeSearch] universal video search failed, using music fallback:', searchError && searchError.message || searchError);
-    result = await yt.music.search(normalizedQuery, { type: 'song' });
-  }
-  let videos = youtubeSearchItems(result);
-  videos = videos.slice(0, Math.max(1, Math.min(50, Number(limit) || 18)));
-  youtubeSearchCache.set(key, { at: Date.now(), items: videos });
-  return videos;
+  if (!normalizedQuery) return [];
+
+  const result = await runYouTubeSearch((yt) => yt.music.search(normalizedQuery, { type: 'song' }));
+  const items = youtubeMusicSearchItems(result).slice(0, maxItems);
+  youtubeSearchCache.set(key, { at: Date.now(), items });
+  return items.map((item) => ({ ...item }));
+}
+
+async function youtubeVideoSearch(query, limit = 18) {
+  const normalizedQuery = String(query || '').trim();
+  const maxItems = Math.max(1, Math.min(50, Number(limit) || 18));
+  const key = `youtube-video|${normalizedQuery.toLowerCase()}|${maxItems}`;
+  const cached = youtubeSearchCache.get(key);
+  if (cached && Date.now() - cached.at < 5 * 60 * 1000) return cached.items.map((item) => ({ ...item }));
+  if (!normalizedQuery) return [];
+
+  const result = await runYouTubeSearch((yt) => yt.search(normalizedQuery, { type: 'video' }));
+  const items = youtubeVideoSearchItems(result).slice(0, maxItems);
+  youtubeSearchCache.set(key, { at: Date.now(), items });
+  return items.map((item) => ({ ...item }));
+}
+
+// Backward-compatible YouTube search now means YouTube Music again. Normal
+// YouTube videos are exposed through youtubeVideoSearch and a separate UI
+// source, so MV/background work cannot silently replace the music provider.
+async function youtubeSearch(query, limit = 18) {
+  return youtubeMusicSearch(query, limit);
 }
 
 async function youtubeAudioUrl(videoId, quality = '') {
@@ -4376,6 +4793,95 @@ async function spotifyMetadataForLyrics(id, query) {
   };
 }
 
+
+function youtubeReferenceMetadataDurationMs(value) {
+  let duration = Number(value || 0);
+  if (duration > 0 && duration < 10000) duration *= 1000;
+  return duration;
+}
+
+async function youtubeMusicLyricsReference(metadata = {}, query = {}) {
+  const track = String(metadata.track || metadata.name || query.track || '').trim();
+  const artist = String(metadata.artist || query.artist || '').trim();
+  const durationMs = youtubeReferenceMetadataDurationMs(metadata.duration || metadata.durationMs || query.duration || 0);
+  if (!track) return null;
+  const cacheKey = normalizeLyricMatchText([track, artist, Math.round(durationMs / 1000)].join('|'));
+  const cached = youtubeMusicReferenceCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < (cached.value ? 30 * 60 * 1000 : 4 * 60 * 1000)) {
+    return cached.value ? { ...cached.value } : null;
+  }
+
+  const yt = await getYouTubeSearchClient().catch(() => getYouTubeClient());
+  const queries = [];
+  const seenQueries = new Set();
+  const addQuery = (value) => {
+    const text = String(value || '').replace(/\s+/g, ' ').trim();
+    const key = normalizeLyricMatchText(text);
+    if (!text || !key || seenQueries.has(key)) return;
+    seenQueries.add(key);
+    queries.push(text);
+  };
+  addQuery(`${track} ${artist}`);
+  addQuery(`${track} ${artist} official audio`);
+  addQuery(`${track} ${artist} topic`);
+  addQuery(track);
+
+  const candidates = [];
+  const seenIds = new Set();
+  for (const term of queries.slice(0, 4)) {
+    try {
+      const result = await yt.music.search(term, { type: 'song' });
+      youtubeMusicSearchItems(result).forEach((candidate) => {
+        const id = String(candidate && (candidate.videoId || candidate.id) || '').trim();
+        if (!id || seenIds.has(id)) return;
+        seenIds.add(id);
+        candidates.push(candidate);
+      });
+    } catch (error) {
+      console.warn('[YouTubeMusicLyricsReference] search failed:', error && error.message || error);
+    }
+  }
+
+  const target = { track, artist, duration: durationMs };
+  const ranked = candidates
+    .map((candidate) => ({ candidate, score: scoreSpotifyYoutubeReference(candidate, target) }))
+    .filter((item) => item.score >= 96)
+    .sort((a, b) => b.score - a.score);
+  const best = ranked[0] || null;
+  const value = best ? {
+    id: String(best.candidate.videoId || best.candidate.id || ''),
+    title: best.candidate.name || best.candidate.title || '',
+    artist: best.candidate.artist || '',
+    duration: lyricSync.normalizeDurationSeconds(best.candidate.duration || 0),
+    score: Math.round(best.score),
+  } : null;
+  youtubeMusicReferenceCache.set(cacheKey, { at: Date.now(), value });
+  return value ? { ...value } : null;
+}
+
+async function youtubeMusicReferenceLyrics(metadata = {}, query = {}) {
+  const reference = await youtubeMusicLyricsReference(metadata, query);
+  if (!reference || !reference.id) return null;
+  let native = null;
+  try { native = await youtubeMusicNativeLyrics(reference.id); } catch (_) { native = null; }
+  if (!native || !native.plainLyric) return null;
+  return { ...native, youtubeMusicReference: reference, source: 'youtube-music-reference' };
+}
+
+function plainLyricForExactVideoAlignment(result = {}) {
+  const direct = String(result.plainLyric || '').trim();
+  if (direct) return direct;
+  return String(result.lyric || '')
+    .split(/\r?\n/)
+    .map((line) => line
+      .replace(/^\[[0-9:.]+\]/, '')
+      .replace(/^\[[0-9]+,[0-9]+\]/, '')
+      .replace(/\([0-9]+,[0-9]+(?:,[0-9]+)?\)/g, '')
+      .trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
 async function lyricsFor(id, provider, query = {}) {
   const cachedProviderMeta = provider === 'spotify' ? {} : songMetadata(id, provider);
   let meta = provider === 'spotify'
@@ -4422,36 +4928,61 @@ async function lyricsFor(id, provider, query = {}) {
     candidateSpotifyIds: provider === 'spotify' ? (Array.isArray(meta.candidateSpotifyIds) ? meta.candidateSpotifyIds : []) : [],
     market: provider === 'spotify' ? providerConfig().spotifyMarket : '',
   };
+  const youtubeSourceType = provider === 'youtube' && String(query.sourceType || query.youtubeSourceType || '').toLowerCase() === 'video'
+    ? 'video'
+    : 'music';
+  if (provider === 'youtube') metadata.youtubeSourceType = youtubeSourceType;
+
+  // Exact captions belong to the selected YouTube video itself, so their
+  // timestamps already include that video's intro, outro, pauses, and edits.
+  // Always prefer them before borrowing text/timing from YouTube Music or
+  // LRCLIB. This is the only zero-remap lyric source for a normal YouTube MV.
+  if (provider === 'youtube' && id) {
+    try {
+      const exactCaption = await youtubeCaptionService.fetchForVideo(id, {
+        getInfo: youtubeInfoViaYtDlp,
+        userAgent: UA,
+        languages: [query.language, providerConfig().language, 'vi', 'en'].filter(Boolean),
+      });
+      if (exactCaption && exactCaption.exactVideoTiming && (exactCaption.yrc || exactCaption.lyric)) {
+        return {
+          ...exactCaption,
+          metadataProvider: youtubeSourceType === 'music' ? 'youtube-music' : 'youtube-video',
+          metadata,
+          match: { score: 100, duration, source: youtubeSourceType === 'music' ? 'exact-youtube-music-caption' : 'exact-selected-video-caption' },
+          exactVideoTiming: true,
+        };
+      }
+    } catch (error) {
+      console.warn('[YouTubeExactCaptionLyrics]', error && error.message || error);
+    }
+  }
   // YouTube Music lyrics and regular YouTube captions are separate data
   // sources. Read the Lyrics tab through youtubei.js first so tracks that show
   // lyrics in YouTube Music still have text even when the video has no caption
   // track and LRCLIB has no matching entry. The native text is later passed to
   // the existing local forced aligner to create word timing without changing UI.
   let youtubeMusicLyric = null;
+  let youtubeMusicReference = null;
   if (provider === 'youtube' && id) {
-    youtubeMusicLyric = await youtubeMusicNativeLyrics(id);
-  }
-
-  // YouTube captions are discovered through the same local yt-dlp engine
-  // already used for playback. JSON3/SRV3/WebVTT tracks are converted into the
-  // existing YRC-compatible line/word model, so no renderer UI or visual effect
-  // needs to be replaced. Uploaded captions are preferred, while original
-  // automatic captions are used when they provide richer word offsets.
-  if (provider === 'youtube' && id) {
-    const captionTimed = await youtubeCaptionService.fetchForVideo(id, {
-      getInfo: youtubeInfoViaYtDlp,
-      userAgent: UA,
-      languages: [query.language, providerConfig().language, 'vi', 'en'].filter(Boolean),
-    });
-    if (captionTimed) {
-      return {
-        ...captionTimed,
-        metadataProvider: 'youtube',
-        metadata,
-        match: { score: 100, duration },
-      };
+    // YouTube Music is a first-class music source again: use the exact song ID
+    // returned by yt.music.search for lyrics, metadata, playback and timing.
+    // Only normal YouTube videos may borrow lyric text from a separately
+    // matched YouTube Music song.
+    try { youtubeMusicLyric = await youtubeMusicNativeLyrics(id); } catch (_) { youtubeMusicLyric = null; }
+    if (youtubeSourceType === 'video' && (!youtubeMusicLyric || !youtubeMusicLyric.plainLyric)) {
+      try {
+        youtubeMusicLyric = await youtubeMusicReferenceLyrics(metadata, query);
+        youtubeMusicReference = youtubeMusicLyric && youtubeMusicLyric.youtubeMusicReference || null;
+      } catch (error) {
+        console.warn('[YouTubeMusicLyricsReference]', error && error.message || error);
+      }
     }
   }
+
+  // Keep the normal YouTube video for playback, while lyrics can come from a
+  // separately matched YouTube Music song. Automatic video captions are used
+  // only as a last resort because spoken captions often are not song lyrics.
 
   if (!trackName) return { lyric: '', tlyric: '', yrc: '', source: 'lrclib', plainLyric: '', metadataProvider: provider, metadata };
 
@@ -4530,14 +5061,15 @@ async function lyricsFor(id, provider, query = {}) {
     // used for display/fallback and for local word alignment.
     plainLyric: nativeYouTubePlainLyric || data.plainLyrics || '',
     instrumental: !!data.instrumental,
-    source: nativeYouTubePlainLyric ? 'youtube-music' : 'lrclib',
-    metadataProvider: provider === 'spotify' ? 'spotify' : (provider === 'youtube' ? 'youtube' : provider),
+    source: nativeYouTubePlainLyric ? (youtubeMusicReference ? 'youtube-music-reference' : 'youtube-music') : 'lrclib',
+    metadataProvider: provider === 'spotify' ? 'spotify' : (provider === 'youtube' ? (youtubeSourceType === 'music' ? 'youtube-music' : 'youtube-video') : provider),
     metadata,
     match,
     youtubeMusicLyrics: nativeYouTubePlainLyric ? {
       available: true,
       provider: youtubeMusicLyric.provider || 'YouTube Music',
       syncType: youtubeMusicLyric.syncType || 'UNSYNCED',
+      reference: youtubeMusicReference || undefined,
     } : undefined,
   };
 
@@ -4574,32 +5106,65 @@ async function lyricsFor(id, provider, query = {}) {
     }
   }
 
-  // When YouTube has no usable caption track, keep YouTube Music/LRCLIB text
-  // visible immediately and start a local forced-alignment job in the background. whisper.cpp
-  // generates word timestamps from the exact YouTube audio, while the trusted
-  // LRCLIB text supplies the words shown by the current renderer. The client
-  // polls this same endpoint until the cached word-aligned result is ready.
+  // Keep the two YouTube sources independent. YouTube Music restores the
+  // original music-provider path: exact music video ID, exact metadata and
+  // native/LRCLIB timing remain visible while optional alignment improves it.
+  // Normal YouTube video keeps the stricter exact-video alignment path.
   if (provider === 'youtube' && id && (baseResult.lyric || baseResult.plainLyric)) {
-    const alignment = await youtubeForcedAlignmentService.request(id, {
-      syncedLyric: baseResult.lyric,
-      plainLyric: baseResult.plainLyric,
-      duration,
-      language: query.language || providerConfig().language || 'auto',
-      track: trackName,
-      artist: artistName,
-    }, {
+    const exactTranscript = plainLyricForExactVideoAlignment(baseResult);
+    const alignmentPayload = youtubeSourceType === 'music'
+      ? {
+        syncedLyric: baseResult.lyric,
+        plainLyric: baseResult.plainLyric,
+        duration,
+        language: query.language || providerConfig().language || 'auto',
+        track: trackName,
+        artist: artistName,
+        exactVideoAlignment: false,
+      }
+      : {
+        syncedLyric: '',
+        plainLyric: exactTranscript,
+        duration,
+        language: query.language || providerConfig().language || 'auto',
+        track: trackName,
+        artist: artistName,
+        exactVideoAlignment: true,
+      };
+    const alignment = exactTranscript ? await youtubeForcedAlignmentService.request(id, alignmentPayload, {
       getYtDlpEngine: prepareYouTubeEngine,
       findNodeRuntime,
-    });
+    }) : null;
     if (alignment && alignment.status === 'ready' && alignment.result) {
       return {
         ...alignment.result,
-        metadataProvider: 'youtube',
+        metadataProvider: youtubeSourceType === 'music' ? 'youtube-music' : 'youtube-video',
         metadata,
         match,
+        youtubeMusicLyrics: baseResult.youtubeMusicLyrics,
+        exactVideoTiming: youtubeSourceType === 'video' ? alignment.result.exactVideoTiming === true : undefined,
         alignment: { status: 'ready', stage: 'ready' },
       };
     }
+    if (youtubeSourceType === 'video' && alignment && alignment.status === 'processing') {
+      // A normal video must not display timing borrowed from another version.
+      return {
+        lyric: '',
+        tlyric: '',
+        yrc: '',
+        plainLyric: '',
+        source: 'youtube-video-alignment-pending',
+        metadataProvider: 'youtube-video',
+        metadata,
+        match,
+        exactVideoTiming: false,
+        youtubeMusicLyrics: baseResult.youtubeMusicLyrics,
+        alignment,
+      };
+    }
+    // YouTube Music keeps its original timed/plain result visible while the
+    // background alignment task runs, matching the behaviour before universal
+    // YouTube video search was introduced.
     baseResult.alignment = alignment || { status: 'failed', stage: 'unknown', message: 'Alignment service is unavailable' };
   }
   return baseResult;
@@ -4658,6 +5223,9 @@ function mapYoutubePodcastProgram(song, radio) {
     source: 'podcast',
     provider: 'qq',
     realProvider: 'youtube',
+    youtubeSourceType: 'video',
+    youtubeSurface: 'video',
+    isYouTubeMusicResult: false,
     id: videoId,
     mid: videoId,
     songmid: videoId,
@@ -4682,7 +5250,7 @@ function mapYoutubePodcastProgram(song, radio) {
 
 async function youtubePodcastSearch(query, limit = 18) {
   const term = String(query || '').trim() || (providerConfig().language === 'en' ? 'popular podcast' : 'podcast Việt Nam');
-  const songs = await youtubeSearch(`${term} podcast`, Math.max(6, Math.min(30, Number(limit) || 18)));
+  const songs = await youtubeVideoSearch(`${term} podcast`, Math.max(6, Math.min(30, Number(limit) || 18)));
   return songs.map(mapYoutubePodcastRadio).filter(Boolean);
 }
 
@@ -4790,6 +5358,9 @@ module.exports = {
   spotifyAddSongToPlaylist,
   spotifyArtistDetail,
   youtubeSearch,
+  youtubeMusicSearch,
+  youtubeVideoSearch,
+  youtubeRecommendations,
   youtubePlaylistTracks,
   youtubeArtistDetail,
   resolveSpotifyPlayback,
@@ -4845,5 +5416,10 @@ module.exports = {
     youtubeCachedVideoDescriptor,
     mapYouTubeMusicItem,
     youtubeSearchItems,
+    markYouTubeSearchSurface,
+    classifyYouTubeMusicGenre,
+    youtubeGenreProfileByKey,
+    canonicalMusicRecommendationTitle,
+    genreRecommendationCandidateScore,
   },
 };

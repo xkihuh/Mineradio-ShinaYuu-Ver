@@ -720,7 +720,10 @@ function createProvider(options = {}) {
   }
 
   async function runAlignment(videoId, input, context, key) {
-    const synced = parseSyncedLyrics(input.syncedLyric, input.duration);
+    // Exact-video alignment must derive every timestamp from the selected
+    // video's own audio. Never preserve line timestamps borrowed from LRCLIB or
+    // a YouTube Music version, because intros/edits make those times drift.
+    const synced = input.exactVideoAlignment ? [] : parseSyncedLyrics(input.syncedLyric, input.duration);
     const lines = synced.length ? synced : parsePlainLyrics(input.plainLyric);
     if (!lines.length) throw new Error('No lyric transcript is available for forced alignment');
     const workDir = ensureDir(path.join(rootDir(), 'work', key));

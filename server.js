@@ -3855,14 +3855,44 @@ async function handleModernMusicRoute(req, res, url, pn) {
     return true;
   }
 
-  if (pn === '/api/qq/search') {
+  if (pn === '/api/qq/search' || pn === '/api/youtube-music/search') {
     try {
       const keywords = url.searchParams.get('keywords') || '';
       const limit = Math.max(1, Math.min(50, parseInt(url.searchParams.get('limit') || '18', 10) || 18));
-      const songs = keywords ? await musicProviders.youtubeSearch(keywords, limit) : [];
-      sendJSON(res, { provider: 'youtube', songs, result: songs });
+      const songs = keywords ? await musicProviders.youtubeMusicSearch(keywords, limit) : [];
+      sendJSON(res, { provider: 'youtube-music', sourceType: 'music', songs, result: songs });
     } catch (error) {
-      console.error('[YouTubeSearch]', error);
+      console.error('[YouTubeMusicSearch]', error);
+      sendJSON(res, { provider: 'youtube-music', sourceType: 'music', error: error.message, songs: [], result: [] }, Number(error.status) || 500);
+    }
+    return true;
+  }
+
+  if (pn === '/api/youtube-video/search') {
+    try {
+      const keywords = url.searchParams.get('keywords') || '';
+      const limit = Math.max(1, Math.min(50, parseInt(url.searchParams.get('limit') || '18', 10) || 18));
+      const songs = keywords ? await musicProviders.youtubeVideoSearch(keywords, limit) : [];
+      sendJSON(res, { provider: 'youtube-video', sourceType: 'video', songs, result: songs });
+    } catch (error) {
+      console.error('[YouTubeVideoSearch]', error);
+      sendJSON(res, { provider: 'youtube-video', sourceType: 'video', error: error.message, songs: [], result: [] }, Number(error.status) || 500);
+    }
+    return true;
+  }
+
+  if (pn === '/api/qq/recommend') {
+    try {
+      const videoId = url.searchParams.get('videoId') || url.searchParams.get('id') || '';
+      const limit = Math.max(1, Math.min(50, parseInt(url.searchParams.get('limit') || '20', 10) || 20));
+      const genre = url.searchParams.get('genre') || '';
+      const sourceType = String(url.searchParams.get('sourceType') || 'music').toLowerCase() === 'video' ? 'video' : 'music';
+      const songs = videoId ? await musicProviders.youtubeRecommendations(videoId, limit, genre, sourceType) : [];
+      const genreKey = songs[0] && songs[0].recommendationGenre || genre || '';
+      const genreLabel = songs[0] && songs[0].recommendationGenreLabel || '';
+      sendJSON(res, { provider: sourceType === 'video' ? 'youtube-video' : 'youtube-music', sourceType, videoId, genre: genreKey, genreLabel, songs, result: songs });
+    } catch (error) {
+      console.error('[YouTubeRecommend]', error);
       sendJSON(res, { provider: 'youtube', error: error.message, songs: [], result: [] }, Number(error.status) || 500);
     }
     return true;
@@ -3937,8 +3967,9 @@ async function handleModernMusicRoute(req, res, url, pn) {
     try {
       const id = url.searchParams.get('mid') || url.searchParams.get('id') || '';
       const quality = url.searchParams.get('quality') || '';
+      const sourceType = String(url.searchParams.get('sourceType') || 'music').toLowerCase() === 'video' ? 'video' : 'music';
       const data = await musicProviders.resolveYouTubePlayback(id, quality);
-      sendJSON(res, { ...data, loggedIn: false, vipType: 0, vipLevel: 'public', isVip: false, isSvip: false, vipLabel: 'YouTube Music' });
+      sendJSON(res, { ...data, sourceType, loggedIn: false, vipType: 0, vipLevel: 'public', isVip: false, isSvip: false, vipLabel: sourceType === 'video' ? 'YouTube Video' : 'YouTube Music' });
     } catch (error) {
       console.error('[YouTubePlayback]', error);
       sendJSON(res, {
@@ -3970,6 +4001,7 @@ async function handleModernMusicRoute(req, res, url, pn) {
         artist: url.searchParams.get('artist') || '',
         album: url.searchParams.get('album') || '',
         duration: url.searchParams.get('duration') || '',
+        sourceType: youtube ? (url.searchParams.get('sourceType') || 'music') : '',
         // Use the exact ID reported by the live Spotify SDK when its duration
         // matches the requested song. This fixes market relinking without ever
         // reusing a stale ID from the previously played track.
@@ -4291,15 +4323,28 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (pn === '/api/qq/search') {
+  if (pn === '/api/qq/search' || pn === '/api/youtube-music/search') {
     try {
       const kw = url.searchParams.get('keywords') || '';
-      const limit = Math.max(4, Math.min(12, parseInt(url.searchParams.get('limit') || '8', 10) || 8));
-      const songs = await handleQQSearch(kw, limit);
-      sendJSON(res, { provider: 'qq', songs });
+      const limit = Math.max(1, Math.min(50, parseInt(url.searchParams.get('limit') || '18', 10) || 18));
+      const songs = await musicProviders.youtubeMusicSearch(kw, limit);
+      sendJSON(res, { provider: 'youtube-music', sourceType: 'music', songs });
     } catch (err) {
-      console.error('[QQSearch]', err);
-      sendJSON(res, { provider: 'qq', error: err.message, songs: [] }, 500);
+      console.error('[YouTubeMusicSearch]', err);
+      sendJSON(res, { provider: 'youtube-music', sourceType: 'music', error: err.message, songs: [] }, 500);
+    }
+    return;
+  }
+
+  if (pn === '/api/youtube-video/search') {
+    try {
+      const kw = url.searchParams.get('keywords') || '';
+      const limit = Math.max(1, Math.min(50, parseInt(url.searchParams.get('limit') || '18', 10) || 18));
+      const songs = await musicProviders.youtubeVideoSearch(kw, limit);
+      sendJSON(res, { provider: 'youtube-video', sourceType: 'video', songs });
+    } catch (err) {
+      console.error('[YouTubeVideoSearch]', err);
+      sendJSON(res, { provider: 'youtube-video', sourceType: 'video', error: err.message, songs: [] }, 500);
     }
     return;
   }
