@@ -8,8 +8,18 @@ const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const dist = path.join(root, 'dist');
 const unpacked = path.join(dist, 'win-unpacked');
-const installer = path.join(dist, 'ShinaYuu-Music-1.1.7-Setup.exe');
+const pkg = require(path.join(root, 'package.json'));
+const displayVersion = String(pkg.shinayuu && pkg.shinayuu.displayVersion || pkg.build && pkg.build.buildVersion || pkg.version || '1.1.7').trim();
+const installer = path.join(dist, `ShinaYuu-Music-${displayVersion}-Setup.exe`);
 const unsigned = process.argv.includes('--unsigned');
+const skipTests = process.argv.includes('--skip-tests') || process.env.SHINAYUU_SKIP_TESTS === '1';
+
+function cliValue(name) {
+  const index = process.argv.indexOf(name);
+  return index >= 0 && process.argv[index + 1] ? process.argv[index + 1] : '';
+}
+const patchFromDir = cliValue('--patch-from-dir') || process.env.SHINAYUU_PATCH_FROM_DIR || '';
+const patchFromVersion = cliValue('--patch-from-version') || process.env.SHINAYUU_PATCH_FROM_VERSION || '';
 
 function fail(message) {
   throw new Error(message);
@@ -61,7 +71,7 @@ function writeLatestYml(file) {
   const sha512 = crypto.createHash('sha512').update(buffer).digest('base64');
   const fileName = path.basename(file);
   const metadata = [
-    'version: 1.1.7',
+    `version: ${displayVersion}`, 
     'files:',
     `  - url: ${fileName}`,
     `    sha512: ${sha512}`,
@@ -84,6 +94,11 @@ if (process.platform !== 'win32') {
 runNode('tools/ensure-castlabs-runtime.js');
 runNode('tools/verify-castlabs-runtime.js');
 runNode('tools/ensure-ytdlp-bundle.js');
+if (skipTests) {
+  console.warn('\n[Build] Skipping regression tests (--skip-tests).');
+} else {
+  run(npmCommand(), ['test']);
+}
 
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(dist, { recursive: true });
@@ -115,4 +130,9 @@ if (!fs.existsSync(installer)) fail(`Installer was not created: ${installer}`);
 
 writeSha256(installer);
 writeLatestYml(installer);
+if (patchFromDir && patchFromVersion) {
+  runNode('tools/build-update-patch.js', ['--from-dir', patchFromDir, '--from-version', patchFromVersion]);
+} else if (patchFromDir || patchFromVersion) {
+  console.warn('[Build] Both --patch-from-dir and --patch-from-version are required; patch generation was skipped.');
+}
 console.log(`\n[Build] Installer created: ${installer}`);

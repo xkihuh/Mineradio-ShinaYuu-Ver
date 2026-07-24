@@ -1,44 +1,45 @@
-# Modification Report — ShinaYuu Music 1.1.7.3
+# Modification Report — ShinaYuu Music 1.1.7.4
 
-## Requested fixes
+## Requested changes
 
-- Recover YouTube audio and MV playback after long pause/background periods on Windows 10 gaming systems without requiring an application restart.
-- Reduce the cold delay between selecting a result and hearing/seeing playback.
-- Prevent the MV from disappearing or remaining black while audio continues.
-- Allow lyric delay and timeline calibration on every playback source.
+- Replace full-installer-only updates with a lightweight update that is applied inside the app and activated by restarting.
+- Fix Playing MV disappearing, freezing, or remaining black after ShinaYuu Music is left in the background for several minutes.
+- Reduce intermittent MV judder while keeping audio as the authoritative playback clock.
+- Preserve the separate Spotify, YouTube Music, and YouTube Video sources and all existing lyrics/UI behavior.
 
-## Implemented changes
+## In-app update implementation
 
-- Classifies expired stream URLs, HTTP failures, timeouts and network interruptions as transient stream failures instead of engine-installation failures.
-- Performs a non-destructive engine health check and only rebuilds the bundled engine for genuine missing, blocked or invalid executable errors.
-- Prefetches fresh YouTube audio/MV descriptors during extended pause and restores the media elements at the saved playback position on resume.
-- Races Innertube with a delayed yt-dlp request for faster first usable descriptors, while retaining yt-dlp and H.264/MP4 compatibility fallbacks.
-- Retries audio and video proxy requests once with a refreshed descriptor when signed URLs expire.
-- Keeps artwork behind the MV until decoded frames are ready and repairs the decoder after background suspension or repeated stalls.
-- Extends per-track lyric delay and timeline-rate controls to exact Spotify, YouTube Music, YouTube Video and local timing sources.
-- Added regression coverage for idle resume, stream refresh, black-video fallback, compatibility recovery and universal lyric calibration.
+- Added a resource-patch generator that compares a previous source/app directory with the current release and packages only approved changed application files.
+- Added SHA-256 metadata for each patched file and a checksum for the complete patch asset.
+- The existing updater now prefers a compatible patch from the GitHub Release, applies it to the installed app, and presents a restart action instead of launching NSIS.
+- The full installer remains available as a fallback for new installations, incompatible patches, runtime/DLL changes, or patch failures.
+- Added optional patch generation to the official Windows release build through `--patch-from-dir` and `--patch-from-version`.
+
+## MV background recovery implementation
+
+- A resumed video is no longer shown merely because the media element emitted `playing`; it remains hidden behind the cover until a decoded frame is confirmed.
+- On foreground return, recovery progresses through bounded stages: resume and clock sync, rebind the current stream, reuse a cached H.264/MP4 descriptor, then request a fresh compatibility stream.
+- Video waiting/stalled events restore the artwork fallback instead of exposing a dead black frame.
+- Extended background periods prime a compatibility descriptor before the user returns when practical.
+- Reduced aggressive hard seeking and narrowed playback-rate correction to make motion smoother while retaining automatic A/V recovery.
 
 ## Preserved systems
 
-- Separate Spotify, YouTube Music and YouTube Video sources
-- Original lyrics/title UI and visual layout
+- Separate Spotify, YouTube Music, and YouTube Video sources
+- Original lyrics/title UI and per-track lyrics calibration
 - Castlabs Electron/Widevine runtime
-- Three.js, GSAP, visualizer and playlist shelf
-- MV display modes and A/V synchronization watchdog
-- Discord Rich Presence, updater and Windows installer pipeline
+- Three.js, GSAP, visualizer, playlist shelf, and all established UI/UX
+- Discord Rich Presence and the full NSIS installer fallback
 
-## Restored architecture
+## Validation
 
-- Spotify remains the Spotify music source.
-- YouTube Music is restored as the dedicated YouTube music source used by music search, music recommendations, music metadata and the original YouTube Music lyric pipeline.
-- YouTube Video is a separate source used only when the user selects normal YouTube video search/results.
-- Playing MV is a visual-only muted stream tied to the selected item; it does not redefine the playback provider or lyric provider.
+- Added regression coverage for background MV resume, decoded-frame gating, compatibility recovery, patch generation, patch application, updater selection, packaging, and version metadata.
+- Verified JavaScript syntax for server, provider, build tools, and all inline renderer scripts.
+- All available regression tests passed; the local archive-library test requires dependencies installed by `npm ci` because the source workspace does not include `node_modules/node-7z`.
 
-## Persistence and queue correctness
+---
 
-- Queue recommendations inherit the source of the seed track: Music stays Music, Video stays Video.
-- Playback prefetch and descriptor keys include the YouTube source type.
-- Listening-history snapshots preserve the source type so reopening a normal video does not silently convert it into a YouTube Music item, and vice versa.
+## Earlier modification history
 
 # Modification Report — ShinaYuu Music 1.1.7
 
@@ -196,3 +197,10 @@
 - Added decoder recovery for cases where the video frame freezes while its media clock appears to continue.
 - Preserved the gentler synchronization behavior for YouTube Music and all existing Spotify, lyrics, playlist, visual, and UI/UX behavior.
 - Added YouTube Video A/V resynchronization regression coverage.
+
+
+## 1.1.7.4
+- Added an in-app resource-patch build tool and optional release-build patch generation.
+- Fixed YouTube MV loss/black frames after long background periods by waiting for a confirmed decoded frame before revealing video.
+- Added staged decoder recovery: clock resync, element rebind, cached compatibility stream, then fresh H.264/MP4 stream.
+- Reduced MV judder with gentler playback-rate correction and less frequent hard seeking.

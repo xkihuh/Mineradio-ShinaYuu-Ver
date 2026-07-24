@@ -1,3 +1,14 @@
+## 1.1.7.4 — In-app patch updates and background MV recovery
+
+- Added restart-only in-app resource updates. A compatible `.patch.json` is downloaded, verified, applied to the installed application files, and activated after restarting ShinaYuu Music.
+- Added `npm run build:update-patch` and optional `--patch-from-dir` / `--patch-from-version` release-build arguments for generating GitHub Release patch assets.
+- Fixed YouTube MV disappearing, freezing, or covering the artwork with a black frame after the application remains in the background for several minutes.
+- Keeps artwork visible until Chromium confirms that the resumed MV has decoded a real frame.
+- Added staged foreground recovery: clock resynchronization, media-element rebind, cached compatibility stream, then a fresh H.264/MP4 stream.
+- Reduced visible MV judder by using gentler playback-rate correction, a slower watchdog cadence, and fewer hard seeks.
+- Preserved Spotify, YouTube Music, YouTube Video, lyrics calibration, Three.js, GSAP, playlists, and the existing UI/UX.
+- Updated package, display/build version, installer name, changelog, release notes, modification report, and regression coverage to 1.1.7.4.
+
 ## 1.1.7.3 — Idle resume, fast playback and MV recovery
 
 - Fixed YouTube playback failing after a track was paused or the application stayed in the background for several minutes.
@@ -524,3 +535,4 @@ All notable changes to ShinaYuu Music are documented in this file.
 - Added decoder recovery for cases where the video frame freezes while its media clock appears to continue.
 - Preserved the gentler synchronization behavior for YouTube Music and all existing Spotify, lyrics, playlist, visual, and UI/UX behavior.
 - Added YouTube Video A/V resynchronization regression coverage.
+

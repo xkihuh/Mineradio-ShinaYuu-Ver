@@ -74,7 +74,7 @@ const APP_VERSION = process.env.MINERADIO_VERSION || (APP_PACKAGE.shinayuu && AP
 const UPDATE_CONFIG = readUpdateConfig(APP_PACKAGE);
 const PATCH_MAX_BYTES = 12 * 1024 * 1024;
 const PATCH_ALLOWED_ROOTS = new Set(['public', 'desktop', 'build']);
-const PATCH_ALLOWED_FILES = new Set(['server.js', 'dj-analyzer.js', 'package.json', 'package-lock.json']);
+const PATCH_ALLOWED_FILES = new Set(['server.js', 'music-providers.js', 'local-library.js', 'youtube-caption-provider.js', 'youtube-forced-aligner.js', 'dj-analyzer.js', 'package.json', 'package-lock.json']);
 const UPDATE_FALLBACK_NOTES = [
   '电影镜头节奏更松',
   '音源失败自动换源',

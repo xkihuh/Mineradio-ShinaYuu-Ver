@@ -1,14 +1,14 @@
-# ShinaYuu Music 1.1.7
+# ShinaYuu Music 1.1.7.4
 
 ShinaYuu Music is a Windows visual music player built with Castlabs Electron, Spotify, YouTube, synchronized lyrics, Three.js, GSAP and Liquid Glass effects.
 
-Version `1.1.7` adds an optional **Playing MV** background. Each YouTube item uses the raw video frames from its exact video ID as a per-track wallpaper without YouTube logos, channel labels, controls or overlays. The wallpaper changes with the selected track and follows play, pause, seek and playback rate while the existing UI/UX, Three.js playlist shelf, lyrics, search, controls and panels keep their original layout and stacking order. The existing audio engine remains the only audible source. Spotify tracks continue to use Spotify artist and album artwork.
+Version `1.1.7.4` keeps the optional **Playing MV** background and adds restart-only in-app resource updates. Each YouTube item uses the raw video frames from its exact video ID as a per-track wallpaper without YouTube logos, channel labels, controls or overlays. The wallpaper changes with the selected track and follows play, pause, seek and playback rate while the existing UI/UX, Three.js playlist shelf, lyrics, search, controls and panels keep their original layout and stacking order. The existing audio engine remains the only audible source. Spotify tracks continue to use Spotify artist and album artwork.
 
-See `RELEASE_1.1.7.md` for the exact release scope.
+See `RELEASE_1.1.7.4.md` for the exact release scope.
 
 ## Release focus
 
-ShinaYuu Music `1.1.7.3` keeps the raw video-only **Playing MV** background while restoring **YouTube Music** as a separate music source and exposing normal **YouTube Video** as an additional source. Playback, lyrics, visual effects and the desktop architecture remain independent from the MV background.
+ShinaYuu Music `1.1.7.4` keeps the raw video-only **Playing MV** background while restoring **YouTube Music** as a separate music source and exposing normal **YouTube Video** as an additional source. Playback, lyrics, visual effects and the desktop architecture remain independent from the MV background.
 
 ## Runtime architecture
 
@@ -162,6 +162,16 @@ Spotify now runs in the same Castlabs Electron renderer as the application UI. T
 - `SECURITY.md` — security reporting and credential handling.
 - `NOTICE.md` — attribution and third-party notices.
 - `CHANGELOG.md` — release history.
+
+## In-app resource patch
+
+Create a restart-only patch from the previous source directory:
+
+```powershell
+npm run build:update-patch -- --from-dir "D:\path\to\previous-source" --from-version 1.1.7.3
+```
+
+The patch and its SHA-256 file are written to `dist/updates`. Upload both to the matching GitHub Release. The app prefers the patch and only falls back to the full installer when no compatible patch is available.
 
 ## Acknowledgments
 
