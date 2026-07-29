@@ -19,7 +19,8 @@
     "test": "npm run test:shinayuu2",
     "prepare:renderer": "node tools/build-renderer-bundle.js",
     "test:shinayuu2": "node tools/audit-public-npm-lock.js && node tools/build-renderer-bundle.js && node tools/audit-i18n.js && node --test tests/shinayuu2-*.test.js",
-    "preview:win": "node build/preview-win.js"
+    "preview:win": "node build/preview-win.js",
+    "build:update-patch": "node tools/build-update-patch.js"
   },
   "build": {
     "appId": "com.shinayuu.music",
@@ -87,7 +88,15 @@
       "artifactName": "ShinaYuu-Music-${version}-Setup.${ext}"
     },
     "buildVersion": "2.0.0.0",
-    "electronDist": "node_modules/electron/dist"
+    "electronDist": "node_modules/electron/dist",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "xkihuh",
+        "repo": "Mineradio-ShinaYuu-Ver",
+        "releaseType": "release"
+      }
+    ]
   },
   "dependencies": {
     "7zip-bin": "^5.2.0",
@@ -146,10 +155,30 @@
       "applicationId": "",
       "largeImageKey": "shinayuu",
       "largeImageText": "ShinaYuu Music"
+    },
+    "update": {
+      "provider": "github",
+      "owner": "xkihuh",
+      "repo": "Mineradio-ShinaYuu-Ver",
+      "repository": "https://github.com/xkihuh/Mineradio-ShinaYuu-Ver",
+      "preview": false,
+      "preferMirrors": false,
+      "mirrors": [],
+      "checkDelayMs": 10000,
+      "checkIntervalMs": 21600000,
+      "autoPrompt": true
     }
   },
   "engines": {
     "node": ">=22.0.0"
   },
-  "displayVersion": "2.0.0"
+  "displayVersion": "2.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xkihuh/Mineradio-ShinaYuu-Ver.git"
+  },
+  "homepage": "https://github.com/xkihuh/Mineradio-ShinaYuu-Ver#readme",
+  "bugs": {
+    "url": "https://github.com/xkihuh/Mineradio-ShinaYuu-Ver/issues"
+  }
 }

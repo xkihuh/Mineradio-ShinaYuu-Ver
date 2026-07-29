@@ -5680,12 +5680,12 @@ async function lyricsFor(id, provider, query = {}) {
       },
     });
 
-    // QQ/NetEase own the first synchronized-lyrics window. Spotify native and
-    // duration-checked LRCLIB are already running in parallel, so this priority
-    // does not create a serial delay when the Chinese providers are unavailable.
+    // QQ/NetEase own a short synchronized-lyrics head start. Spotify native and
+    // duration-checked LRCLIB are already running in parallel; the short window
+    // preserves source priority without making Spotify appear lyric-less.
     const primaryFirst = await Promise.race([
       primaryCrossPromise.then((value) => usablePrimary(value) ? value : null),
-      new Promise((resolve) => setTimeout(() => resolve(null), 620)),
+      new Promise((resolve) => setTimeout(() => resolve(null), 220)),
     ]);
     if (primaryFirst) return wrapPrimary(primaryFirst);
 
@@ -5697,7 +5697,7 @@ async function lyricsFor(id, provider, query = {}) {
         spotifyNativePromise.then((value) => usableTimed(value) ? { kind: 'native', value } : Promise.reject(new Error('NO_NATIVE_TIMED_LYRIC'))),
         spotifyFastLrclibPromise.then((value) => usableTimed(value) ? { kind: 'lrclib', value } : Promise.reject(new Error('NO_LRCLIB_TIMED_LYRIC'))),
       ]).catch(() => null),
-      new Promise((resolve) => setTimeout(() => resolve(null), 900)),
+      new Promise((resolve) => setTimeout(() => resolve(null), 520)),
     ]);
     if (timedResult && timedResult.kind === 'primary') return wrapPrimary(timedResult.value);
     if (timedResult && timedResult.value) return timedResult.value;
@@ -5711,14 +5711,14 @@ async function lyricsFor(id, provider, query = {}) {
         spotifyNativePromise.then((value) => usableAny(value) ? { kind: 'native', value } : Promise.reject(new Error('NO_NATIVE_TEXT'))),
         spotifyFastLrclibPromise.then((value) => usableAny(value) ? { kind: 'lrclib', value } : Promise.reject(new Error('NO_LRCLIB_TEXT'))),
       ]).catch(() => null),
-      new Promise((resolve) => setTimeout(() => resolve(null), 320)),
+      new Promise((resolve) => setTimeout(() => resolve(null), 180)),
     ]);
     if (textResult && textResult.kind === 'primary') return wrapPrimary(textResult.value);
     if (textResult && textResult.value) return textResult.value;
 
     primaryCrossLyrics = await Promise.race([
       primaryCrossPromise,
-      new Promise((resolve) => setTimeout(() => resolve(null), 80)),
+      new Promise((resolve) => setTimeout(() => resolve(null), 40)),
     ]);
   } else {
     primaryCrossLyrics = await primaryCrossPromise;
