@@ -1,8 +1,8 @@
 {
   "name": "shinayuu-music",
   "productName": "ShinaYuu Music",
-  "version": "2.0.0",
-  "description": "ShinaYuu Music 2.0.0: a unified desktop music player with YouTube Music, YouTube Video, Spotify Premium, local music, synchronized multi-provider lyrics, AutoMix, visual lyrics and desktop wallpaper features.",
+  "version": "2.0.2",
+  "description": "ShinaYuu Music 2.0.2: customizable Home wallpaper notes with Liquid UI, unlimited quote entries, per-quote typography and smart readable motion effects, plus the 2.0.1 AutoMix, Spotify playback and updater fixes.",
   "author": "ShinaYuu",
   "license": "GPL-3.0-only",
   "main": "desktop/main.js",
@@ -20,7 +20,9 @@
     "prepare:renderer": "node tools/build-renderer-bundle.js",
     "test:shinayuu2": "node tools/audit-public-npm-lock.js && node tools/build-renderer-bundle.js && node tools/audit-i18n.js && node --test tests/shinayuu2-*.test.js",
     "preview:win": "node build/preview-win.js",
-    "build:update-patch": "node tools/build-update-patch.js"
+    "build:update-patch": "node tools/build-update-patch.js",
+    "patch": "node tools/create-update-patch.js",
+    "build:patch": "node tools/create-update-patch.js"
   },
   "build": {
     "appId": "com.shinayuu.music",
@@ -87,7 +89,7 @@
       "include": "build/installer.nsh",
       "artifactName": "ShinaYuu-Music-${version}-Setup.${ext}"
     },
-    "buildVersion": "2.0.0.0",
+    "buildVersion": "2.0.2.0",
     "electronDist": "node_modules/electron/dist",
     "publish": [
       {
@@ -120,8 +122,8 @@
     "rcedit": "^5.0.2"
   },
   "shinayuu": {
-    "displayVersion": "2.0.0",
-    "edition": "ShinaYuu Music 2.0.0 Official",
+    "displayVersion": "2.0.2",
+    "edition": "ShinaYuu Music 2.0.2 Official",
     "lineage": {
       "productCore": "ShinaYuu Music 1.1.8.7",
       "visualUiAndLyricsStage": "Mineradio 2.0.2",
@@ -172,7 +174,7 @@
   "engines": {
     "node": ">=22.0.0"
   },
-  "displayVersion": "2.0.0",
+  "displayVersion": "2.0.2",
   "repository": {
     "type": "git",
     "url": "https://github.com/xkihuh/Mineradio-ShinaYuu-Ver.git"

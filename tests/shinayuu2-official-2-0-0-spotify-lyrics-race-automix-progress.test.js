@@ -45,7 +45,8 @@ test('progress uses a VSync ticker and a compositor-only AutoMix handoff', () =>
   assert.match(progress, /requestAnimationFrame\(playbackProgressFrameTick\)/);
   assert.match(progress, /fill\.style\.transform = 'scaleX\('/);
   assert.match(progress, /window\.beginSmoothProgressHandoff = beginSmoothProgressHandoff/);
-  assert.match(mix, /window\.beginSmoothProgressHandoff\(incoming, incomingDuration\)/);
+  assert.match(mix, /function commitAutoMixUiHandoff\(pending, media\)/);
+  assert.match(mix, /window\.beginSmoothProgressHandoff\(media \|\| null, duration\)/);
   assert.match(mix, /window\.startPlaybackProgressTicker\(\)/);
   assert.match(spotify, /typeof window\.startPlaybackProgressTicker === 'function'/);
   assert.match(spotify, /\}, 500\);/);

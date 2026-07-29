@@ -1,3 +1,27 @@
+# ShinaYuu Music Changelog
+
+## 2.0.2
+- Added a Liquid Glass Home wallpaper content customizer with editable built-in quotes and an unrestricted item list for user-created notes/messages.
+- Added per-quote text, signature, color, font family, font size, weight, italic style, alignment, enabled state, effect and speed controls.
+- Added add, edit, duplicate, delete, clear-all and restore-default workflows with local persistence and v1 quote migration.
+- Added smart automatic overflow handling: static for short notes, marquee for long single lines, paged transitions for medium text and vertical scrolling for long text.
+- Added manual Static, Vertical scroll, Horizontal marquee, Paged, Typewriter and Segment fade modes.
+- Added hover pause, sequential/random cycling, reduced-motion support, scrollable static overflow and a full-content Liquid reader.
+- Keeps Home layout stable by animating only the text viewport and preventing frequent Home renders from restarting the active effect.
+- Bumped package, display, build and installer versions to 2.0.2 / 2.0.2.0.
+
+## 2.0.1
+- Restored the ShinaYuu Music 1.1.7.x-style update experience: automatic new-version notification, release notes, current-to-latest version display and explicit Later / Update now actions.
+- Added a visible `Cập nhật ngay / Update now` button after a newer release is detected.
+- Connected the existing updater backend to the UI for quick patch download, progress/speed display, SHA verification, automatic full-installer fallback, restart-after-patch and installer launch followed by app shutdown.
+- Added startup and periodic update checks using the configured `checkDelayMs`, `checkIntervalMs` and `autoPrompt` settings.
+- Added `npm run patch` / `npm run build:patch` to generate a version-aware resource patch and SHA-256 checksum from a previous source ZIP, source folder, or installed `resources/app` directory.
+- Eliminated the one-frame AutoMix UI hitch by pre-decoding the next cover and committing progress/title/artwork in a single compositor frame.
+- Reused the progress handoff ghost instead of inserting/removing DOM at every transition.
+- Deferred heavy cover analysis, badges, likes, cinema profile and panel refresh outside the critical handoff window.
+- Prewarms the Spotify Web Playback SDK immediately after account login, resumes matched-but-paused SDK tracks, activates dormant devices on retry and reconnects the SDK on the final direct-play attempt.
+- Adds a last-resort matched YouTube Music audio fallback when Spotify direct playback is unavailable, so a failed Spotify row no longer leaves the player silent or locks the queue.
+
 # ShinaYuu Music 2.0.0
 
 - Mixed YouTube/Spotify queues now normalize Spotify track identities before playback, preserve the audible source during SDK recovery, and skip a temporarily failed Spotify item instead of locking the rest of the queue.
