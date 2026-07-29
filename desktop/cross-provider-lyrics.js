@@ -95,6 +95,85 @@ function durationCompatibility(sourceDuration, targetDuration) {
   };
 }
 
+
+function formatLrcTimestamp(totalMs, bracket) {
+  const ms = Math.max(0, Math.round(Number(totalMs) || 0));
+  const minutes = Math.floor(ms / 60000);
+  const seconds = Math.floor((ms % 60000) / 1000);
+  const millis = ms % 1000;
+  return `${bracket === '<' ? '<' : '['}${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(millis).padStart(3, '0')}${bracket === '<' ? '>' : ']'}`;
+}
+
+function scaleLrcTiming(text, scale) {
+  const factor = Number(scale) || 1;
+  if (!text || Math.abs(factor - 1) < 0.0001) return String(text || '');
+  return String(text).replace(/([\[<])(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?([\]>])/g, (full, open, min, sec, frac, close) => {
+    if ((open === '[' && close !== ']') || (open === '<' && close !== '>')) return full;
+    const fraction = String(frac || '0');
+    const fractionMs = fraction.length === 1 ? Number(fraction) * 100 : (fraction.length === 2 ? Number(fraction) * 10 : Number(fraction.slice(0, 3)));
+    const sourceMs = (Number(min) * 60 + Number(sec)) * 1000 + fractionMs;
+    return formatLrcTimestamp(sourceMs * factor, open);
+  });
+}
+
+function scaleMillisecondTiming(text, scale) {
+  const factor = Number(scale) || 1;
+  if (!text || Math.abs(factor - 1) < 0.0001) return String(text || '');
+  return String(text)
+    .replace(/^\[(\d+),(\d+)\]/gm, (full, start, duration) => `[${Math.max(0, Math.round(Number(start) * factor))},${Math.max(1, Math.round(Number(duration) * factor))}]`)
+    .replace(/\((\d+),(\d+)(,\d+)?\)/g, (full, start, duration, suffix) => `(${Math.max(0, Math.round(Number(start) * factor))},${Math.max(1, Math.round(Number(duration) * factor))}${suffix || ''})`);
+}
+
+function scaleTimedPayloadField(text, scale) {
+  const raw = String(text || '');
+  if (!raw) return '';
+  if (/^\[\d+,\d+\]/m.test(raw) || /\(\d+,\d+(?:,\d+)?\)/.test(raw)) return scaleMillisecondTiming(raw, scale);
+  if (/^[\s\S]*?[\[<]\d{1,3}:\d{1,2}/m.test(raw)) return scaleLrcTiming(raw, scale);
+  return raw;
+}
+
+function calibrateTimedPayload(best, useTiming, targetDuration) {
+  const sourceDuration = normalizeDurationSeconds(best && best.candidate && best.candidate.duration || 0);
+  const target = normalizeDurationSeconds(targetDuration);
+  const confidence = Number(best && best.confidence || 0);
+  const duration = best && best.durationMatch || durationCompatibility(sourceDuration, target);
+  const scale = sourceDuration > 0 && target > 0 ? target / sourceDuration : 1;
+  const eligible = !!useTiming
+    && confidence >= 92
+    && duration && duration.compatible
+    && sourceDuration > 0 && target > 0
+    && scale >= 0.975 && scale <= 1.025
+    && Math.abs(target - sourceDuration) >= 0.35;
+  if (!eligible) {
+    return {
+      lyric: String(best && best.lyric || ''),
+      tlyric: String(best && best.tlyric || ''),
+      yrc: String(best && (best.yrc || best.qrc) || ''),
+      qrc: String(best && best.qrc || ''),
+      ytlrc: String(best && best.ytlrc || ''),
+      romalrc: String(best && (best.romalrc || best.roma) || ''),
+      yromalrc: String(best && best.yromalrc || ''),
+      timingCalibration: { applied: false, scale: 1, sourceDuration, targetDuration: target },
+    };
+  }
+  return {
+    lyric: scaleTimedPayloadField(best.lyric, scale),
+    tlyric: scaleTimedPayloadField(best.tlyric, scale),
+    yrc: scaleTimedPayloadField(best.yrc || best.qrc, scale),
+    qrc: scaleTimedPayloadField(best.qrc, scale),
+    ytlrc: scaleTimedPayloadField(best.ytlrc, scale),
+    romalrc: scaleTimedPayloadField(best.romalrc || best.roma, scale),
+    yromalrc: scaleTimedPayloadField(best.yromalrc, scale),
+    timingCalibration: {
+      applied: true,
+      scale: Number(scale.toFixed(6)),
+      sourceDuration,
+      targetDuration: target,
+      durationDelta: Number((target - sourceDuration).toFixed(3)),
+    },
+  };
+}
+
 function scoreCandidate(candidate, target) {
   if (!candidate || !candidate.name) return { score: -Infinity, confidence: 0, duration: durationCompatibility(0, 0) };
   const titleA = compactTitle(candidate.name);
@@ -730,14 +809,15 @@ function createBroker(options = {}) {
       const allowForeignTiming = playbackProvider !== 'youtube' || youtubeSourceType !== 'video';
       const useTiming = allowForeignTiming && best.timingSafe;
       const sourceDuration = normalizeDurationSeconds(best.candidate && best.candidate.duration || 0);
+      const calibrated = calibrateTimedPayload(best, useTiming, target.duration);
       const result = {
-        lyric: useTiming ? String(best.lyric || '') : '',
-        tlyric: String(best.tlyric || ''),
-        yrc: useTiming ? String(best.yrc || best.qrc || '') : '',
-        qrc: String(best.qrc || ''),
-        ytlrc: String(best.ytlrc || ''),
-        romalrc: String(best.romalrc || best.roma || ''),
-        yromalrc: String(best.yromalrc || ''),
+        lyric: useTiming ? calibrated.lyric : '',
+        tlyric: calibrated.tlyric,
+        yrc: useTiming ? calibrated.yrc : '',
+        qrc: calibrated.qrc,
+        ytlrc: calibrated.ytlrc,
+        romalrc: calibrated.romalrc,
+        yromalrc: calibrated.yromalrc,
         plainLyric: String(best.plainLyric || ''),
         source: `${best.provider}-${useTiming ? (best.hasWordTiming ? 'word-timed' : 'line-timed') : 'text'}`,
         lyricTextProvider: best.provider,
@@ -749,6 +829,7 @@ function createBroker(options = {}) {
         timingSafe: useTiming,
         sourceDuration,
         targetDuration: target.duration,
+        timingCalibration: calibrated.timingCalibration,
         match: {
           provider: best.provider,
           id: best.candidate && (best.candidate.id || best.candidate.mid) || '',
@@ -791,4 +872,7 @@ module.exports = {
   lyricTextWithoutTiming,
   scoreCandidate,
   durationCompatibility,
+  scaleLrcTiming,
+  scaleMillisecondTiming,
+  calibrateTimedPayload,
 };
