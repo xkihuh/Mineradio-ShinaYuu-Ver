@@ -10,7 +10,7 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
 test('official GitHub update source is embedded in package metadata', () => {
   const pkg = JSON.parse(read('package.json'));
-  assert.equal(pkg.version, '2.0.0');
+  assert.equal(pkg.version, '2.0.1');
   assert.deepEqual(pkg.repository, {
     type: 'git',
     url: 'https://github.com/xkihuh/Mineradio-ShinaYuu-Ver.git',
@@ -44,8 +44,9 @@ test('AutoMix uses an audio-thread gain curve and yields before queue metadata c
   assert.match(mix, /setValueCurveAtTime\(outgoingCurve, startAt, durationSec\)/);
   assert.match(mix, /setValueCurveAtTime\(incomingCurve, startAt, durationSec\)/);
   assert.match(mix, /window\.shinayuuAutoMixCriticalUntil = performance\.now\(\) \+ 900/);
-  assert.match(mix, /await waitForVisualFrames\(2\)/);
-  assert.match(mix, /await delay\(0\)/);
+  assert.match(mix, /await waitForVisualFrames\(1\)/);
+  assert.match(mix, /function commitAutoMixUiHandoff\(pending, media\)/);
+  assert.match(mix, /sy-automix-cover-swap/);
 });
 
 test('progress handoff crossfades two compositor layers instead of sweeping backwards', () => {
@@ -64,6 +65,7 @@ test('noncritical queue and visual work is deferred outside the AutoMix handoff'
   assert.match(playback, /deferQueueHydrationForAutoMix/);
   assert.match(playback, /hydrate-song-deferred/);
   assert.match(playback, /if \(smoothAutoMixHandoff\) setTimeout\(applyTrackVisualMode, 260\)/);
-  assert.match(playback, /requestAnimationFrame\(function \(\) \{ setTimeout\(applyTrackUiCommit, 86\); \}\)/);
+  assert.match(playback, /opts\.autoMixUiPrecommitted/);
+  assert.match(playback, /setTimeout\(applyTrackUiCommit, 360\)/);
   assert.match(playback, /delay: smoothAutoMixHandoff \? 720 : 130/);
 });
