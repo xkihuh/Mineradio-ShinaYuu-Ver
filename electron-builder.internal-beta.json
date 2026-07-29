@@ -1,0 +1,80 @@
+{
+  "appId": "com.shinayuu.music.internal",
+  "productName": "ShinaYuu Music Alpha",
+  "directories": {
+    "output": "dist-internal-alpha",
+    "buildResources": "build"
+  },
+  "afterPack": "build/after-pack.js",
+  "toolsets": {
+    "winCodeSign": "1.1.0"
+  },
+  "extraMetadata": {
+    "name": "shinayuu-music-internal",
+    "productName": "ShinaYuu Music Alpha",
+    "version": "2.0.0-alpha.3",
+    "shinayuu": {
+      "internalAlpha": true,
+      "runtimeName": "ShinaYuu Music Alpha",
+      "appUserModelId": "com.shinayuu.music.internal",
+      "update": {
+        "disabled": true,
+        "provider": "none",
+        "preview": false,
+        "preferMirrors": false,
+        "mirrors": []
+      }
+    }
+  },
+  "files": [
+    "desktop/**/*",
+    "public/**/*",
+    "build/**/*",
+    "server.js",
+    "music-providers.js",
+    "modern-music-routes.js",
+    "local-library.js",
+    "youtube-caption-provider.js",
+    "youtube-forced-aligner.js",
+    "dj-analyzer.js",
+    "qishui-audio-decryptor/**/*",
+    "qishui-api.js",
+    "kugou-api.js",
+    "LICENSE",
+    "NOTICE.md",
+    "docs/THIRD_PARTY_PORTS.md",
+    "package.json",
+    "!public/index.*.html",
+    "public/index.html"
+  ],
+  "asar": true,
+  "win": {
+    "executableName": "ShinaYuuMusicAlpha",
+    "icon": "build/icon.ico",
+    "signAndEditExecutable": false,
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      }
+    ]
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": false,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "ShinaYuu Music Alpha",
+    "installerIcon": "build/icon.ico",
+    "uninstallerIcon": "build/icon.ico",
+    "installerSidebar": "build/installerSidebar.bmp",
+    "uninstallerSidebar": "build/installerSidebar.bmp",
+    "installerHeader": "build/installerHeader.bmp",
+    "include": "build/installer-internal-beta.nsh",
+    "artifactName": "ShinaYuu-Music-${version}-Internal-Alpha-Setup.${ext}"
+  },
+  "publish": null
+}

@@ -56,6 +56,8 @@ const tls = require('tls');
 const { once } = require('events');
 const { fileURLToPath } = require('url');
 const { analyzePodcastDjStream, analyzePodcastDjIntro } = require('./dj-analyzer');
+const { appendCuefieldFeedback, readCuefieldFeedbackStats } = require('./desktop/cuefield/feedback-log');
+const { planCuefieldTransitionFromCache } = require('./desktop/cuefield/shinayuu-transition-planner');
 const musicProviders = require('./music-providers');
 const { getLocalLibrary } = require('./local-library');
 const localLibrary = getLocalLibrary();
@@ -65,12 +67,13 @@ const HOST = process.env.HOST || '0.0.0.0';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 const COOKIE_FILE = process.env.COOKIE_FILE || path.join(__dirname, '.cookie');
 const QQ_COOKIE_FILE = process.env.QQ_COOKIE_FILE || path.join(__dirname, '.qq-cookie');
-const UPDATE_WORK_DIR = process.env.MINERADIO_UPDATE_DIR || path.join(__dirname, 'updates');
-const UPDATE_DOWNLOAD_DIR = process.env.MINERADIO_UPDATE_DOWNLOAD_DIR || path.join(UPDATE_WORK_DIR, 'downloads');
-const UPDATE_PATCH_BACKUP_DIR = process.env.MINERADIO_PATCH_BACKUP_DIR || path.join(UPDATE_WORK_DIR, 'backups', 'patches');
-const BEATMAP_CACHE_DIR = process.env.MINERADIO_BEAT_CACHE_DIR || 'D:\\ShinaYuuMusicCache\\beatmaps';
+const UPDATE_WORK_DIR = process.env.SHINAYUU_UPDATE_DIR || process.env.MINERADIO_UPDATE_DIR || path.join(__dirname, 'updates');
+const UPDATE_DOWNLOAD_DIR = process.env.SHINAYUU_UPDATE_DOWNLOAD_DIR || process.env.MINERADIO_UPDATE_DOWNLOAD_DIR || path.join(UPDATE_WORK_DIR, 'downloads');
+const UPDATE_PATCH_BACKUP_DIR = process.env.SHINAYUU_PATCH_BACKUP_DIR || process.env.MINERADIO_PATCH_BACKUP_DIR || path.join(UPDATE_WORK_DIR, 'backups', 'patches');
+const BEATMAP_CACHE_DIR = process.env.SHINAYUU_BEAT_CACHE_DIR || process.env.MINERADIO_BEAT_CACHE_DIR || 'D:\\ShinaYuuMusicCache\\beatmaps';
+const CUEFIELD_FEEDBACK_FILE = process.env.CUEFIELD_FEEDBACK_FILE || path.join(process.env.SHINAYUU_DATA_DIR || __dirname, 'cuefield-feedback.jsonl');
 const APP_PACKAGE = readPackageInfo();
-const APP_VERSION = process.env.MINERADIO_VERSION || (APP_PACKAGE.shinayuu && APP_PACKAGE.shinayuu.displayVersion) || APP_PACKAGE.version || '0.9.11';
+const APP_VERSION = process.env.SHINAYUU_VERSION || process.env.MINERADIO_VERSION || (APP_PACKAGE.shinayuu && APP_PACKAGE.shinayuu.displayVersion) || APP_PACKAGE.version || '0.9.11';
 const UPDATE_CONFIG = readUpdateConfig(APP_PACKAGE);
 const PATCH_MAX_BYTES = 12 * 1024 * 1024;
 const PATCH_ALLOWED_ROOTS = new Set(['public', 'desktop', 'build']);
@@ -130,7 +133,15 @@ function completeSpotifyHostLyricsRequest(payload = {}) {
     trackId,
     status: Number(payload.status || 200),
     transport: 'webview2-session',
-  } : null;
+    attempted: true,
+  } : {
+    payload: null,
+    trackId,
+    status: Number(payload.status || 204),
+    transport: 'webview2-session',
+    attempted: true,
+    error: String(payload.error || ''),
+  };
   if (result && trackId) spotifyHostLyricsCache.set(trackId, { at: Date.now(), value: result });
   if (waiter) {
     clearTimeout(waiter.timer);
@@ -152,7 +163,9 @@ function requestSpotifyHostLyrics(candidateIds, metadata = {}) {
     if (cached && Date.now() - cached.at < 6 * 60 * 60 * 1000) return Promise.resolve(cached.value);
   }
   const host = publicSpotifyHostState();
-  if (!host.alive || !host.connected) return Promise.resolve(null);
+  if (!host.alive || !host.connected) {
+    return Promise.resolve({ unavailable: true, attempted: false, transport: 'webview2-session' });
+  }
   const requestId = crypto.randomUUID();
   spotifyHostState.lyricsRequestRevision += 1;
   spotifyHostState.lyricsRequest = {
@@ -166,8 +179,8 @@ function requestSpotifyHostLyrics(candidateIds, metadata = {}) {
     const timer = setTimeout(() => {
       spotifyHostLyricsWaiters.delete(requestId);
       if (spotifyHostState.lyricsRequest && spotifyHostState.lyricsRequest.requestId === requestId) spotifyHostState.lyricsRequest = null;
-      resolve(null);
-    }, 4500);
+      resolve({ payload: null, trackId: ids[0] || '', status: 408, transport: 'webview2-session', attempted: true, error: 'SPOTIFY_LYRICS_SESSION_TIMEOUT' });
+    }, 1200);
     spotifyHostLyricsWaiters.set(requestId, { resolve, timer });
   });
 }
@@ -385,16 +398,19 @@ function parseGitHubRepository(input) {
   return null;
 }
 function readUpdateConfig(pkg) {
-  const local = (pkg && pkg.mineradio && pkg.mineradio.update) || {};
-  const repoHint = process.env.MINERADIO_UPDATE_REPOSITORY
+  const local = (pkg && pkg.shinayuu && pkg.shinayuu.update)
+    || (pkg && pkg.mineradio && pkg.mineradio.update)
+    || {};
+  const repoHint = process.env.SHINAYUU_UPDATE_REPOSITORY
+    || process.env.MINERADIO_UPDATE_REPOSITORY
     || process.env.GITHUB_REPOSITORY
     || local.repository
     || local.github
     || (pkg && pkg.repository && (pkg.repository.url || pkg.repository))
     || '';
   const parsed = parseGitHubRepository(repoHint) || {};
-  const owner = process.env.MINERADIO_UPDATE_OWNER || local.owner || parsed.owner || '';
-  const repo = process.env.MINERADIO_UPDATE_REPO || local.repo || parsed.repo || '';
+  const owner = process.env.SHINAYUU_UPDATE_OWNER || process.env.MINERADIO_UPDATE_OWNER || local.owner || parsed.owner || '';
+  const repo = process.env.SHINAYUU_UPDATE_REPO || process.env.MINERADIO_UPDATE_REPO || local.repo || parsed.repo || '';
   return {
     provider: local.provider || 'github',
     owner,
@@ -406,7 +422,10 @@ function readUpdateConfig(pkg) {
     checkDelayMs: Math.max(1000, Number(local.checkDelayMs || 10000) || 10000),
     checkIntervalMs: Math.max(60000, Number(local.checkIntervalMs || 21600000) || 21600000),
     autoPrompt: local.autoPrompt !== false,
-    manifest: process.env.MINERADIO_UPDATE_MANIFEST
+    manifest: process.env.SHINAYUU_UPDATE_MANIFEST
+      || process.env.SHINAYUU_UPDATE_MANIFEST_URL
+      || process.env.SHINAYUU_UPDATE_MANIFEST_FILE
+      || process.env.MINERADIO_UPDATE_MANIFEST
       || process.env.MINERADIO_UPDATE_MANIFEST_URL
       || process.env.MINERADIO_UPDATE_MANIFEST_FILE
       || '',
@@ -417,7 +436,7 @@ function parseUpdateMirrorList(value) {
   return String(value || '').split(/[\n,;]/);
 }
 function readUpdateMirrors(local) {
-  const envMirrors = process.env.MINERADIO_UPDATE_MIRRORS || process.env.MINERADIO_UPDATE_MIRROR || '';
+  const envMirrors = process.env.SHINAYUU_UPDATE_MIRRORS || process.env.SHINAYUU_UPDATE_MIRROR || process.env.MINERADIO_UPDATE_MIRRORS || process.env.MINERADIO_UPDATE_MIRROR || '';
   const raw = envMirrors
     ? parseUpdateMirrorList(envMirrors)
     : parseUpdateMirrorList(local.mirrors || local.downloadMirrors || []);
@@ -1341,7 +1360,7 @@ function writePatchFile(job, file) {
   if (expected && expected !== actual) throw new Error('PATCH_HASH_MISMATCH:' + rel);
   backupPatchTarget(job, rel, target);
   fs.mkdirSync(path.dirname(target), { recursive: true });
-  const tmp = target + '.mineradio-patch';
+  const tmp = target + '.shinayuu-patch';
   fs.writeFileSync(tmp, content);
   fs.renameSync(tmp, target);
   if (expected && sha256Hex(fs.readFileSync(target)) !== expected) throw new Error('PATCH_WRITE_VERIFY_FAILED:' + rel);
@@ -1350,7 +1369,7 @@ function writePatchFile(job, file) {
 function normalizePatchPayload(payload) {
   if (!payload || typeof payload !== 'object') throw new Error('INVALID_PATCH_PAYLOAD');
   const type = String(payload.type || payload.kind || '');
-  if (type && type !== 'mineradio-resource-patch') throw new Error('UNSUPPORTED_PATCH_TYPE');
+  if (type && type !== 'shinayuu-resource-patch' && type !== 'mineradio-resource-patch') throw new Error('UNSUPPORTED_PATCH_TYPE');
   const from = normalizeVersion(payload.from || payload.baseVersion || '');
   const to = normalizeVersion(payload.to || payload.version || payload.targetVersion || '');
   const files = Array.isArray(payload.files) ? payload.files : [];
@@ -3481,7 +3500,7 @@ async function handleModernMusicRoute(req, res, url, pn) {
     return true;
   }
 
-  if (pn === '/api/qq/login/status') {
+  if (pn === '/api/qq/login/status' || pn === '/api/youtube-music/status') {
     try {
       const status = await musicProviders.youtubeLoginStatus(baseUrl);
       const engine = await musicProviders.prepareYouTubeEngine().catch(() => musicProviders.youtubeEngineStatus());
@@ -3519,7 +3538,7 @@ async function handleModernMusicRoute(req, res, url, pn) {
     return true;
   }
 
-  if (pn === '/api/youtube/logout' || pn === '/api/qq/logout') {
+  if (pn === '/api/youtube/logout' || pn === '/api/youtube-music/logout' || pn === '/api/qq/logout') {
     musicProviders.clearYouTubeToken();
     sendJSON(res, { ok: true, provider: 'youtube', loggedIn: false });
     return true;
@@ -3528,6 +3547,24 @@ async function handleModernMusicRoute(req, res, url, pn) {
   if (pn === '/api/local/library') {
     try { sendJSON(res, await localLibrary.init()); }
     catch (error) { modernProviderError(res, error); }
+    return true;
+  }
+
+  if (pn === '/api/local/search') {
+    try {
+      const state = await localLibrary.init();
+      const query = String(url.searchParams.get('keywords') || '').trim().toLowerCase();
+      const offset = Math.max(0, Number(url.searchParams.get('offset') || 0) || 0);
+      const limit = Math.max(1, Math.min(50, Number(url.searchParams.get('limit') || 18) || 18));
+      const tokens = query.split(/\s+/).filter(Boolean);
+      const rows = (Array.isArray(state.tracks) ? state.tracks : []).filter((track) => {
+        if (!tokens.length) return true;
+        const haystack = [track.name, track.title, track.artist, track.album].filter(Boolean).join(' ').toLowerCase();
+        return tokens.every((token) => haystack.includes(token));
+      });
+      const songs = rows.slice(offset, offset + limit).map((track) => ({ ...track, provider: 'local', source: 'local', type: 'local' }));
+      sendJSON(res, { ok: true, provider: 'local', songs, result: songs, total: rows.length, offset, limit, nextOffset: offset + songs.length, hasMore: offset + songs.length < rows.length });
+    } catch (error) { modernProviderError(res, error); }
     return true;
   }
 
@@ -3623,6 +3660,36 @@ async function handleModernMusicRoute(req, res, url, pn) {
       sendJSON(res, await musicProviders.spotifyLoginResult(state, baseUrl));
     } catch (error) {
       modernProviderError(res, error, 400);
+    }
+    return true;
+  }
+
+  if (pn === '/api/spotify/search') {
+    try {
+      const query = String(
+        url.searchParams.get('keywords')
+        || url.searchParams.get('query')
+        || url.searchParams.get('q')
+        || ''
+      ).trim();
+      const limit = Math.max(1, Math.min(50, Number(url.searchParams.get('limit') || 18) || 18));
+      if (!query) {
+        sendJSON(res, { ok: true, provider: 'spotify', songs: [], result: [], offset: 0, limit, hasMore: false });
+        return true;
+      }
+      const songs = await musicProviders.spotifySearch(query, limit);
+      const rows = Array.isArray(songs) ? songs : [];
+      sendJSON(res, {
+        ok: true,
+        provider: 'spotify',
+        songs: rows,
+        result: rows,
+        offset: 0,
+        limit,
+        hasMore: rows.length >= limit,
+      });
+    } catch (error) {
+      modernProviderError(res, error, Number(error && error.status) || 502);
     }
     return true;
   }
@@ -3742,8 +3809,8 @@ async function handleModernMusicRoute(req, res, url, pn) {
   if (pn === '/api/spotify/player/seek' && req.method === 'POST') {
     try {
       const body = await readRequestBody(req);
-      await musicProviders.spotifySeekPlayback(Number(body.positionMs || 0), String(body.deviceId || ''));
-      sendJSON(res, { ok: true });
+      const seeked = await musicProviders.spotifySeekPlayback(Number(body.positionMs || 0), String(body.deviceId || ''));
+      sendJSON(res, { ok: true, ...(seeked || {}) });
     } catch (error) { modernProviderError(res, error, 500); }
     return true;
   }
@@ -3757,7 +3824,7 @@ async function handleModernMusicRoute(req, res, url, pn) {
     return true;
   }
 
-  if (pn === '/api/login/status') {
+  if (pn === '/api/login/status' || pn === '/api/spotify/status') {
     try { sendJSON(res, await musicProviders.spotifyLoginStatus(baseUrl)); }
     catch (error) { modernProviderError(res, error); }
     return true;
@@ -3769,7 +3836,7 @@ async function handleModernMusicRoute(req, res, url, pn) {
     return true;
   }
 
-  if (pn === '/api/logout') {
+  if (pn === '/api/logout' || pn === '/api/spotify/logout') {
     musicProviders.clearSpotifyToken();
     sendJSON(res, { ok: true, provider: 'spotify', loggedIn: false });
     return true;
@@ -3780,7 +3847,7 @@ async function handleModernMusicRoute(req, res, url, pn) {
     return true;
   }
 
-  if (pn === '/api/qq/login/status') {
+  if (pn === '/api/qq/login/status' || pn === '/api/youtube-music/status') {
     let engine;
     try { engine = await musicProviders.prepareYouTubeEngine(); }
     catch (_) { engine = musicProviders.youtubeEngineStatus(); }
@@ -3801,7 +3868,38 @@ async function handleModernMusicRoute(req, res, url, pn) {
     return true;
   }
 
-  if (pn === '/api/qq/login/cookie' || pn === '/api/qq/logout') {
+  if (pn === '/api/qq/login/cookie') {
+    try {
+      const body = req.method === 'POST' ? await readRequestBody(req) : {};
+      const cookie = String(body.cookie || body.data || body.text || '').trim();
+      const saved = typeof musicProviders.setYouTubeCookieHeader === 'function'
+        ? musicProviders.setYouTubeCookieHeader(cookie)
+        : false;
+      let engine;
+      try { engine = await musicProviders.prepareYouTubeEngine({ reason: 'cookie_login' }); }
+      catch (_) { engine = musicProviders.youtubeEngineStatus(); }
+      sendJSON(res, {
+        provider: 'youtube',
+        ok: !!saved,
+        loggedIn: !!saved,
+        available: true,
+        configured: true,
+        nickname: saved ? 'YouTube (Cookie)' : 'YouTube',
+        userId: saved ? 'browser-cookie' : 'public',
+        avatar: '',
+        playbackKeyReady: !!(engine && engine.ready),
+        engine,
+        saved: !!saved,
+      }, saved ? 200 : 400);
+    } catch (error) {
+      modernProviderError(res, error);
+    }
+    return true;
+  }
+
+  if (pn === '/api/qq/logout') {
+    if (typeof musicProviders.clearYouTubeCookieHeader === 'function') musicProviders.clearYouTubeCookieHeader();
+    if (typeof musicProviders.clearYouTubeToken === 'function') musicProviders.clearYouTubeToken();
     sendJSON(res, { provider: 'youtube', ok: true, loggedIn: false, available: true, playbackKeyReady: true });
     return true;
   }
@@ -3881,12 +3979,12 @@ async function handleModernMusicRoute(req, res, url, pn) {
     return true;
   }
 
-  if (pn === '/api/qq/recommend') {
+  if (pn === '/api/qq/recommend' || pn === '/api/youtube-music/recommend' || pn === '/api/youtube-video/recommend') {
     try {
       const videoId = url.searchParams.get('videoId') || url.searchParams.get('id') || '';
       const limit = Math.max(1, Math.min(50, parseInt(url.searchParams.get('limit') || '20', 10) || 20));
       const genre = url.searchParams.get('genre') || '';
-      const sourceType = String(url.searchParams.get('sourceType') || 'music').toLowerCase() === 'video' ? 'video' : 'music';
+      const sourceType = pn.includes('/youtube-video/') || String(url.searchParams.get('sourceType') || 'music').toLowerCase() === 'video' ? 'video' : 'music';
       const songs = videoId ? await musicProviders.youtubeRecommendations(videoId, limit, genre, sourceType) : [];
       const genreKey = songs[0] && songs[0].recommendationGenre || genre || '';
       const genreLabel = songs[0] && songs[0].recommendationGenreLabel || '';
@@ -3930,7 +4028,7 @@ async function handleModernMusicRoute(req, res, url, pn) {
     return true;
   }
 
-  if (pn === '/api/qq/song/video') {
+  if (pn === '/api/qq/song/video' || pn === '/api/youtube-music/song/video' || pn === '/api/youtube-video/song/video') {
     try {
       const id = url.searchParams.get('mid') || url.searchParams.get('id') || '';
       const quality = url.searchParams.get('quality') || 'auto';
@@ -3963,31 +4061,52 @@ async function handleModernMusicRoute(req, res, url, pn) {
     return true;
   }
 
-  if (pn === '/api/qq/song/url') {
+  if (pn === '/api/qq/song/url' || pn === '/api/youtube-music/song/url' || pn === '/api/youtube-video/song/url') {
     try {
       const id = url.searchParams.get('mid') || url.searchParams.get('id') || '';
       const quality = url.searchParams.get('quality') || '';
-      const sourceType = String(url.searchParams.get('sourceType') || 'music').toLowerCase() === 'video' ? 'video' : 'music';
+      const sourceType = pn.includes('/youtube-video/') || String(url.searchParams.get('sourceType') || 'music').toLowerCase() === 'video' ? 'video' : 'music';
       const refresh = url.searchParams.get('refresh') === '1';
       const data = await musicProviders.resolveYouTubePlayback(id, quality, { refresh });
       sendJSON(res, { ...data, sourceType, loggedIn: false, vipType: 0, vipLevel: 'public', isVip: false, isSvip: false, vipLabel: sourceType === 'video' ? 'YouTube Video' : 'YouTube Music' });
     } catch (error) {
-      console.error('[YouTubePlayback]', error);
+      const authRequired = error && error.code === 'YOUTUBE_AUTH_REQUIRED';
+      const displayMessage = String(
+        (musicProviders.publicProviderConfig && musicProviders.publicProviderConfig().language === 'en'
+          ? error && error.userMessageEn
+          : error && error.userMessageVi)
+        || error && error.userMessageVi
+        || error && error.userMessageEn
+        || error && error.message
+        || 'YouTube playback stream is unavailable.'
+      );
+      console.error('[YouTubePlayback]', String(error && error.code || 'YOUTUBE_STREAM_UNAVAILABLE'),
+        String(error && error.engineCode || ''), JSON.stringify(error && error.diagnostics || {}));
       sendJSON(res, {
         url: null,
         playable: false,
-        reason: error.code === 'YOUTUBE_ENGINE_UNAVAILABLE' ? 'youtube_engine_unavailable' : 'youtube_stream_unavailable',
-        message: error.message || 'YouTube playback stream is unavailable.',
+        reason: error.code === 'YOUTUBE_ENGINE_UNAVAILABLE'
+          ? 'youtube_engine_unavailable'
+          : (authRequired ? 'youtube_auth_required' : 'youtube_stream_unavailable'),
+        message: displayMessage,
         engineCode: error.engineCode || error.code || '',
-        restriction: { provider: 'youtube', category: error.code === 'YOUTUBE_ENGINE_UNAVAILABLE' ? 'engine_unavailable' : 'url_unavailable', message: error.message || 'YouTube playback stream is unavailable.', action: 'retry' },
+        diagnostics: error.diagnostics || null,
+        restriction: {
+          provider: 'youtube',
+          category: error.code === 'YOUTUBE_ENGINE_UNAVAILABLE'
+            ? 'engine_unavailable'
+            : (authRequired ? 'login_required' : 'url_unavailable'),
+          message: displayMessage,
+          action: authRequired ? 'login' : 'retry',
+        },
       }, Number(error.status) || 500);
     }
     return true;
   }
 
-  if (pn === '/api/lyric' || pn === '/api/qq/lyric') {
+  if (pn === '/api/lyric' || pn === '/api/spotify/lyric' || pn === '/api/qq/lyric' || pn === '/api/youtube-music/lyric' || pn === '/api/youtube-video/lyric') {
     try {
-      const youtube = pn.includes('/qq/');
+      const youtube = pn.includes('/qq/') || pn.includes('/youtube-music/') || pn.includes('/youtube-video/');
       const id = youtube ? (url.searchParams.get('mid') || url.searchParams.get('id') || '') : (url.searchParams.get('id') || '');
       const hostState = youtube ? null : publicSpotifyHostState();
       const requestedDuration = Math.max(0, Number(url.searchParams.get('duration') || 0));
@@ -4017,7 +4136,7 @@ async function handleModernMusicRoute(req, res, url, pn) {
     return true;
   }
 
-  if (pn === '/api/user/playlists') {
+  if (pn === '/api/user/playlists' || pn === '/api/spotify/user/playlists') {
     try {
       const status = await musicProviders.spotifyLoginStatus(baseUrl);
       if (!status.loggedIn) { sendJSON(res, { loggedIn: false, provider: 'spotify', playlists: [] }); return true; }
@@ -4027,7 +4146,7 @@ async function handleModernMusicRoute(req, res, url, pn) {
     return true;
   }
 
-  if (pn === '/api/qq/user/playlists') {
+  if (pn === '/api/qq/user/playlists' || pn === '/api/youtube-music/user/playlists') {
     try {
       const status = await musicProviders.youtubeLoginStatus(baseUrl);
       if (!status.loggedIn) { sendJSON(res, { loggedIn: false, provider: 'youtube', configured: status.configured, playlists: [] }); return true; }
@@ -4038,13 +4157,13 @@ async function handleModernMusicRoute(req, res, url, pn) {
     return true;
   }
 
-  if (pn === '/api/playlist/tracks') {
+  if (pn === '/api/playlist/tracks' || pn === '/api/spotify/playlist/tracks') {
     try { sendJSON(res, await musicProviders.spotifyPlaylistTracks(url.searchParams.get('id') || '')); }
     catch (error) { modernProviderError(res, error); }
     return true;
   }
 
-  if (pn === '/api/qq/playlist/tracks') {
+  if (pn === '/api/qq/playlist/tracks' || pn === '/api/youtube-music/playlist/tracks') {
     try {
       const id = url.searchParams.get('id') || '';
       const status = await musicProviders.youtubeLoginStatus(baseUrl).catch(() => ({ loggedIn: false }));
@@ -4217,6 +4336,68 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (pn === '/api/cuefield/transition') {
+    if (req.method !== 'POST') {
+      sendJSON(res, { ok: false, error: 'METHOD_NOT_ALLOWED' }, 405);
+      return;
+    }
+    try {
+      const body = await readRequestBody(req);
+      const fromKey = String(body && body.fromKey || '').trim();
+      const toKey = String(body && body.toKey || '').trim();
+      const inlineEntry = (key, map, song) => map && typeof map === 'object' ? {
+        key,
+        meta: {
+          title: String(song && (song.name || song.title) || '').slice(0, 160),
+          artist: String(song && song.artist || '').slice(0, 160),
+          provider: String(song && (song.provider || song.realProvider || song.type) || '').slice(0, 32),
+        },
+        map,
+      } : null;
+      const plan = planCuefieldTransitionFromCache({
+        readBeatMapCache,
+        fromKey,
+        toKey,
+        fromEntry: inlineEntry(fromKey, body && body.fromMap, body && body.fromSong),
+        toEntry: inlineEntry(toKey, body && body.toMap, body && body.toSong),
+        fromLrc: body && body.fromLrc || '',
+        toLrc: body && body.toLrc || '',
+        exitBias: body && body.exitBias || 'late',
+        maxEntryTime: Math.max(8, Math.min(32, Number(body && body.maxEntryTime) || 32)),
+      });
+      sendJSON(res, plan);
+    } catch (err) {
+      sendJSON(res, {
+        ok: false,
+        error: err && (err.code || err.message) || 'CUEFIELD_TRANSITION_FAILED',
+      }, 422);
+    }
+    return;
+  }
+
+  if (pn === '/api/cuefield/feedback') {
+    if (req.method === 'GET') {
+      try {
+        sendJSON(res, { ok: true, stats: readCuefieldFeedbackStats(CUEFIELD_FEEDBACK_FILE) });
+      } catch (err) {
+        sendJSON(res, { ok: false, error: err.message || 'CUEFIELD_FEEDBACK_READ_FAILED' }, 500);
+      }
+      return;
+    }
+    if (req.method === 'POST') {
+      try {
+        const body = await readRequestBody(req);
+        const record = appendCuefieldFeedback(CUEFIELD_FEEDBACK_FILE, body);
+        sendJSON(res, { ok: true, record });
+      } catch (err) {
+        sendJSON(res, { ok: false, error: err.code || err.message || 'CUEFIELD_FEEDBACK_SAVE_FAILED' }, 400);
+      }
+      return;
+    }
+    sendJSON(res, { ok: false, error: 'METHOD_NOT_ALLOWED' }, 405);
+    return;
+  }
+
   if (pn === '/api/beatmap/cache/status') {
     const info = beatCacheRootInfo();
     sendJSON(res, {
@@ -4380,7 +4561,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ---------- 歌曲URL ----------
-  if (pn === '/api/qq/login/status') {
+  if (pn === '/api/qq/login/status' || pn === '/api/youtube-music/status') {
     try {
       const info = await getQQLoginInfo();
       sendJSON(res, info);
@@ -5172,6 +5353,7 @@ const server = http.createServer(async (req, res) => {
 
   // ---------- Audio proxy with Range support ----------
   if (pn === '/api/audio') {
+    let audioAbortCleanup = null;
     try {
       const streamToken = url.searchParams.get('stream') || '';
       const descriptor = streamToken ? musicProviders.getYouTubeStreamDescriptor(streamToken) : null;
@@ -5194,7 +5376,17 @@ const server = http.createServer(async (req, res) => {
       delete hdr['content-length'];
       let activeDescriptor = descriptor;
       let activeAudioUrl = audioUrl;
-      let up = await fetch(activeAudioUrl, { headers: hdr, redirect: 'follow' });
+      const upstreamAbort = new AbortController();
+      const abortUpstream = () => {
+        if (!upstreamAbort.signal.aborted) upstreamAbort.abort();
+      };
+      req.once('aborted', abortUpstream);
+      res.once('close', abortUpstream);
+      audioAbortCleanup = () => {
+        req.off('aborted', abortUpstream);
+        res.off('close', abortUpstream);
+      };
+      let up = await fetch(activeAudioUrl, { headers: hdr, redirect: 'follow', signal: upstreamAbort.signal });
       if (!up.ok && up.status !== 206 && activeDescriptor && activeDescriptor.videoId && /^(403|410|416|429)$/.test(String(up.status))) {
         try {
           const refreshed = await musicProviders.resolveYouTubePlayback(
@@ -5209,7 +5401,7 @@ const server = http.createServer(async (req, res) => {
             if (range) retryHeaders.Range = range;
             delete retryHeaders.Host; delete retryHeaders.host;
             delete retryHeaders['Content-Length']; delete retryHeaders['content-length'];
-            up = await fetch(activeAudioUrl, { headers: retryHeaders, redirect: 'follow' });
+            up = await fetch(activeAudioUrl, { headers: retryHeaders, redirect: 'follow', signal: upstreamAbort.signal });
           }
         } catch (refreshError) {
           console.warn('[AudioProxyRefresh]', refreshError.message || refreshError);
@@ -5220,7 +5412,8 @@ const server = http.createServer(async (req, res) => {
         'Access-Control-Allow-Origin': '*',
         'Cross-Origin-Resource-Policy': 'cross-origin',
         'Accept-Ranges': 'bytes',
-        'Cache-Control': 'no-store',
+        'Cache-Control': 'private, max-age=60',
+        'Vary': 'Range',
       };
       const cl = up.headers.get('content-length'); if (cl) out['Content-Length'] = cl;
       const cr = up.headers.get('content-range');  if (cr) out['Content-Range']  = cr;
@@ -5233,16 +5426,40 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(up.status, out);
       if (!up.body) { res.end(); return; }
       const reader = up.body.getReader();
-      while (true) {
-        const c = await reader.read();
-        if (c.done) break;
-        if (!res.destroyed) res.write(c.value);
+      try {
+        while (true) {
+          const c = await reader.read();
+          if (c.done || res.destroyed || upstreamAbort.signal.aborted) break;
+          if (!res.write(c.value)) {
+            await new Promise((resolve) => {
+              let settled = false;
+              const finish = () => {
+                if (settled) return;
+                settled = true;
+                res.off('drain', finish);
+                res.off('close', finish);
+                resolve();
+              };
+              res.once('drain', finish);
+              res.once('close', finish);
+            });
+          }
+        }
+      } finally {
+        try { reader.releaseLock(); } catch (_) { }
+        if (typeof audioAbortCleanup === 'function') {
+          audioAbortCleanup();
+          audioAbortCleanup = null;
+        }
       }
-      if (!res.destroyed) res.end();
+      if (!res.destroyed && !upstreamAbort.signal.aborted) res.end();
     } catch (err) {
-      console.error('[AudioProxy]', err.message || err);
-      if (!res.headersSent) res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
-      if (!res.destroyed) res.end('Audio proxy failed');
+      const aborted = err && (err.name === 'AbortError' || err.code === 'ABORT_ERR');
+      if (!aborted && !res.destroyed) console.error('[AudioProxy]', err.message || err);
+      if (!aborted && !res.headersSent) res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
+      if (!res.destroyed) res.end(aborted ? '' : 'Audio proxy failed');
+    } finally {
+      if (typeof audioAbortCleanup === 'function') audioAbortCleanup();
     }
     return;
   }

@@ -445,6 +445,7 @@ async function decodePodcastDjEnergyRange(audioUrl, opts) {
   try {
     const headers = {
       'User-Agent': opts.userAgent || DEFAULT_UA,
+      'Referer': 'https://music.163.com/',
     };
     if (opts.range) headers.Range = opts.range;
     const resp = await fetch(audioUrl, { headers });
@@ -527,7 +528,8 @@ async function analyzePodcastDjRangeSamples(audioUrl, opts) {
       method: 'HEAD',
       headers: {
         'User-Agent': opts.userAgent || DEFAULT_UA,
-        },
+        'Referer': 'https://music.163.com/',
+      },
     });
     contentLength = Number(head.headers.get('content-length') || 0) || 0;
   } catch (err) {
@@ -819,7 +821,8 @@ async function analyzePodcastDjStreamFull(audioUrl, opts) {
     const resp = await fetch(audioUrl, {
       headers: {
         'User-Agent': opts.userAgent || DEFAULT_UA,
-        },
+        'Referer': 'https://music.163.com/',
+      },
     });
     if (!resp.ok || !resp.body) throw new Error('Audio fetch failed: ' + resp.status);
     const reader = resp.body.getReader();

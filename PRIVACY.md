@@ -1,39 +1,34 @@
-# Privacy
+# 隐私与用户数据说明
 
-ShinaYuu Music is a local desktop application. The project does not operate a telemetry service and is not designed to upload listening history, searches, custom artwork, lyrics, or account tokens to a ShinaYuu Music server.
+Mineradio 是本地桌面应用。项目不应把用户登录状态、Cookie、播放历史、搜索历史、自定义封面、自定义歌词或本地缓存提交到 GitHub。
 
-## Locally stored data
+## 本地数据
 
-The application may store the following data on the user's computer:
+应用可能在本机保存以下数据：
 
-- Spotify Client ID, market, and language settings.
-- Spotify OAuth access and refresh tokens.
-- Optional Google/YouTube OAuth access and refresh tokens.
-- Search history, synchronized playlist metadata, and application-managed playlists.
-- Paths to local music folders or archives selected by the user.
-- Cached track metadata and artwork.
-- Lyric data, per-track lyric calibration, and layout settings.
-- Visualizer, Desktop Lyrics, wallpaper, Discord, and volume preferences.
-- Beat-analysis cache, YouTube lyric cache, and local forced-alignment cache.
-- Downloaded helper runtimes and models used for local alignment.
-- Cached archive extraction, embedded artwork, and local-library scan metadata.
+- 网易云音乐登录 Cookie
+- QQ 音乐登录 Cookie
+- 搜索历史
+- 自定义专辑封面
+- 自定义歌词
+- 歌词布局与视觉控制设置
+- 本地节奏分析缓存
+- 更新安装包下载缓存
 
-## Third-party services
+这些数据用于本地体验，不属于开源仓库内容。
 
-The application communicates directly with third-party services required for requested features, including Spotify, Google OAuth, YouTube Data API, YouTube, YouTube Music, LRCLIB, Open-Meteo, and Castlabs Electron release and component-update endpoints. Each service is governed by its own privacy policy and terms.
+## 不应上传的内容
 
-## Files that must not be committed
+以下内容不应提交到 GitHub：
 
-- `music-sources.json`
-- `spotify-token.json`
-- `youtube-token.json`
-- `local-library.json`
 - `.cookie`
 - `.qq-cookie`
+- `updates/`
 - `node_modules/`
-- `dist/`
-- User audio, tokens, cookies, or account data
+- Electron 打包产物
+- 用户上传的本地音乐文件
+- 用户账号信息、Cookie、Token、二维码登录状态
 
-## Security of credentials
+## 第三方平台
 
-Do not include tokens, cookies, or private account data in public issue reports. Sanitize logs before sharing them.
+用户通过网易云音乐、QQ 音乐等第三方平台登录时，应遵守对应平台的用户协议。Mineradio 不提供绕过付费、绕过会员、破解音质或重新分发音乐内容的能力。

@@ -1,52 +1,25 @@
 {
   "name": "shinayuu-music",
   "productName": "ShinaYuu Music",
-  "version": "1.1.7-patch.4",
-  "description": "A Windows visual music player powered by Castlabs Electron with Spotify, YouTube, synchronized lyrics, Discord Rich Presence, and integrated master volume control.",
+  "version": "2.0.0",
+  "description": "ShinaYuu Music 2.0.0: a unified desktop music player with YouTube Music, YouTube Video, Spotify Premium, local music, synchronized multi-provider lyrics, AutoMix, visual lyrics and desktop wallpaper features.",
   "author": "ShinaYuu",
+  "license": "GPL-3.0-only",
   "main": "desktop/main.js",
   "private": true,
   "scripts": {
-    "start": "node tools/ensure-castlabs-runtime.js && electron .",
-    "dev": "node tools/ensure-castlabs-runtime.js && electron .",
-    "build:win": "node tools/build-windows-release.js",
-    "build:win:dir": "node tools/ensure-castlabs-runtime.js && node tools/verify-castlabs-runtime.js && node tools/ensure-ytdlp-bundle.js && electron-builder --win dir",
-    "preview:win": "node build/preview-win.js",
-    "test": "node tests/mv-background-resume-update-patch-regression.test.js && node tests/liquid-glass-transparency-regression.test.js && node tests/liquid-glass-home-regression.test.js && node tests/window-startup-compatibility-regression.test.js && node tests/window-rounded-corners-regression.test.js && node tests/auto-update-regression.test.js && node tests/background-media-library-regression.test.js && node tests/lightweight-optimization-regression.test.js && node tests/cpu-micro-optimization-regression.test.js && node tests/background-video-stream-regression.test.js && node tests/now-playing-background-regression.test.js && node tests/youtube-mv-player-state-regression.test.js && node tests/youtube-mv-sharp-audio-regression.test.js && node tests/youtube-video-av-resync-regression.test.js && node tests/youtube-mv-smooth-sync-regression.test.js && node tests/youtube-universal-video-search-regression.test.js && node tests/youtube-genre-recommendation-regression.test.js && node tests/runtime-performance-regression.test.js && node tests/stage-text-mode-regression.test.js && node tests/youtube-account-regression.test.js && node tests/youtube-engine-recovery-regression.test.js && node tests/youtube-idle-resume-black-video-lyrics-control-regression.test.js && node tests/local-library-regression.test.js && node tests/playback-prefetch-regression.test.js && node tests/playback-latency-regression.test.js && node tests/instant-playback-response-regression.test.js && node tests/audio-session-bridge-regression.test.js && node tests/localization-regression.test.js && node tests/lyric-calibration-panel-regression.test.js && node tests/master-volume-regression.test.js && node tests/castlabs-electron-regression.test.js && node tests/youtube-music-restoration-performance-lyrics-regression.test.js && node tests/youtube-music-lyrics-regression.test.js && node tests/youtube-caption-lyrics-regression.test.js && node tests/youtube-forced-alignment-regression.test.js && node tests/provider-regression.test.js && node tests/spotify-auth-regression.test.js && node tests/spotify-playlist-regression.test.js && node tests/spotify-direct-player-regression.test.js && node tests/spotify-seek-lyrics-recovery-regression.test.js && node tests/realtime-playback-regression.test.js && node tests/lyrics-sync-regression.test.js && node tests/spotify-lyrics-regression.test.js && node tests/ui-regression.test.js && node tests/packaging-regression.test.js && node tests/discord-ipc-client-regression.test.js && node tests/discord-presence-regression.test.js",
-    "test:providers": "node tests/provider-regression.test.js",
-    "test:spotify": "node tests/spotify-playlist-regression.test.js && node tests/spotify-direct-player-regression.test.js && node tests/spotify-seek-lyrics-recovery-regression.test.js",
-    "test:ui": "node tests/ui-regression.test.js",
-    "test:packaging": "node tests/packaging-regression.test.js",
-    "test:spotify-auth": "node tests/spotify-auth-regression.test.js",
-    "test:discord": "node tests/discord-ipc-client-regression.test.js && node tests/discord-presence-regression.test.js",
-    "test:lyrics": "node tests/lyrics-sync-regression.test.js && node tests/spotify-lyrics-regression.test.js",
-    "test:youtube-lyrics": "node tests/youtube-caption-lyrics-regression.test.js && node tests/youtube-forced-alignment-regression.test.js",
-    "test:youtube-music-lyrics": "node tests/youtube-music-lyrics-regression.test.js",
-    "test:volume": "node tests/master-volume-regression.test.js",
-    "test:audio-session": "node tests/audio-session-bridge-regression.test.js",
-    "test:localization": "node tests/localization-regression.test.js",
-    "test:lyric-panel": "node tests/lyric-calibration-panel-regression.test.js",
+    "start": "node tools/ensure-castlabs-runtime.js && node tools/build-renderer-bundle.js && electron .",
+    "build:win": "node tools/ensure-castlabs-runtime.js && node tools/verify-castlabs-runtime.js && node tools/ensure-ytdlp-bundle.js && node tools/build-renderer-bundle.js && electron-builder --win nsis --publish never",
+    "build:win:dir": "node tools/ensure-castlabs-runtime.js && node tools/verify-castlabs-runtime.js && node tools/ensure-ytdlp-bundle.js && node tools/build-renderer-bundle.js && electron-builder --win dir",
+    "build:win:internal-beta": "electron-builder --config electron-builder.internal-beta.json --win nsis --publish never",
+    "dev": "node tools/ensure-castlabs-runtime.js && node tools/build-renderer-bundle.js && electron .",
     "setup:castlabs": "node tools/ensure-castlabs-runtime.js",
     "verify:castlabs": "node tools/verify-castlabs-runtime.js",
-    "test:castlabs": "node tests/castlabs-electron-regression.test.js",
-    "build:win:unsigned": "node tools/build-windows-release.js --unsigned",
-    "build:win:installer": "electron-builder --win nsis --prepackaged dist/win-unpacked",
-    "sign:evs:runtime": "node tools/evs-package.js sign node_modules/electron/dist",
-    "verify:evs:runtime": "node tools/evs-package.js verify node_modules/electron/dist",
-    "sign:evs:package": "node tools/evs-package.js sign dist/win-unpacked",
-    "verify:evs:package": "node tools/evs-package.js verify dist/win-unpacked",
-    "test:local-library": "node tests/local-library-regression.test.js",
-    "test:youtube-account": "node tests/youtube-account-regression.test.js",
-    "test:background-media": "node tests/background-media-library-regression.test.js && node tests/background-video-stream-regression.test.js && node tests/now-playing-background-regression.test.js && node tests/youtube-mv-player-state-regression.test.js && node tests/youtube-mv-sharp-audio-regression.test.js && node tests/youtube-video-av-resync-regression.test.js && node tests/youtube-mv-smooth-sync-regression.test.js && node tests/youtube-universal-video-search-regression.test.js",
-    "test:stage-text": "node tests/stage-text-mode-regression.test.js",
-    "test:liquid-glass": "node tests/liquid-glass-home-regression.test.js && node tests/liquid-glass-transparency-regression.test.js",
-    "test:startup": "node tests/window-startup-compatibility-regression.test.js",
-    "test:performance": "node tests/runtime-performance-regression.test.js && node tests/lightweight-optimization-regression.test.js && node tests/cpu-micro-optimization-regression.test.js && node tests/playback-latency-regression.test.js",
     "setup:youtube-engine": "node tools/ensure-ytdlp-bundle.js",
-    "build:win:skip-tests": "node tools/build-windows-release.js --skip-tests",
-    "test:youtube-recommendations": "node tests/youtube-genre-recommendation-regression.test.js",
-    "test:youtube-resume": "node tests/youtube-idle-resume-black-video-lyrics-control-regression.test.js",
-    "build:update-patch": "node tools/build-update-patch.js"
+    "test": "npm run test:shinayuu2",
+    "prepare:renderer": "node tools/build-renderer-bundle.js",
+    "test:shinayuu2": "node tools/audit-public-npm-lock.js && node tools/build-renderer-bundle.js && node tools/audit-i18n.js && node --test tests/shinayuu2-*.test.js",
+    "preview:win": "node build/preview-win.js"
   },
   "build": {
     "appId": "com.shinayuu.music",
@@ -65,11 +38,20 @@
       "build/**/*",
       "server.js",
       "music-providers.js",
+      "modern-music-routes.js",
       "local-library.js",
       "youtube-caption-provider.js",
       "youtube-forced-aligner.js",
       "dj-analyzer.js",
+      "qishui-audio-decryptor/**/*",
+      "qishui-api.js",
+      "kugou-api.js",
+      "LICENSE",
+      "NOTICE.md",
+      "docs/THIRD_PARTY_PORTS.md",
       "package.json",
+      "!desktop/wallpaper-preload.js",
+      "!public/wallpaper.html",
       "!public/index.*.html",
       "public/index.html",
       "vendor/yt-dlp.exe",
@@ -102,23 +84,10 @@
       "uninstallerSidebar": "build/installerSidebar.bmp",
       "installerHeader": "build/installerHeader.bmp",
       "include": "build/installer.nsh",
-      "artifactName": "ShinaYuu-Music-1.1.7.4-Setup.${ext}"
+      "artifactName": "ShinaYuu-Music-${version}-Setup.${ext}"
     },
-    "buildVersion": "1.1.7.4",
+    "buildVersion": "2.0.0.0",
     "electronDist": "node_modules/electron/dist"
-  },
-  "mineradio": {
-    "update": {
-      "provider": "github",
-      "owner": "",
-      "repo": "",
-      "preview": false,
-      "preferMirrors": false,
-      "mirrors": [],
-      "checkDelayMs": 10000,
-      "checkIntervalMs": 21600000,
-      "autoPrompt": true
-    }
   },
   "dependencies": {
     "7zip-bin": "^5.2.0",
@@ -127,35 +96,60 @@
     "ffmpeg-static": "^5.3.0",
     "gsap": "^3.15.0",
     "mpg123-decoder": "^1.0.3",
-    "music-metadata": "^11.14.0",
+    "music-metadata": "11.14.0",
     "node-7z": "^3.0.0",
     "youtubei.js": "^17.2.0"
+  },
+  "overrides": {
+    "axios": "1.18.1",
+    "body-parser": "1.20.6",
+    "music-metadata": "11.14.0"
   },
   "devDependencies": {
     "electron": "file:vendor/castlabs-electron",
     "electron-builder": "^26.15.3",
     "rcedit": "^5.0.2"
   },
-  "engines": {
-    "node": ">=24.0.0"
-  },
   "shinayuu": {
-    "discord": {
-      "applicationId": "",
-      "largeImageKey": "shinayuu",
-      "largeImageText": "ShinaYuu Music"
+    "displayVersion": "2.0.0",
+    "edition": "ShinaYuu Music 2.0.0 Official",
+    "lineage": {
+      "productCore": "ShinaYuu Music 1.1.8.7",
+      "visualUiAndLyricsStage": "Mineradio 2.0.2",
+      "desktopWallpaper": "Mineradio 2.0.2 implementation"
     },
-    "displayVersion": "1.1.7.4",
     "runtime": {
       "engine": "castlabs-electron",
-      "electronVersion": "42.5.2+wvcus",
-      "widevineComponentUpdater": true,
-      "spotifyPlayback": "main-renderer"
+      "spotifyPlayback": "main-renderer",
+      "youtubePlayback": "youtubei.js + yt-dlp fallback"
+    },
+    "providers": {
+      "playback": [
+        "youtube-music",
+        "youtube-video",
+        "spotify",
+        "local"
+      ],
+      "lyrics": [
+        "shinayuu",
+        "qq",
+        "netease",
+        "kugou",
+        "qishui"
+      ]
     },
     "youtube": {
       "oauthClientId": "",
       "oauthClientSecret": ""
+    },
+    "discord": {
+      "applicationId": "",
+      "largeImageKey": "shinayuu",
+      "largeImageText": "ShinaYuu Music"
     }
   },
-  "license": "GPL-3.0-only"
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "displayVersion": "2.0.0"
 }

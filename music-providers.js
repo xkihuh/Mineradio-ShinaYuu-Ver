@@ -5,11 +5,12 @@ const path = require('path');
 const crypto = require('crypto');
 const { spawn, execFileSync } = require('child_process');
 
-const UA = 'ShinaYuu Music/1.1.7.4';
+const UA = 'ShinaYuu Music/1.1.8.7';
 const CONFIG_FILE = process.env.MUSIC_SOURCE_CONFIG_FILE || path.join(__dirname, '.music-sources.json');
 const TOKEN_FILE = process.env.SPOTIFY_TOKEN_FILE || path.join(__dirname, '.spotify-token.json');
 const YOUTUBE_TOKEN_FILE = process.env.YOUTUBE_TOKEN_FILE || path.join(path.dirname(TOKEN_FILE), 'youtube-token.json');
 const YOUTUBE_DEVICE_TOKEN_FILE = process.env.YOUTUBE_DEVICE_TOKEN_FILE || path.join(path.dirname(YOUTUBE_TOKEN_FILE), 'youtube-device-token.json');
+const YOUTUBE_COOKIE_HEADER_FILE = process.env.YOUTUBE_COOKIE_HEADER_FILE || process.env.QQ_COOKIE_FILE || path.join(path.dirname(YOUTUBE_TOKEN_FILE), 'youtube-cookie-header.txt');
 const LRCLIB_BASE = 'https://lrclib.net/api';
 // Spotify does not publish a lyrics endpoint in the public Web API. This
 // compatibility bridge mirrors the timed-lyrics response used by Spotify's
@@ -19,6 +20,7 @@ const SPOTIFY_LYRICS_BASE = 'https://spclient.wg.spotify.com/color-lyrics/v2/tra
 const lyricSync = require('./public/lyrics-sync');
 const youtubeCaptions = require('./youtube-caption-provider');
 const youtubeForcedAligner = require('./youtube-forced-aligner');
+const crossProviderLyrics = require('./desktop/cross-provider-lyrics');
 
 const spotifyTrackCache = new Map();
 const youtubePodcastCache = new Map();
@@ -34,6 +36,9 @@ const youtubeDeviceAuthClients = new Map();
 const spotifyAudioAnalysisCache = new Map();
 const spotifyLyricsCache = new Map();
 const spotifyLyricsFailureCache = new Map();
+const spotifyLyricsInFlight = new Map();
+const spotifyFastLyricsCache = new Map();
+const spotifyFastLyricsInFlight = new Map();
 const spotifyYoutubeLyricsCache = new Map();
 let spotifySessionLyricsProvider = null;
 const youtubeMusicLyricsCache = new Map();
@@ -48,11 +53,21 @@ const youtubeForcedAlignmentService = youtubeForcedAligner.createProvider({
   runChild,
   userAgent: UA,
 });
+const crossProviderLyricsBroker = crossProviderLyrics.createBroker({
+  userAgent: UA,
+  timeoutMs: 3200,
+  logger: console,
+});
 let youtubeClientPromise = null;
 let youtubeSearchClientPromise = null;
+let youtubePublicPlaybackClientPromise = null;
+let youtubeAuthenticatedPlaybackClientPromise = null;
 let youtubeAccountClientPromise = null;
 let youtubeAccountClientKey = '';
 let youtubeCookieProvider = null;
+let youtubeYtDlpAuthPreference = { key: '', expiresAt: 0 };
+const youtubeYtDlpAuthFailures = new Map();
+let youtubeYtDlpLastAuthDiagnostics = { mode: 'public', tried: [], updatedAt: 0 };
 let youtubePlaylistSyncState = { updatedAt: 0, authMode: '', count: 0, sources: {}, failures: [] };
 let youtubeEnginePreparePromise = null;
 let youtubeEngineLastStatus = { ready: false, engine: 'yt-dlp', message: 'not_prepared' };
@@ -195,14 +210,117 @@ function setYouTubeCookieProvider(provider) {
   invalidateYouTubeAccountSession();
 }
 
-async function youtubeBrowserCookie() {
-  if (!youtubeCookieProvider) return '';
+function normalizeYouTubeCookieHeader(value) {
+  return String(value || '')
+    .replace(/[\r\n]+/g, '; ')
+    .split(';')
+    .map((part) => part.trim())
+    .filter((part) => /^[^=;\s]+=[^;]*$/.test(part))
+    .join('; ')
+    .slice(0, 256 * 1024);
+}
+
+function savedYouTubeCookieHeader() {
   try {
-    return String(await youtubeCookieProvider() || '').trim();
-  } catch (error) {
-    console.warn('[YouTubeCookieAuth] cookie provider failed:', error.message || error);
+    if (!fs.existsSync(YOUTUBE_COOKIE_HEADER_FILE)) return '';
+    return normalizeYouTubeCookieHeader(fs.readFileSync(YOUTUBE_COOKIE_HEADER_FILE, 'utf8'));
+  } catch (_) {
     return '';
   }
+}
+
+function setYouTubeCookieHeader(value) {
+  const cookie = normalizeYouTubeCookieHeader(value);
+  try {
+    fs.mkdirSync(path.dirname(YOUTUBE_COOKIE_HEADER_FILE), { recursive: true });
+    if (!cookie) {
+      safeUnlink(YOUTUBE_COOKIE_HEADER_FILE);
+      safeUnlink(path.join(appDataDir(), 'youtube-cookies.txt'));
+      youtubeYtDlpAuthPreference = { key: '', expiresAt: 0 };
+      invalidateYouTubeAccountSession();
+      youtubeClientPromise = null;
+      youtubeSearchClientPromise = null;
+      youtubePublicPlaybackClientPromise = null;
+      youtubeAuthenticatedPlaybackClientPromise = null;
+      return false;
+    }
+    fs.writeFileSync(YOUTUBE_COOKIE_HEADER_FILE, cookie, { encoding: 'utf8', mode: 0o600 });
+    youtubeYtDlpAuthPreference = { key: '', expiresAt: 0 };
+    invalidateYouTubeAccountSession();
+    youtubeClientPromise = null;
+    youtubeSearchClientPromise = null;
+    youtubePublicPlaybackClientPromise = null;
+    youtubeAuthenticatedPlaybackClientPromise = null;
+    return true;
+  } catch (error) {
+    console.warn('[YouTubeCookieAuth] cookie save failed:', error.message || error);
+    return false;
+  }
+}
+
+function clearYouTubeCookieHeader() {
+  return setYouTubeCookieHeader('');
+}
+
+function normalizeYouTubeCookieRows(value) {
+  if (!Array.isArray(value)) return [];
+  const nowSeconds = Date.now() / 1000;
+  const output = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue;
+    const name = String(item.name || '').trim();
+    const cookieValue = String(item.value == null ? '' : item.value).replace(/[\t\r\n]/g, '');
+    const domain = String(item.domain || '').trim().toLowerCase();
+    if (!name || !/^[A-Za-z0-9_.-]+$/.test(name) || !domain) continue;
+    const normalizedDomain = domain.replace(/^#HttpOnly_/, '');
+    const host = normalizedDomain.replace(/^\./, '');
+    if (!(host === 'youtube.com' || host.endsWith('.youtube.com') || host === 'google.com' || host.endsWith('.google.com'))) continue;
+    const expires = Number(item.expirationDate || item.expires || 0);
+    if (Number.isFinite(expires) && expires > 0 && expires < nowSeconds) continue;
+    output.push({
+      name,
+      value: cookieValue,
+      domain: normalizedDomain,
+      path: String(item.path || '/').trim() || '/',
+      secure: !!item.secure,
+      httpOnly: !!item.httpOnly,
+      expirationDate: Number.isFinite(expires) && expires > 0 ? Math.floor(expires) : 0,
+    });
+  }
+  return output;
+}
+
+function youtubeCookieHeaderFromRows(rows) {
+  const values = new Map();
+  for (const cookie of normalizeYouTubeCookieRows(rows)) {
+    if (cookie.name) values.set(cookie.name, cookie.value);
+  }
+  return normalizeYouTubeCookieHeader(Array.from(values, ([name, value]) => `${name}=${value}`).join('; '));
+}
+
+async function youtubeBrowserCookieBundle() {
+  let provided = '';
+  let cookies = [];
+  if (youtubeCookieProvider) {
+    try {
+      const result = await youtubeCookieProvider();
+      if (typeof result === 'string') provided = normalizeYouTubeCookieHeader(result);
+      else if (result && typeof result === 'object') {
+        cookies = normalizeYouTubeCookieRows(result.cookies || result.rows || []);
+        provided = normalizeYouTubeCookieHeader(result.header || result.cookieHeader || youtubeCookieHeaderFromRows(cookies));
+      }
+    } catch (error) {
+      console.warn('[YouTubeCookieAuth] cookie provider failed:', error.message || error);
+    }
+  }
+  return {
+    header: provided || savedYouTubeCookieHeader(),
+    cookies,
+  };
+}
+
+async function youtubeBrowserCookie() {
+  return (await youtubeBrowserCookieBundle()).header;
 }
 
 function youtubeCookieLooksSignedIn(cookie) {
@@ -1199,7 +1317,20 @@ async function youtubeLoginStatus(baseUrl = '') {
           redirectUri: youtubeRedirectUri(baseUrl),
         };
       } catch (error) {
-        if (error.status !== 401) throw error;
+        if (Number(error && error.status) === 401) {
+          clearYouTubeToken();
+        } else {
+          // OAuth already completed and the token is valid. A disabled YouTube
+          // Data API, an empty channel list, rate limiting or a temporary
+          // profile failure must not make the desktop app look logged out.
+          return {
+            provider: 'youtube', loggedIn: true, authorized: true, profilePending: true,
+            configured: true, quickLoginAvailable: true, advancedConfigured: true,
+            authMode: 'official', userId: '', nickname: 'YouTube Music', avatar: '',
+            profileError: error && (error.message || String(error)) || 'YOUTUBE_PROFILE_PENDING',
+            redirectUri: youtubeRedirectUri(baseUrl),
+          };
+        }
       }
     }
   }
@@ -1464,6 +1595,222 @@ function ytDlpRuntimeEnv(nodeRuntime = findNodeRuntime()) {
     return { ELECTRON_RUN_AS_NODE: '1' };
   }
   return {};
+}
+
+function ytDlpCookieFilePath() {
+  return path.join(appDataDir(), 'youtube-cookies.txt');
+}
+
+function writeYtDlpCookieFile(cookieHeader, cookieRows = []) {
+  const normalized = normalizeYouTubeCookieHeader(cookieHeader);
+  const structured = normalizeYouTubeCookieRows(cookieRows);
+  if (!normalized && !structured.length) return '';
+  const rows = ['# Netscape HTTP Cookie File', '# Generated locally by ShinaYuu Music for yt-dlp playback.'];
+  const seen = new Set();
+
+  for (const cookie of structured) {
+    const key = `${cookie.domain}\n${cookie.path}\n${cookie.name}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const domain = cookie.httpOnly ? `#HttpOnly_${cookie.domain}` : cookie.domain;
+    const includeSubdomains = cookie.domain.startsWith('.') ? 'TRUE' : 'FALSE';
+    rows.push(`${domain}\t${includeSubdomains}\t${cookie.path}\t${cookie.secure ? 'TRUE' : 'FALSE'}\t${cookie.expirationDate || 0}\t${cookie.name}\t${cookie.value}`);
+  }
+
+  if (!structured.length) {
+    for (const part of normalized.split(';')) {
+      const item = part.trim();
+      const index = item.indexOf('=');
+      if (index <= 0) continue;
+      const name = item.slice(0, index).trim();
+      const value = item.slice(index + 1).replace(/[\t\r\n]/g, '');
+      const key = `.youtube.com\n/\n${name}`;
+      if (!/^[A-Za-z0-9_.-]+$/.test(name) || seen.has(key)) continue;
+      seen.add(key);
+      rows.push(`.youtube.com\tTRUE\t/\tTRUE\t0\t${name}\t${value}`);
+    }
+  }
+
+  if (rows.length <= 2) return '';
+  const target = ytDlpCookieFilePath();
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, `${rows.join('\n')}\n`, { encoding: 'utf8', mode: 0o600 });
+  return target;
+}
+
+function youtubeCookieRowsLookSignedIn(rows) {
+  const names = new Set(normalizeYouTubeCookieRows(rows).map((cookie) => cookie.name));
+  const hasApiSecret = ['SAPISID', '__Secure-1PAPISID', '__Secure-3PAPISID'].some((name) => names.has(name));
+  const hasSession = ['SID', '__Secure-1PSID', '__Secure-3PSID'].some((name) => names.has(name));
+  return hasApiSecret && hasSession;
+}
+
+function ytDlpAuthChallenge(error) {
+  const message = String(error && (error.stderr || error.message) || '').toLowerCase();
+  return /sign in to confirm|not a bot|cookies-from-browser|authentication|login required|confirm your age|age-restricted|members-only|streaming data not available|no video formats found|only images are available/.test(message);
+}
+
+function ytDlpBrowserCookieFailure(error) {
+  const message = String(error && (error.stderr || error.message) || '').toLowerCase();
+  return /cookies?\s+(?:sqlite\s+)?database|could not find[^\n]*cookies?\s+database|could not copy[^\n]*cookies?|failed to decrypt[^\n]*cookies?|browser[^\n]*cookies?|profile[^\n]*(?:not found|does not exist)|no such file[^\n]*cookies?|keyring|dpapi|permission denied[^\n]*cookies?/.test(message);
+}
+
+function ytDlpAuthRecoveryError(error) {
+  return ytDlpAuthChallenge(error) || ytDlpBrowserCookieFailure(error);
+}
+
+function ytDlpClientFallbackError(error) {
+  const message = String(error && (error.stderr || error.message) || '').toLowerCase();
+  return ytDlpAuthRecoveryError(error)
+    || /no video formats found|requested format is not available|only images are available|player response playability status|this video is not available|streaming data not available|no audio formats|format is not available|unplayable|po token|http error 403|forbidden|nsig|signature extraction|challenge solving|javascript runtime/.test(message);
+}
+
+function ytDlpBrowserBaseName(source) {
+  return String(source || '').trim().toLowerCase().split(/[+:]/, 1)[0];
+}
+
+function directoryContainsChromiumCookies(root) {
+  if (!root || !fs.existsSync(root)) return false;
+  const candidates = ['Default', 'Guest Profile'];
+  try {
+    for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+      if (entry.isDirectory() && /^Profile \d+$/i.test(entry.name)) candidates.push(entry.name);
+    }
+  } catch (_) {}
+  return candidates.some((profile) => {
+    const folder = path.join(root, profile);
+    return fs.existsSync(path.join(folder, 'Network', 'Cookies')) || fs.existsSync(path.join(folder, 'Cookies'));
+  });
+}
+
+function ytDlpBrowserCookieSourceAvailable(source) {
+  if (String(process.env.YTDLP_SKIP_BROWSER_COOKIE_CHECK || '').trim() === '1') return true;
+  if (process.platform !== 'win32') return true;
+  const browser = ytDlpBrowserBaseName(source);
+  const local = String(process.env.LOCALAPPDATA || '').trim();
+  const roaming = String(process.env.APPDATA || '').trim();
+  if (!browser) return false;
+  if (browser === 'edge') return directoryContainsChromiumCookies(path.join(local, 'Microsoft', 'Edge', 'User Data'));
+  if (browser === 'chrome') return directoryContainsChromiumCookies(path.join(local, 'Google', 'Chrome', 'User Data'));
+  if (browser === 'brave') return directoryContainsChromiumCookies(path.join(local, 'BraveSoftware', 'Brave-Browser', 'User Data'));
+  if (browser === 'chromium') return directoryContainsChromiumCookies(path.join(local, 'Chromium', 'User Data'));
+  if (browser === 'vivaldi') return directoryContainsChromiumCookies(path.join(local, 'Vivaldi', 'User Data'));
+  if (browser === 'firefox') {
+    const profiles = path.join(roaming, 'Mozilla', 'Firefox', 'Profiles');
+    if (!profiles || !fs.existsSync(profiles)) return false;
+    try {
+      return fs.readdirSync(profiles, { withFileTypes: true }).some((entry) => entry.isDirectory() && fs.existsSync(path.join(profiles, entry.name, 'cookies.sqlite')));
+    } catch (_) { return false; }
+  }
+  return true;
+}
+
+function ytDlpBrowserCookieSources() {
+  const configuredBrowser = String(process.env.YTDLP_BROWSER_COOKIE_SOURCE || '').trim();
+  const defaults = process.platform === 'win32' ? ['edge', 'chrome', 'brave', 'firefox'] : ['chrome', 'firefox'];
+  const ordered = configuredBrowser ? [configuredBrowser, ...defaults] : defaults;
+  const output = [];
+  const seen = new Set();
+  for (const source of ordered) {
+    const value = String(source || '').trim();
+    const key = value.toLowerCase();
+    if (!value || seen.has(key)) continue;
+    seen.add(key);
+    if (ytDlpBrowserCookieSourceAvailable(value)) output.push(value);
+  }
+  return output;
+}
+
+function ytDlpAuthStrategies(cookieBundle) {
+  const bundle = cookieBundle && typeof cookieBundle === 'object'
+    ? cookieBundle
+    : { header: String(cookieBundle || ''), cookies: [] };
+  const strategies = [];
+  const signedIn = youtubeCookieLooksSignedIn(bundle.header) || youtubeCookieRowsLookSignedIn(bundle.cookies);
+  const cookieFile = signedIn ? writeYtDlpCookieFile(bundle.header, bundle.cookies) : '';
+
+  // Public music videos must not depend on a browser/account cookie. YouTube
+  // currently exposes different format sets to different Innertube clients,
+  // so try explicit no-cookie clients before falling back to account cookies.
+  // This also avoids a stale/rotated cookie turning every public track into a
+  // false YOUTUBE_AUTH_REQUIRED failure.
+  strategies.push(
+    { key: 'public:android_vr', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=android_vr'] },
+    { key: 'public:ios', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=ios'] },
+    { key: 'public:tv', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=tv'] },
+    { key: 'public:web_embedded', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=web_embedded'] },
+    { key: 'public:web_safari', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=web_safari'] },
+    { key: 'public:default', args: ['--no-cookies'] },
+  );
+  if (cookieFile) strategies.push({ key: 'app-cookie', args: ['--cookies', cookieFile] });
+  for (const browser of ytDlpBrowserCookieSources()) {
+    strategies.push({ key: `browser:${browser}`, args: ['--cookies-from-browser', browser] });
+  }
+
+  const now = Date.now();
+  const preferred = youtubeYtDlpAuthPreference.expiresAt > now ? youtubeYtDlpAuthPreference.key : '';
+  const unique = [];
+  const used = new Set();
+  for (const item of strategies.sort((a, b) => {
+    const aPublic = a.key.startsWith('public:');
+    const bPublic = b.key.startsWith('public:');
+    if (aPublic !== bPublic) return aPublic ? -1 : 1;
+    return a.key === preferred ? -1 : b.key === preferred ? 1 : 0;
+  })) {
+    const blockedUntil = Number(youtubeYtDlpAuthFailures.get(item.key) || 0);
+    if (blockedUntil > now && item.key !== 'public:default' && item.key !== 'app-cookie') continue;
+    if (!used.has(item.key)) { used.add(item.key); unique.push(item); }
+  }
+  return unique;
+}
+
+function insertYtDlpStrategyArgs(args, extra) {
+  const list = Array.isArray(args) ? args.slice() : [];
+  const url = list.length ? list.pop() : '';
+  return list.concat(extra || [], url ? [url] : []);
+}
+
+async function runYtDlpWithAuthRecovery(engine, args, options = {}) {
+  const cookieBundle = await youtubeBrowserCookieBundle();
+  const strategies = ytDlpAuthStrategies(cookieBundle);
+  const tried = [];
+  let lastError = null;
+  for (let index = 0; index < strategies.length; index += 1) {
+    const strategy = strategies[index];
+    if (index > 0 && lastError && !ytDlpClientFallbackError(lastError)) break;
+    tried.push(strategy.key);
+    try {
+      const result = await runChild(engine.executable, insertYtDlpStrategyArgs(args, strategy.args), {
+        ...options,
+        timeoutMs: strategy.key.startsWith('browser:')
+          ? Math.min(Number(options.timeoutMs || 70000), 42000)
+          : Number(options.timeoutMs || 70000),
+      });
+      youtubeYtDlpAuthFailures.delete(strategy.key);
+      youtubeYtDlpAuthPreference = { key: strategy.key, expiresAt: Date.now() + 30 * 60 * 1000 };
+      youtubeYtDlpLastAuthDiagnostics = { mode: strategy.key, tried, updatedAt: Date.now() };
+      return result;
+    } catch (error) {
+      lastError = error;
+      if (strategy.key.startsWith('browser:') && ytDlpBrowserCookieFailure(error)) {
+        youtubeYtDlpAuthFailures.set(strategy.key, Date.now() + 5 * 60 * 1000);
+        if (youtubeYtDlpAuthPreference.key === strategy.key) youtubeYtDlpAuthPreference = { key: '', expiresAt: 0 };
+      }
+      if (!ytDlpClientFallbackError(error)) break;
+    }
+  }
+  youtubeYtDlpLastAuthDiagnostics = { mode: 'failed', tried, updatedAt: Date.now() };
+  if (lastError && ytDlpAuthRecoveryError(lastError)) {
+    const error = new Error('YOUTUBE_AUTH_REQUIRED');
+    error.code = 'YOUTUBE_AUTH_REQUIRED';
+    error.status = 401;
+    error.userMessageVi = 'YouTube chưa cấp được luồng phát công khai hoặc phiên đăng nhập hợp lệ. Hãy thử đăng nhập lại YouTube trong ứng dụng; nếu dùng cookie trình duyệt, hãy đóng hẳn Edge/Chrome rồi thử lại.';
+    error.userMessageEn = 'YouTube could not provide a public stream or a valid signed-in session. Sign in to YouTube again in the app; if browser cookies are used, fully close Edge/Chrome and retry.';
+    error.cause = lastError;
+    error.diagnostics = { auth: youtubeYtDlpLastAuthDiagnostics };
+    throw error;
+  }
+  throw lastError || new Error('yt-dlp failed');
 }
 
 function userYtDlpPath() {
@@ -1781,6 +2128,8 @@ function cachedYouTubeYtDlpInfo(videoId) {
 function ytDlpMetadataArgs(videoId) {
   const nodeRuntime = findNodeRuntime();
   const args = [
+    '--ignore-config',
+    '--remote-components', 'ejs:github',
     '--no-playlist',
     '--no-warnings',
     '--quiet',
@@ -1788,6 +2137,7 @@ function ytDlpMetadataArgs(videoId) {
     '--skip-download',
     '--socket-timeout', '20',
     '--retries', '2',
+    '--extractor-retries', '2',
   ];
   if (nodeRuntime) args.push('--js-runtimes', `node:${nodeRuntime}`);
   args.push(`https://www.youtube.com/watch?v=${encodeURIComponent(String(videoId || ''))}`);
@@ -1799,7 +2149,7 @@ async function youtubeInfoViaYtDlp(videoId) {
   if (cached) return cached;
   const engine = await prepareYouTubeEngine();
   const nodeRuntime = findNodeRuntime();
-  const result = await runChild(engine.executable, ytDlpMetadataArgs(videoId), {
+  const result = await runYtDlpWithAuthRecovery(engine, ytDlpMetadataArgs(videoId), {
     timeoutMs: 60000,
     maxOutput: 24 * 1024 * 1024,
     env: ytDlpRuntimeEnv(nodeRuntime),
@@ -1814,12 +2164,15 @@ async function youtubeInfoViaYtDlp(videoId) {
 function ytDlpArgs(videoId, quality = '') {
   const nodeRuntime = findNodeRuntime();
   const args = [
+    '--ignore-config',
+    '--remote-components', 'ejs:github',
     '--no-playlist',
     '--no-warnings',
     '--quiet',
     '--dump-single-json',
     '--socket-timeout', '20',
     '--retries', '2',
+    '--extractor-retries', '2',
     '--fragment-retries', '2',
     '--format', String(quality || '').toLowerCase() === 'standard' ? 'bestaudio[abr<=160]/bestaudio/best' : 'bestaudio/best',
   ];
@@ -1834,7 +2187,7 @@ async function youtubeAudioViaYtDlp(videoId, quality = '', options = {}) {
   if (cachedDescriptor) return playbackResultFromYouTubeDescriptor(cachedDescriptor, 'yt-dlp-cache');
   const engine = await prepareYouTubeEngine();
   const nodeRuntime = findNodeRuntime();
-  const result = await runChild(engine.executable, ytDlpArgs(videoId, quality), {
+  const result = await runYtDlpWithAuthRecovery(engine, ytDlpArgs(videoId, quality), {
     timeoutMs: 70000,
     maxOutput: 18 * 1024 * 1024,
     env: ytDlpRuntimeEnv(nodeRuntime),
@@ -1863,7 +2216,14 @@ async function youtubeAudioViaYtDlp(videoId, quality = '', options = {}) {
 
 function normalizeBackgroundVideoQuality(quality) {
   const value = String(quality || 'auto').trim().toLowerCase();
-  return /^(eco|balanced|high|ultra)$/.test(value) ? value : 'auto';
+  const aliases = {
+    '720p': 'eco', hd: 'eco',
+    '1080p': 'balanced', fhd: 'balanced', fullhd: 'balanced',
+    '1440p': 'high', '2k': 'high', qhd: 'high',
+    '2160p': 'ultra', '4k': 'ultra', uhd: 'ultra', highest: 'max', maximum: 'max', max: 'max', '8k': 'max',
+  };
+  if (aliases[value]) return aliases[value];
+  return /^(eco|balanced|high|ultra|max)$/.test(value) ? value : 'auto';
 }
 
 function youtubeBackgroundVideoLimits(quality) {
@@ -1873,7 +2233,7 @@ function youtubeBackgroundVideoLimits(quality) {
     // High requests 1440p so object-fit:cover has enough source pixels after
     // cropping on a Full-HD desktop. Ultra may use 2160p on capable systems;
     // Balanced remains 1080p and Eco remains 720p.
-    height: mode === 'eco' ? 720 : (mode === 'balanced' ? 1080 : (mode === 'ultra' ? 2160 : 1440)),
+    height: mode === 'eco' ? 720 : (mode === 'balanced' ? 1080 : (mode === 'ultra' ? 2160 : (mode === 'max' ? 4320 : 1440))),
     // A large portion of YouTube's high-resolution catalog is available only
     // as 50/60 fps video-only formats.
     fps: mode === 'eco' ? 30 : 60,
@@ -1883,7 +2243,7 @@ function youtubeBackgroundVideoLimits(quality) {
 function youtubeBackgroundVideoFormat(quality, options = {}) {
   const { mode, height, fps } = youtubeBackgroundVideoLimits(quality);
   const compatibility = !!(options && options.compatibility);
-  const minimumHeight = mode === 'eco' ? 720 : (mode === 'balanced' ? 1080 : (mode === 'ultra' ? 2160 : 1440));
+  const minimumHeight = mode === 'eco' ? 720 : (mode === 'balanced' ? 1080 : (mode === 'ultra' ? 2160 : (mode === 'max' ? 2160 : 1440)));
   // Ask for the requested tier first, then fall back one tier at a time only
   // when the upload genuinely does not contain that resolution. This prevents
   // yt-dlp from silently selecting a soft 360p/480p rendition while Full HD or
@@ -2011,12 +2371,15 @@ function youtubeCachedVideoDescriptor(info, videoId, quality, options = {}) {
 function ytDlpVideoArgs(videoId, quality = 'auto', options = {}) {
   const nodeRuntime = findNodeRuntime();
   const args = [
+    '--ignore-config',
+    '--remote-components', 'ejs:github',
     '--no-playlist',
     '--no-warnings',
     '--quiet',
     '--dump-single-json',
     '--socket-timeout', '20',
     '--retries', '2',
+    '--extractor-retries', '2',
     '--fragment-retries', '2',
     '--format', youtubeBackgroundVideoFormat(quality, options),
   ];
@@ -2038,7 +2401,7 @@ async function youtubeVideoViaYtDlp(videoId, quality = 'auto', options = {}) {
   }
   const engine = await prepareYouTubeEngine();
   const nodeRuntime = findNodeRuntime();
-  const result = await runChild(engine.executable, ytDlpVideoArgs(videoId, quality, options), {
+  const result = await runYtDlpWithAuthRecovery(engine, ytDlpVideoArgs(videoId, quality, options), {
     timeoutMs: 70000,
     maxOutput: 18 * 1024 * 1024,
     env: ytDlpRuntimeEnv(nodeRuntime),
@@ -2076,9 +2439,11 @@ async function youtubeVideoViaYtDlp(videoId, quality = 'auto', options = {}) {
 }
 
 function publicProviderConfig(config = providerConfig(), baseUrl = '') {
+  const storedSpotifyToken = spotifyToken();
+  const effectiveSpotifyClientId = String(config.spotifyClientId || storedSpotifyToken.clientId || '').trim();
   return {
-    spotifyClientId: config.spotifyClientId,
-    spotifyConfigured: !!config.spotifyClientId,
+    spotifyClientId: effectiveSpotifyClientId,
+    spotifyConfigured: !!effectiveSpotifyClientId,
     spotifyMarket: config.spotifyMarket,
     youtubeClientId: config.youtubeClientId,
     youtubeConfigured: !!config.youtubeClientId,
@@ -2134,7 +2499,7 @@ function saveSpotifyToken(token) {
   const merged = {
     ...current,
     ...token,
-    clientId: config.spotifyClientId || current.clientId || '',
+    clientId: config.spotifyClientId || token.clientId || current.clientId || '',
   };
   if (token.access_token || token.expires_in != null) {
     merged.obtainedAt = now;
@@ -2219,6 +2584,10 @@ async function spotifyTokenRequest(params) {
     }
     throw error;
   }
+  // Persist the exact OAuth client that issued this token. This keeps
+  // catalogue search and refresh working even when the user config file is
+  // temporarily unavailable or was moved between source folders.
+  if (params && params.client_id) data.clientId = String(params.client_id || '').trim();
   if (String(params && params.grant_type || '') === 'authorization_code') {
     data.profile = null;
     data.profileFetchedAt = 0;
@@ -2233,9 +2602,10 @@ async function refreshSpotifyAccessToken() {
   spotifyRefreshPromise = (async () => {
     const config = providerConfig();
     const token = spotifyToken();
-    if (!config.spotifyClientId || !token.refresh_token) return null;
+    const clientId = String(config.spotifyClientId || token.clientId || '').trim();
+    if (!clientId || !token.refresh_token) return null;
     return spotifyTokenRequest({
-      client_id: config.spotifyClientId,
+      client_id: clientId,
       grant_type: 'refresh_token',
       refresh_token: token.refresh_token,
     });
@@ -2462,6 +2832,18 @@ function rememberSpotifyLyricsFailure(trackId, detail = {}) {
 }
 
 async function spotifyNativeLyrics(id, metadata = {}) {
+  const candidateIds = spotifyLyricsCandidateIds(id, metadata);
+  if (!candidateIds.length) return null;
+  const key = candidateIds.join('|');
+  if (spotifyLyricsInFlight.has(key)) return spotifyLyricsInFlight.get(key);
+  const job = spotifyNativeLyricsUncached(id, metadata).finally(() => {
+    if (spotifyLyricsInFlight.get(key) === job) spotifyLyricsInFlight.delete(key);
+  });
+  spotifyLyricsInFlight.set(key, job);
+  return job;
+}
+
+async function spotifyNativeLyricsUncached(id, metadata = {}) {
   if (/^(0|false|off|disabled)$/i.test(String(process.env.SPOTIFY_NATIVE_LYRICS || '').trim())) return null;
   const candidateIds = spotifyLyricsCandidateIds(id, metadata);
   if (!candidateIds.length) return null;
@@ -2471,17 +2853,66 @@ async function spotifyNativeLyrics(id, metadata = {}) {
     if (cached && Date.now() - cached.at < 6 * 60 * 60 * 1000) return cached.value;
   }
 
-  let token = await validSpotifyToken(false);
   const configuredMarket = String(metadata.market || providerConfig().spotifyMarket || '').trim().toUpperCase();
-  const markets = ['from_token'];
-  if (configuredMarket && configuredMarket !== 'FROM_TOKEN') markets.push(configuredMarket);
   const failures = [];
+  let sessionAttempted = false;
+
+  // Ask the live Spotify player session first. It owns the browser context that
+  // is already playing the exact relinked track, so it is both faster and more
+  // reliable than waiting on the Node compatibility endpoint to reject RBAC.
+  if (spotifySessionLyricsProvider) {
+    try {
+      const sessionResult = await spotifySessionLyricsProvider(candidateIds, {
+        ...metadata,
+        market: configuredMarket,
+        failures,
+      });
+      sessionAttempted = !!(sessionResult && sessionResult.attempted !== false && sessionResult.unavailable !== true);
+      const payload = sessionResult && (sessionResult.payload || sessionResult.data || (sessionResult.lyrics ? sessionResult : null));
+      const resolvedTrackId = spotifyLyricsTrackId(sessionResult && sessionResult.trackId) || candidateIds[0];
+      const value = normalizeSpotifyLyricsPayload(payload, {
+        ...metadata,
+        spotifyId: resolvedTrackId,
+        id: resolvedTrackId,
+      });
+      if (value && value.plainLyric) {
+        value.spotifyLyricsDiagnostics = {
+          transport: 'webview2-session',
+          requestedTrackId: resolvedTrackId,
+          status: Number(sessionResult && sessionResult.status || 200),
+          failures,
+        };
+        candidateIds.forEach((candidateId) => spotifyLyricsCache.set(candidateId, { at: Date.now(), value }));
+        return value;
+      }
+      if (sessionAttempted && sessionResult && sessionResult.error) {
+        failures.push({ status: Number(sessionResult.status || 0), error: String(sessionResult.error || ''), transport: 'webview2-session' });
+      }
+    } catch (error) {
+      failures.push({ status: 0, error: String(error && (error.message || error) || ''), transport: 'webview2-session' });
+      console.warn('[SpotifyLyricsSession]', error && (error.message || error));
+    }
+  }
+
+  // A connected Spotify browser session is the authoritative native-lyrics
+  // transport. If that live session has already answered without lyrics, do
+  // not serially spend another 5-8 seconds probing the compatibility endpoint
+  // that Spotify commonly rejects with RBAC. Continue immediately to the
+  // QQ/NetEase/LRCLIB pipeline instead. The old Node probe remains opt-in for
+  // diagnostics through SPOTIFY_NATIVE_NODE_FALLBACK=1.
+  const allowNodeCompatibilityFallback = !sessionAttempted
+    || /^(1|true|on|enabled)$/i.test(String(process.env.SPOTIFY_NATIVE_NODE_FALLBACK || '').trim());
+  if (!allowNodeCompatibilityFallback) return null;
+
+  let token = await validSpotifyToken(false);
+  const markets = ['from_token'];
 
   if (token && token.access_token) {
-    for (const trackId of candidateIds) {
+    spotifyLyricsCandidates:
+    for (const trackId of candidateIds.slice(0, 2)) {
       const rememberedFailure = spotifyLyricsFailureCache.get(trackId);
       const deterministicFailure = rememberedFailure
-        && Date.now() - Number(rememberedFailure.at || 0) < 5 * 60 * 1000
+        && Date.now() - Number(rememberedFailure.at || 0) < 30 * 60 * 1000
         && [401, 403, 404].includes(Number(rememberedFailure.status || 0));
       if (deterministicFailure) {
         failures.push({ trackId, ...rememberedFailure, cached: true });
@@ -2496,7 +2927,7 @@ async function spotifyNativeLyrics(id, metadata = {}) {
             'App-Platform': 'WebPlayer',
             'User-Agent': UA,
           },
-        }, 10000);
+        }, 2600);
         try {
           let response = await request(token.access_token);
           if (response.status === 401 && token.refresh_token) {
@@ -2508,6 +2939,11 @@ async function spotifyNativeLyrics(id, metadata = {}) {
             const detail = { status: response.status, market, body: body.slice(0, 300), transport: 'node' };
             failures.push({ trackId, ...detail });
             rememberSpotifyLyricsFailure(trackId, detail);
+            const rbacDenied = response.status === 403 && /RBAC:\s*access denied/i.test(body);
+            if (rbacDenied) {
+              console.warn('[SpotifyLyrics] native endpoint unavailable (403 RBAC); using external lyric providers');
+              break spotifyLyricsCandidates;
+            }
             console.warn('[SpotifyLyrics] request failed', `status=${response.status}`, `track=${trackId}`, `market=${market}`, body.slice(0, 160));
             continue;
           }
@@ -2539,7 +2975,7 @@ async function spotifyNativeLyrics(id, metadata = {}) {
   // The hidden WebView2 player owns the live Spotify playback session. When
   // the Node request is rejected, ask that session to repeat the request with
   // its browser context/cookies before falling back to LRCLIB.
-  if (spotifySessionLyricsProvider) {
+  if (spotifySessionLyricsProvider && !sessionAttempted) {
     try {
       const sessionResult = await spotifySessionLyricsProvider(candidateIds, {
         ...metadata,
@@ -2701,7 +3137,8 @@ function spotifyStatusFromProfile(config, token, profile, baseUrl = '') {
 async function spotifyLoginStatus(baseUrl = '') {
   const config = providerConfig();
   const token = await validSpotifyToken(false);
-  if (!config.spotifyClientId) {
+  const effectiveClientId = String(config.spotifyClientId || token && token.clientId || '').trim();
+  if (!effectiveClientId) {
     return {
       provider: 'spotify',
       loggedIn: false,
@@ -2731,10 +3168,16 @@ async function spotifyLoginStatus(baseUrl = '') {
   const retryAt = Math.max(Number(token.profileRetryAt || 0), spotifyRateLimitUntil);
   return {
     provider: 'spotify',
-    loggedIn: false,
+    // The OAuth token is the connection. Profile loading may be rate-limited,
+    // but the renderer should immediately retain the connected account state.
+    loggedIn: true,
     authorized: true,
     profilePending: true,
     configured: true,
+    nickname: 'Spotify',
+    userId: '',
+    avatar: '',
+    product: '',
     playbackScopesReady: spotifyPlaybackScopesReady(token),
     grantedScopes: String(token.scope || '').split(/\s+/).filter(Boolean),
     retryAt,
@@ -2756,7 +3199,9 @@ function cleanSpotifyAuthTransactions() {
 
 function beginSpotifyLogin(baseUrl) {
   const config = providerConfig();
-  if (!config.spotifyClientId) {
+  const savedToken = spotifyToken();
+  const effectiveClientId = String(config.spotifyClientId || savedToken.clientId || '').trim();
+  if (!effectiveClientId) {
     const error = new Error('SPOTIFY_CLIENT_ID_REQUIRED');
     error.status = 400;
     throw error;
@@ -2766,7 +3211,7 @@ function beginSpotifyLogin(baseUrl) {
   const state = randomUrlSafe(18);
   const verifier = randomUrlSafe(64);
   const challenge = base64Url(sha256(verifier));
-  spotifyAuthRequests.set(state, { verifier, redirectUri, createdAt: Date.now() });
+  spotifyAuthRequests.set(state, { verifier, redirectUri, clientId: effectiveClientId, createdAt: Date.now() });
   spotifyAuthResults.set(state, { state, stage: 'authorization', complete: false, createdAt: Date.now() });
   const scopes = [
     'user-read-private',
@@ -2784,7 +3229,7 @@ function beginSpotifyLogin(baseUrl) {
     'user-modify-playback-state',
   ];
   const params = new URLSearchParams({
-    client_id: config.spotifyClientId,
+    client_id: effectiveClientId,
     response_type: 'code',
     redirect_uri: redirectUri,
     code_challenge_method: 'S256',
@@ -2827,9 +3272,15 @@ async function completeSpotifyLogin(query) {
   }
   spotifyAuthRequests.delete(state);
   const config = providerConfig();
+  const effectiveClientId = String(pending.clientId || config.spotifyClientId || spotifyToken().clientId || '').trim();
+  if (!effectiveClientId) {
+    const error = new Error('SPOTIFY_CLIENT_ID_REQUIRED');
+    error.status = 400;
+    throw error;
+  }
   try {
     const token = await spotifyTokenRequest({
-      client_id: config.spotifyClientId,
+      client_id: effectiveClientId,
       grant_type: 'authorization_code',
       code: String(query.code),
       redirect_uri: pending.redirectUri,
@@ -3083,10 +3534,10 @@ function mapSpotifyTrack(track) {
   const artists = spotifyArtists(track.artists);
   const album = track.album || {};
   const song = {
-    provider: 'netease',
+    provider: 'spotify',
     realProvider: 'spotify',
-    source: 'netease',
-    type: 'song',
+    source: 'spotify',
+    type: 'spotify',
     id: spotifyTrackIdFromValue(track) || '',
     spotifyId: spotifyTrackIdFromValue(track) || '',
     spotifyUri: track.uri || (spotifyTrackIdFromValue(track) ? `spotify:track:${spotifyTrackIdFromValue(track)}` : ''),
@@ -3119,25 +3570,39 @@ function mapSpotifyTrack(track) {
 async function spotifySearch(query, limit = 18) {
   const config = providerConfig();
   const token = await validSpotifyToken(false);
-  if (!config.spotifyClientId || !token) return [];
+  const clientId = String(config.spotifyClientId || token && token.clientId || '').trim();
+  if (!clientId || !token || !token.access_token) return [];
 
-  // Since Spotify's February 2026 Development Mode changes, /search accepts
-  // at most 10 items per request. Paginate instead of sending the legacy 18/50
-  // limit, which makes Spotify return HTTP 400 and previously caused the UI to
-  // silently show only YouTube results.
+  // Spotify Development Mode accepts at most 10 items per search request.
+  // Keep the request native to Spotify and retry without a forced market when
+  // the account market/relinked catalog rejects the configured market.
   const target = Math.max(1, Math.min(30, Number(limit) || 18));
   const songs = [];
   let offset = 0;
   while (songs.length < target) {
     const pageSize = Math.min(10, target - songs.length);
     const params = new URLSearchParams({
-      q: String(query || ''),
+      q: String(query || '').trim(),
       type: 'track',
       limit: String(pageSize),
       offset: String(offset),
-      market: config.spotifyMarket,
     });
-    const data = await spotifyApi(`/search?${params.toString()}`);
+    const market = String(config.spotifyMarket || '').trim().toUpperCase();
+    if (/^[A-Z]{2}$/.test(market)) params.set('market', market);
+    let data;
+    try {
+      // Profile loading may have been rate-limited independently. Do not let a
+      // cached /me retry window suppress catalogue search without attempting
+      // the actual /search endpoint.
+      data = await spotifyApi(`/search?${params.toString()}`, { ignoreRateLimit: true, required: true });
+    } catch (error) {
+      if (params.has('market') && Number(error && error.status) === 400) {
+        params.delete('market');
+        data = await spotifyApi(`/search?${params.toString()}`, { ignoreRateLimit: true, required: true });
+      } else {
+        throw error;
+      }
+    }
     const page = ((data && data.tracks && data.tracks.items) || [])
       .map(mapSpotifyTrack)
       .filter((song) => song.id && song.name);
@@ -3155,9 +3620,9 @@ async function spotifyUserPlaylists(limit = 50) {
     const id = String(playlist.id || '');
     const ownerId = String(playlist.owner && playlist.owner.id || '');
     return {
-      provider: 'netease',
+      provider: 'spotify',
       realProvider: 'spotify',
-      source: 'netease',
+      source: 'spotify',
       id,
       name: playlist.name || '',
       cover: playlist.images && playlist.images[0] && playlist.images[0].url || '',
@@ -3351,13 +3816,16 @@ async function createYouTubeClient(retrievePlayer) {
   if (yt.Platform && yt.Platform.shim) {
     yt.Platform.shim.eval = async (data) => new Function(data.output)();
   }
+  const cookie = await youtubeBrowserCookie();
+  const useCookie = youtubeCookieLooksSignedIn(cookie);
   return yt.Innertube.create({
     lang: providerConfig().language === 'en' ? 'en' : 'vi',
     location: providerConfig().spotifyMarket || 'VN',
     retrieve_player: retrievePlayer !== false,
     enable_session_cache: true,
-    generate_session_locally: false,
-    user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36',
+    generate_session_locally: useCookie,
+    ...(useCookie ? { cookie, client_type: 'WEB' } : {}),
+    user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/150 Safari/537.36',
   });
 }
 
@@ -3379,6 +3847,48 @@ async function getYouTubeSearchClient() {
     });
   }
   return youtubeSearchClientPromise;
+}
+
+async function createYouTubePlaybackClient(authenticated = false) {
+  const yt = await import('youtubei.js');
+  if (yt.Platform && yt.Platform.shim) {
+    yt.Platform.shim.eval = async (data) => new Function(data.output)();
+  }
+  const cookie = authenticated ? await youtubeBrowserCookie() : '';
+  if (authenticated && !youtubeCookieLooksSignedIn(cookie)) {
+    const error = new Error('YOUTUBE_SIGNED_IN_COOKIE_UNAVAILABLE');
+    error.code = 'YOUTUBE_SIGNED_IN_COOKIE_UNAVAILABLE';
+    throw error;
+  }
+  return yt.Innertube.create({
+    lang: providerConfig().language === 'en' ? 'en' : 'vi',
+    location: providerConfig().spotifyMarket || 'VN',
+    retrieve_player: true,
+    enable_session_cache: false,
+    generate_session_locally: !!cookie,
+    ...(cookie ? { cookie, client_type: 'WEB' } : {}),
+    user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/150 Safari/537.36',
+  });
+}
+
+async function getYouTubePublicPlaybackClient() {
+  if (!youtubePublicPlaybackClientPromise) {
+    youtubePublicPlaybackClientPromise = createYouTubePlaybackClient(false).catch((error) => {
+      youtubePublicPlaybackClientPromise = null;
+      throw error;
+    });
+  }
+  return youtubePublicPlaybackClientPromise;
+}
+
+async function getYouTubeAuthenticatedPlaybackClient() {
+  if (!youtubeAuthenticatedPlaybackClientPromise) {
+    youtubeAuthenticatedPlaybackClientPromise = createYouTubePlaybackClient(true).catch((error) => {
+      youtubeAuthenticatedPlaybackClientPromise = null;
+      throw error;
+    });
+  }
+  return youtubeAuthenticatedPlaybackClientPromise;
 }
 
 async function runYouTubeSearch(operation) {
@@ -3991,19 +4501,19 @@ async function youtubeSearch(query, limit = 18) {
   return youtubeMusicSearch(query, limit);
 }
 
-async function youtubeAudioViaInnertube(videoId, quality = '', options = {}) {
-  const refresh = !!(options && options.refresh);
-  const cachedDescriptor = refresh ? null : cachedYouTubeAudioDescriptor(videoId, quality);
-  if (cachedDescriptor) return playbackResultFromYouTubeDescriptor(cachedDescriptor, 'youtube-cache');
-  const yt = await getYouTubeClient();
+async function youtubeAudioDescriptorViaInnertubeClient(client, videoId, quality = '', engine = 'youtubei.js') {
   const requested = String(quality || '').toLowerCase();
-  const format = await yt.getStreamingData(String(videoId), {
+  const format = await client.getStreamingData(String(videoId), {
     type: 'audio',
     quality: requested === 'standard' ? 'bestefficiency' : 'best',
     format: 'any',
   });
   const directUrl = String(format && format.url || '').trim();
-  if (!directUrl) throw new Error('youtubei.js returned no audio URL');
+  if (!directUrl) {
+    const error = new Error(`${engine} returned no audio URL`);
+    error.code = 'YOUTUBE_INNERTUBE_NO_AUDIO_URL';
+    throw error;
+  }
   const descriptor = {
     url: directUrl,
     headers: {},
@@ -4016,10 +4526,40 @@ async function youtubeAudioViaInnertube(videoId, quality = '', options = {}) {
   };
   cacheYouTubeAudioDescriptor(videoId, quality, descriptor);
   return {
-    ...playbackResultFromYouTubeDescriptor(descriptor, 'youtubei.js-fast'),
+    ...playbackResultFromYouTubeDescriptor(descriptor, engine),
     level: requested || 'exhigh',
     quality: requested === 'standard' ? 'Standard' : 'YouTube Music',
   };
+}
+
+async function youtubeAudioViaInnertube(videoId, quality = '', options = {}) {
+  const refresh = !!(options && options.refresh);
+  const cachedDescriptor = refresh ? null : cachedYouTubeAudioDescriptor(videoId, quality);
+  if (cachedDescriptor) return playbackResultFromYouTubeDescriptor(cachedDescriptor, 'youtube-cache');
+
+  const failures = [];
+  try {
+    const publicClient = await getYouTubePublicPlaybackClient();
+    return await youtubeAudioDescriptorViaInnertubeClient(publicClient, videoId, quality, 'youtubei.js-public');
+  } catch (error) {
+    youtubePublicPlaybackClientPromise = null;
+    failures.push({ mode: 'public', code: String(error && error.code || ''), message: String(error && error.message || error || '') });
+  }
+
+  // A public-video failure must not make the whole provider depend on browser
+  // cookies. Signed-in playback is a second, isolated recovery path only.
+  try {
+    const authenticatedClient = await getYouTubeAuthenticatedPlaybackClient();
+    return await youtubeAudioDescriptorViaInnertubeClient(authenticatedClient, videoId, quality, 'youtubei.js-authenticated');
+  } catch (error) {
+    youtubeAuthenticatedPlaybackClientPromise = null;
+    failures.push({ mode: 'authenticated', code: String(error && error.code || ''), message: String(error && error.message || error || '') });
+  }
+
+  const error = new Error('youtubei.js could not resolve an audio stream');
+  error.code = 'YOUTUBE_INNERTUBE_STREAM_UNAVAILABLE';
+  error.diagnostics = failures;
+  throw error;
 }
 
 async function youtubeAudioUrl(videoId, quality = '', options = {}) {
@@ -4041,10 +4581,19 @@ async function youtubeAudioUrl(videoId, quality = '', options = {}) {
     const ytDlpError = errors[1] || errors[0] || aggregate;
     const engineCode = ytDlpFailureCode(ytDlpError);
     const actualEngineFailure = /^(YTDLP_NOT_FOUND|YTDLP_BLOCKED_OR_PERMISSION|YTDLP_INVALID_EXECUTABLE|ENOENT|EACCES|EPERM)$/i.test(engineCode);
-    const error = new Error(`YouTube stream unavailable: ${ytDlpError && ytDlpError.message || 'yt-dlp failed'}; ${fastError && fastError.message || 'youtubei.js failed'}`);
-    error.code = actualEngineFailure ? 'YOUTUBE_ENGINE_UNAVAILABLE' : 'YOUTUBE_STREAM_UNAVAILABLE';
+    const authFailure = String(ytDlpError && ytDlpError.code || '').toUpperCase() === 'YOUTUBE_AUTH_REQUIRED';
+    const error = new Error(authFailure
+      ? 'YOUTUBE_AUTH_REQUIRED'
+      : `YouTube stream unavailable: ${ytDlpError && ytDlpError.message || 'yt-dlp failed'}; ${fastError && fastError.message || 'youtubei.js failed'}`);
+    error.code = authFailure ? 'YOUTUBE_AUTH_REQUIRED' : (actualEngineFailure ? 'YOUTUBE_ENGINE_UNAVAILABLE' : 'YOUTUBE_STREAM_UNAVAILABLE');
     error.engineCode = engineCode;
-    error.status = 503;
+    error.status = authFailure ? 401 : 503;
+    error.userMessageVi = authFailure ? String(ytDlpError && ytDlpError.userMessageVi || '') : '';
+    error.userMessageEn = authFailure ? String(ytDlpError && ytDlpError.userMessageEn || '') : '';
+    error.diagnostics = {
+      ytDlp: ytDlpError && (ytDlpError.diagnostics || ytDlpError.message) || '',
+      innertube: fastError && (fastError.code || fastError.message) || '',
+    };
     throw error;
   }
 }
@@ -4194,10 +4743,12 @@ async function spotifyResumePlayback(deviceId = '') {
 }
 
 async function spotifySeekPlayback(positionMs, deviceId = '') {
-  const params = new URLSearchParams({ position_ms: String(Math.max(0, Math.round(Number(positionMs) || 0))) });
-  if (deviceId) params.set('device_id', deviceId);
+  const normalizedPositionMs = Math.max(0, Math.round(Number(positionMs) || 0));
+  const normalizedDeviceId = String(deviceId || '');
+  const params = new URLSearchParams({ position_ms: String(normalizedPositionMs) });
+  if (normalizedDeviceId) params.set('device_id', normalizedDeviceId);
   await spotifyApi(`/me/player/seek?${params.toString()}`, { method: 'PUT' });
-  return true;
+  return { positionMs: normalizedPositionMs, deviceId: normalizedDeviceId };
 }
 
 async function spotifySetPlaybackVolume(volumePercent, deviceId = '') {
@@ -4298,7 +4849,7 @@ async function resolveYouTubePlayback(videoId, quality, options = {}) {
 async function youtubeVideoViaInnertube(videoId, quality = 'auto', options = {}) {
   const id = String(videoId || '').trim();
   const mode = normalizeBackgroundVideoQuality(quality);
-  const requestedQuality = mode === 'eco' ? '720p' : (mode === 'balanced' ? '1080p' : (mode === 'ultra' ? '2160p' : '1440p'));
+  const requestedQuality = mode === 'eco' ? '720p' : (mode === 'balanced' ? '1080p' : (mode === 'high' ? '1440p' : (mode === 'ultra' ? '2160p' : '4320p')));
   const yt = await getYouTubeClient();
   const format = await yt.getStreamingData(id, { type: 'video', quality: requestedQuality, format: 'any' });
   const directUrl = String(format && format.url || '').trim();
@@ -4358,9 +4909,12 @@ async function resolveYouTubeVideoBackground(videoId, quality = 'auto', options 
     const errors = aggregate && Array.isArray(aggregate.errors) ? aggregate.errors : [];
     const fastError = errors[0] || null;
     const ytDlpError = errors[1] || errors[0] || aggregate;
-    const error = new Error(`YouTube background video unavailable: ${ytDlpError && ytDlpError.message || 'yt-dlp failed'}; ${fastError && fastError.message || 'youtubei.js failed'}`);
-    error.code = 'YOUTUBE_BACKGROUND_VIDEO_UNAVAILABLE';
-    error.status = 503;
+    const authFailure = String(ytDlpError && ytDlpError.code || '').toUpperCase() === 'YOUTUBE_AUTH_REQUIRED';
+    const error = new Error(authFailure
+      ? ytDlpError.message
+      : `YouTube background video unavailable: ${ytDlpError && ytDlpError.message || 'yt-dlp failed'}; ${fastError && fastError.message || 'youtubei.js failed'}`);
+    error.code = authFailure ? 'YOUTUBE_AUTH_REQUIRED' : 'YOUTUBE_BACKGROUND_VIDEO_UNAVAILABLE';
+    error.status = authFailure ? 401 : 503;
     throw error;
   }
 }
@@ -4786,7 +5340,7 @@ async function spotifyYoutubeLyricsFallback(metadata = {}, query = {}) {
 async function fetchLrclibJson(pathname, params) {
   const response = await fetchWithTimeout(`${LRCLIB_BASE}${pathname}?${params.toString()}`, {
     headers: { 'User-Agent': UA, Accept: 'application/json' },
-  }, 8500);
+  }, 4200);
   const data = await response.json().catch(() => (pathname === '/search' ? [] : {}));
   if (!response.ok) return pathname === '/search' ? [] : null;
   return data;
@@ -4801,21 +5355,118 @@ async function safeFetchLrclibJson(pathname, params) {
   }
 }
 
-async function spotifyMetadataForLyrics(id, query) {
-  let meta = songMetadata(id, 'spotify');
-  // A song can come from a restored queue or playlist after the in-memory cache
-  // has been cleared. Fetch the track by ID so lyrics always use exact Spotify
-  // metadata rather than any YouTube title/artist fallback.
-  if ((!meta || !meta.name) && id) {
-    try {
-      meta = mapSpotifyTrack(await spotifyApi(`/tracks/${encodeURIComponent(id)}?market=${encodeURIComponent(providerConfig().spotifyMarket)}`));
-    } catch (error) {
-      console.warn('[SpotifyLyricsMetadata]', id, error.message);
-      meta = meta || {};
-    }
+async function fastFetchLrclibJson(pathname, params, timeoutMs = 2400) {
+  try {
+    const response = await fetchWithTimeout(`${LRCLIB_BASE}${pathname}?${params.toString()}`, {
+      headers: { 'User-Agent': UA, Accept: 'application/json' },
+    }, timeoutMs);
+    const data = await response.json().catch(() => (pathname === '/search' ? [] : {}));
+    if (!response.ok) return pathname === '/search' ? [] : null;
+    return data;
+  } catch (_) {
+    return pathname === '/search' ? [] : null;
   }
+}
+
+function normalizeFastLrclibSpotifyResult(candidate, metadata = {}) {
+  if (!candidate || typeof candidate !== 'object') return null;
+  const durationMatch = lyricSync.durationCompatibility(candidate.duration, metadata.duration);
+  const score = scoreLyricCandidate(candidate, {
+    name: metadata.track,
+    artist: metadata.artist,
+    album: metadata.album,
+    durationSeconds: metadata.duration,
+  });
+  if (score < 48 || !durationMatch.compatible) return null;
+  const lyric = String(candidate.syncedLyrics || '');
+  const plainLyric = String(candidate.plainLyrics || '').trim();
+  if (!lyric && !plainLyric) return null;
+  return {
+    lyric,
+    tlyric: '',
+    yrc: '',
+    plainLyric,
+    instrumental: !!candidate.instrumental,
+    source: lyric ? 'lrclib-fast-synced' : 'lrclib-fast-plain',
+    metadataProvider: 'spotify',
+    metadata,
+    match: {
+      id: candidate.id || null,
+      score: Math.round(score),
+      track: candidate.trackName || candidate.name || '',
+      artist: candidate.artistName || '',
+      album: candidate.albumName || '',
+      duration: Number(candidate.duration || 0),
+      synced: !!lyric,
+    },
+  };
+}
+
+async function spotifyFastLrclibLyrics(metadata = {}) {
+  const track = String(metadata.track || '').trim();
+  const artist = String(metadata.artist || '').trim();
+  if (!track || !artist) return null;
+  const key = normalizeLyricMatchText([track, artist, metadata.album || '', Math.round(Number(metadata.duration || 0))].join('|'));
+  const cached = spotifyFastLyricsCache.get(key);
+  if (cached) {
+    const ttl = cached.value ? 30 * 60 * 1000 : 90 * 1000;
+    if (Date.now() - cached.at < ttl) return cached.value ? { ...cached.value } : null;
+    spotifyFastLyricsCache.delete(key);
+  }
+  if (spotifyFastLyricsInFlight.has(key)) return spotifyFastLyricsInFlight.get(key);
+  const job = (async () => {
+    const exactParams = new URLSearchParams({ track_name: track, artist_name: artist });
+    if (metadata.album) exactParams.set('album_name', String(metadata.album));
+    if (Number(metadata.duration) > 0) exactParams.set('duration', String(Math.round(Number(metadata.duration))));
+    const searchParams = new URLSearchParams({ track_name: track, artist_name: artist });
+    const [exact, search] = await Promise.all([
+      fastFetchLrclibJson('/get', exactParams, 2200),
+      fastFetchLrclibJson('/search', searchParams, 2400),
+    ]);
+    const candidates = [];
+    if (exact && typeof exact === 'object') candidates.push(exact);
+    if (Array.isArray(search)) candidates.push(...search.slice(0, 12));
+    const ranked = candidates
+      .map((candidate) => ({ candidate, value: normalizeFastLrclibSpotifyResult(candidate, metadata) }))
+      .filter((item) => item.value)
+      .sort((a, b) => Number(b.value.match && b.value.match.score || 0) - Number(a.value.match && a.value.match.score || 0));
+    const value = ranked[0] ? ranked[0].value : null;
+    spotifyFastLyricsCache.set(key, { at: Date.now(), value });
+    return value ? { ...value } : null;
+  })().finally(() => spotifyFastLyricsInFlight.delete(key));
+  spotifyFastLyricsInFlight.set(key, job);
+  return job;
+}
+
+async function spotifyMetadataForLyrics(id, query = {}) {
   const currentTrackId = spotifyLyricsTrackId(query.currentTrackId);
   const requestedTrackId = spotifyLyricsTrackId(id);
+  const lookupTrackId = currentTrackId || requestedTrackId;
+  const cached = songMetadata(lookupTrackId || id, 'spotify') || {};
+  let meta = {
+    ...cached,
+    name: String(cached.name || query.track || '').trim(),
+    artist: String(cached.artist || query.artist || '').trim(),
+    album: String(cached.album || query.album || '').trim(),
+    duration: Number(cached.duration || query.duration || 0),
+  };
+
+  // The renderer already owns exact title/artist/duration at the moment a
+  // Spotify track starts. Do not block lyrics on a second /tracks request when
+  // that metadata is present. Fetch only to fill genuinely missing identity.
+  const rendererMetadataReady = !!(meta.name && meta.artist);
+  if (!rendererMetadataReady && lookupTrackId) {
+    try {
+      const request = spotifyApi(`/tracks/${encodeURIComponent(lookupTrackId)}?market=${encodeURIComponent(providerConfig().spotifyMarket)}`);
+      const fetched = await Promise.race([
+        request,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('SPOTIFY_LYRICS_METADATA_TIMEOUT')), 1400)),
+      ]);
+      meta = { ...meta, ...mapSpotifyTrack(fetched) };
+    } catch (error) {
+      console.warn('[SpotifyLyricsMetadata]', lookupTrackId, error.message);
+    }
+  }
   const linkedFromId = spotifyLyricsTrackId(meta.linkedFromId || meta.relinkedFromId);
   return {
     ...meta,
@@ -4905,6 +5556,34 @@ async function youtubeMusicReferenceLyrics(metadata = {}, query = {}) {
   return { ...native, youtubeMusicReference: reference, source: 'youtube-music-reference' };
 }
 
+async function crossProviderLyricsFor(metadata = {}, provider = '', youtubeSourceType = '', query = {}, providers = ['qq', 'netease', 'kugou', 'qishui']) {
+  try {
+    const requestedProviders = Array.isArray(providers) && providers.length ? providers : ['qq', 'netease', 'kugou', 'qishui'];
+    return await crossProviderLyricsBroker.find({
+      track: metadata.track || query.track || '',
+      artist: metadata.artist || query.artist || '',
+      album: metadata.album || query.album || '',
+      duration: metadata.duration || query.duration || 0,
+      isrc: metadata.isrc || '',
+    }, {
+      playbackProvider: provider,
+      youtubeSourceType,
+      language: query.language || providerConfig().language || 'vi',
+      providers: requestedProviders,
+      fast: provider === 'spotify',
+    });
+  } catch (error) {
+    console.warn('[CrossProviderLyrics]', error && error.message || error);
+    return null;
+  }
+}
+
+function lyricMetadataProvider(provider, youtubeSourceType) {
+  if (provider === 'spotify') return 'spotify';
+  if (provider === 'youtube') return youtubeSourceType === 'video' ? 'youtube-video' : 'youtube-music';
+  return provider || 'unknown';
+}
+
 function plainLyricForExactVideoAlignment(result = {}) {
   const direct = String(result.plainLyric || '').trim();
   if (direct) return direct;
@@ -4970,11 +5649,107 @@ async function lyricsFor(id, provider, query = {}) {
     : 'music';
   if (provider === 'youtube') metadata.youtubeSourceType = youtubeSourceType;
 
-  // Exact captions belong to the selected YouTube video itself, so their
-  // timestamps already include that video's intro, outro, pauses, and edits.
-  // Always prefer them before borrowing text/timing from YouTube Music or
-  // LRCLIB. This is the only zero-remap lyric source for a normal YouTube MV.
-  if (provider === 'youtube' && id) {
+  // ShinaYuu's lyrics pipeline owns source selection. QQ and NetEase are
+  // the primary lyrics tier for every playback source. Start Spotify's exact
+  // session lookup at the same time so a provider timeout never adds a second
+  // serial wait before lyrics can appear.
+  const spotifyNativePromise = provider === 'spotify'
+    ? spotifyNativeLyrics(metadata.currentTrackId || metadata.spotifyId || id, metadata).catch(() => null)
+    : null;
+  const spotifyFastLrclibPromise = provider === 'spotify'
+    ? spotifyFastLrclibLyrics(metadata).catch(() => null)
+    : null;
+  const primaryCrossPromise = crossProviderLyricsFor(metadata, provider, youtubeSourceType, query, ['qq', 'netease']).catch(() => null);
+  let primaryCrossLyrics = null;
+
+  if (provider === 'spotify') {
+    const usablePrimary = (value) => value && value.timingSafe && (value.yrc || value.lyric);
+    const usableTimed = (value) => value && (value.yrc || value.lyric);
+    const usableAny = (value) => value && (value.lyric || value.plainLyric || value.yrc);
+    const wrapPrimary = (value) => ({
+      ...value,
+      metadataProvider: 'spotify',
+      metadata,
+      match: value.match || null,
+      crossProviderLyrics: {
+        tier: 'primary',
+        textProvider: value.lyricTextProvider || '',
+        timingProvider: value.timingProvider || '',
+        translationProvider: value.translationProvider || '',
+        confidence: Number(value.confidence || 0),
+      },
+    });
+
+    // QQ/NetEase own the first synchronized-lyrics window. Spotify native and
+    // duration-checked LRCLIB are already running in parallel, so this priority
+    // does not create a serial delay when the Chinese providers are unavailable.
+    const primaryFirst = await Promise.race([
+      primaryCrossPromise.then((value) => usablePrimary(value) ? value : null),
+      new Promise((resolve) => setTimeout(() => resolve(null), 620)),
+    ]);
+    if (primaryFirst) return wrapPrimary(primaryFirst);
+
+    // Prefer a synchronized result. This prevents a fast unsynced response from
+    // hiding a correct line-timed QQ/NE or Spotify result that arrives moments later.
+    const timedResult = await Promise.race([
+      Promise.any([
+        primaryCrossPromise.then((value) => usablePrimary(value) ? { kind: 'primary', value } : Promise.reject(new Error('NO_PRIMARY_TIMED_LYRIC'))),
+        spotifyNativePromise.then((value) => usableTimed(value) ? { kind: 'native', value } : Promise.reject(new Error('NO_NATIVE_TIMED_LYRIC'))),
+        spotifyFastLrclibPromise.then((value) => usableTimed(value) ? { kind: 'lrclib', value } : Promise.reject(new Error('NO_LRCLIB_TIMED_LYRIC'))),
+      ]).catch(() => null),
+      new Promise((resolve) => setTimeout(() => resolve(null), 900)),
+    ]);
+    if (timedResult && timedResult.kind === 'primary') return wrapPrimary(timedResult.value);
+    if (timedResult && timedResult.value) return timedResult.value;
+
+    // Never leave Spotify blank merely because a synchronized source is absent.
+    // Accept exact text now; the renderer estimates a temporary timeline while
+    // the normal retry/prefetch pipeline continues looking for timed lyrics.
+    const textResult = await Promise.race([
+      Promise.any([
+        primaryCrossPromise.then((value) => usableAny(value) ? { kind: 'primary', value } : Promise.reject(new Error('NO_PRIMARY_TEXT'))),
+        spotifyNativePromise.then((value) => usableAny(value) ? { kind: 'native', value } : Promise.reject(new Error('NO_NATIVE_TEXT'))),
+        spotifyFastLrclibPromise.then((value) => usableAny(value) ? { kind: 'lrclib', value } : Promise.reject(new Error('NO_LRCLIB_TEXT'))),
+      ]).catch(() => null),
+      new Promise((resolve) => setTimeout(() => resolve(null), 320)),
+    ]);
+    if (textResult && textResult.kind === 'primary') return wrapPrimary(textResult.value);
+    if (textResult && textResult.value) return textResult.value;
+
+    primaryCrossLyrics = await Promise.race([
+      primaryCrossPromise,
+      new Promise((resolve) => setTimeout(() => resolve(null), 80)),
+    ]);
+  } else {
+    primaryCrossLyrics = await primaryCrossPromise;
+  }
+  if (primaryCrossLyrics && primaryCrossLyrics.timingSafe && (primaryCrossLyrics.yrc || primaryCrossLyrics.lyric)) {
+    // YouTube Video may contain an intro, outro or edit that differs from the
+    // QQ/NetEase album version. Keep QQ/NE as the primary lyric text source,
+    // but run that text through ShinaYuu's exact-video forced aligner instead
+    // of applying borrowed timestamps directly. Other music sources can use
+    // the high-confidence synchronized timing immediately.
+    if (!(provider === 'youtube' && youtubeSourceType === 'video')) {
+      return {
+        ...primaryCrossLyrics,
+        metadataProvider: lyricMetadataProvider(provider, youtubeSourceType),
+        metadata,
+        match: primaryCrossLyrics.match || null,
+        crossProviderLyrics: {
+          tier: 'primary',
+          textProvider: primaryCrossLyrics.lyricTextProvider || '',
+          timingProvider: primaryCrossLyrics.timingProvider || '',
+          translationProvider: primaryCrossLyrics.translationProvider || '',
+          confidence: Number(primaryCrossLyrics.confidence || 0),
+        },
+      };
+    }
+  }
+
+  // QQ and NetEase remain the primary ShinaYuu lyrics sources. Exact YouTube
+  // captions are used only when those providers have no usable lyric text;
+  // their timestamps already include the selected video's intro and outro.
+  if (provider === 'youtube' && id && !(primaryCrossLyrics && (primaryCrossLyrics.plainLyric || primaryCrossLyrics.lyric || primaryCrossLyrics.yrc))) {
     try {
       const exactCaption = await youtubeCaptionService.fetchForVideo(id, {
         getInfo: youtubeInfoViaYtDlp,
@@ -4994,6 +5769,7 @@ async function lyricsFor(id, provider, query = {}) {
       console.warn('[YouTubeExactCaptionLyrics]', error && error.message || error);
     }
   }
+
   // YouTube Music lyrics and regular YouTube captions are separate data
   // sources. Read the Lyrics tab through youtubei.js first so tracks that show
   // lyrics in YouTube Music still have text even when the video has no caption
@@ -5029,9 +5805,14 @@ async function lyricsFor(id, provider, query = {}) {
   let spotifyYoutubeFallback = null;
   let spotifyPlainFallback = null;
   if (provider === 'spotify') {
-    const spotifyTimed = await spotifyNativeLyrics(metadata.currentTrackId || metadata.spotifyId || id, metadata);
-    if (spotifyTimed && spotifyTimed.lyric) return spotifyTimed;
-    if (spotifyTimed && spotifyTimed.plainLyric) spotifyPlainFallback = spotifyTimed;
+    const spotifyTimed = await Promise.race([
+      Promise.any([
+        spotifyNativePromise.then((value) => value && (value.lyric || value.plainLyric) ? value : Promise.reject(new Error('NO_NATIVE_LYRIC'))),
+        spotifyFastLrclibPromise.then((value) => value && (value.lyric || value.plainLyric) ? value : Promise.reject(new Error('NO_FAST_LRCLIB_LYRIC'))),
+      ]).catch(() => null),
+      new Promise((resolve) => setTimeout(() => resolve(null), 260)),
+    ]);
+    if (spotifyTimed && (spotifyTimed.lyric || spotifyTimed.plainLyric)) return spotifyTimed;
   }
 
   const candidates = [];
@@ -5096,9 +5877,13 @@ async function lyricsFor(id, provider, query = {}) {
     // Prefer the text attached to the exact YouTube Music video. LRCLIB synced
     // timing is still kept when available, while native YouTube Music text is
     // used for display/fallback and for local word alignment.
-    plainLyric: nativeYouTubePlainLyric || data.plainLyrics || '',
+    plainLyric: (primaryCrossLyrics && primaryCrossLyrics.plainLyric) || nativeYouTubePlainLyric || data.plainLyrics || '',
     instrumental: !!data.instrumental,
-    source: nativeYouTubePlainLyric ? (youtubeMusicReference ? 'youtube-music-reference' : 'youtube-music') : 'lrclib',
+    source: primaryCrossLyrics && primaryCrossLyrics.plainLyric
+      ? (primaryCrossLyrics.source || 'qq-netease-primary')
+      : (nativeYouTubePlainLyric
+        ? (youtubeMusicReference ? 'youtube-music-reference' : 'youtube-music')
+        : (data.syncedLyrics || data.plainLyrics ? 'lrclib' : 'lrclib')),
     metadataProvider: provider === 'spotify' ? 'spotify' : (provider === 'youtube' ? (youtubeSourceType === 'music' ? 'youtube-music' : 'youtube-video') : provider),
     metadata,
     match,
@@ -5108,7 +5893,58 @@ async function lyricsFor(id, provider, query = {}) {
       syncType: youtubeMusicLyric.syncType || 'UNSYNCED',
       reference: youtubeMusicReference || undefined,
     } : undefined,
+    crossProviderLyrics: primaryCrossLyrics ? {
+      tier: 'primary',
+      textProvider: primaryCrossLyrics.lyricTextProvider || '',
+      timingProvider: primaryCrossLyrics.timingProvider || '',
+      translationProvider: primaryCrossLyrics.translationProvider || '',
+      confidence: Number(primaryCrossLyrics.confidence || 0),
+      textOnly: !primaryCrossLyrics.timingSafe,
+    } : undefined,
   };
+  if (primaryCrossLyrics && primaryCrossLyrics.tlyric && !baseResult.tlyric) baseResult.tlyric = primaryCrossLyrics.tlyric;
+
+  // Cross-provider Lyrics Broker: when the exact playback provider and
+  // the primary QQ/NetEase tier does not provide synchronized lyrics, search Kugou and Qishui by
+  // title, artist, album, duration and ISRC. Foreign timing is accepted only
+  // for a high-confidence duration-compatible match. Normal YouTube videos
+  // borrow text only, then keep using the exact-video forced aligner so MV
+  // intros/outros never inherit album timestamps.
+  let crossLyrics = null;
+  if (!baseResult.lyric) {
+    crossLyrics = await crossProviderLyricsFor(metadata, provider, youtubeSourceType, query, ['kugou', 'qishui']);
+    if (crossLyrics && crossLyrics.timingSafe && (crossLyrics.yrc || crossLyrics.lyric)) {
+      return {
+        ...crossLyrics,
+        metadataProvider: lyricMetadataProvider(provider, youtubeSourceType),
+        metadata,
+        match: crossLyrics.match || match,
+        crossProviderLyrics: {
+          textProvider: crossLyrics.lyricTextProvider || '',
+          timingProvider: crossLyrics.timingProvider || '',
+          translationProvider: crossLyrics.translationProvider || '',
+          tier: 'secondary',
+          confidence: Number(crossLyrics.confidence || 0),
+        },
+      };
+    }
+    if (crossLyrics && crossLyrics.plainLyric && !baseResult.plainLyric && !(provider === 'spotify' && spotifyPlainFallback && spotifyPlainFallback.plainLyric)) {
+      baseResult.plainLyric = crossLyrics.plainLyric;
+      baseResult.source = crossLyrics.source || 'cross-provider-text';
+      baseResult.match = crossLyrics.match || baseResult.match;
+    }
+    if (crossLyrics && !baseResult.tlyric && crossLyrics.tlyric) baseResult.tlyric = crossLyrics.tlyric;
+    if (crossLyrics) {
+      baseResult.crossProviderLyrics = {
+        textProvider: crossLyrics.lyricTextProvider || '',
+        timingProvider: crossLyrics.timingProvider || '',
+        translationProvider: crossLyrics.translationProvider || '',
+        tier: 'secondary',
+        confidence: Number(crossLyrics.confidence || 0),
+        textOnly: !crossLyrics.timingSafe,
+      };
+    }
+  }
 
   // Prefer an exact LRCLIB result before starting the much more expensive
   // YouTube reference search. Besides reducing provider traffic, this keeps a
@@ -5120,7 +5956,7 @@ async function lyricsFor(id, provider, query = {}) {
       ...baseResult,
       metadataProvider: 'spotify',
       metadata,
-      match,
+      match: baseResult.match || match,
     };
   }
   if (provider === 'spotify' && spotifyPlainFallback && !baseResult.lyric) {
@@ -5184,18 +6020,21 @@ async function lyricsFor(id, provider, query = {}) {
       };
     }
     if (youtubeSourceType === 'video' && alignment && alignment.status === 'processing') {
-      // A normal video must not display timing borrowed from another version.
+      // A normal video must not borrow timestamps from an album version, but
+      // the exact QQ/NetEase lyric text should already be visible while the
+      // ShinaYuu forced aligner prepares timing for the selected MV.
       return {
         lyric: '',
-        tlyric: '',
+        tlyric: baseResult.tlyric || '',
         yrc: '',
-        plainLyric: '',
+        plainLyric: exactTranscript || baseResult.plainLyric || '',
         source: 'youtube-video-alignment-pending',
         metadataProvider: 'youtube-video',
         metadata,
         match,
         exactVideoTiming: false,
         youtubeMusicLyrics: baseResult.youtubeMusicLyrics,
+        crossProviderLyrics: baseResult.crossProviderLyrics,
         alignment,
       };
     }
@@ -5376,6 +6215,8 @@ module.exports = {
   youtubeLoginResult,
   clearYouTubeToken,
   setYouTubeCookieProvider,
+  setYouTubeCookieHeader,
+  clearYouTubeCookieHeader,
   invalidateYouTubeAccountSession,
   youtubeAccountPlaylists,
   youtubeAccountPlaylistTracks,
@@ -5446,6 +6287,11 @@ module.exports = {
     youtubePlaylistFromDataApiItem,
     youtubeSpecialPlaylistSummary,
     youtubeCookieLooksSignedIn,
+    normalizeYouTubeCookieRows,
+    youtubeCookieRowsLookSignedIn,
+    ytDlpAuthChallenge,
+    ytDlpBrowserCookieFailure,
+    ytDlpBrowserCookieSourceAvailable,
     youtubeDurationSeconds,
     youtubeThumbnail,
     youtubeBackgroundVideoLimits,

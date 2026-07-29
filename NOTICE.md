@@ -1,47 +1,32 @@
-# Notices and Attribution
+# NOTICE
 
-## Project origin
+Mineradio 使用了以下第三方项目或服务。各项目版权归其原作者所有。
 
-ShinaYuu Music is a modified work based on the original **Mineradio** project by XxHuberrr. Original copyright, authorship, attribution, and license notices must be retained when this project or a modified version is redistributed.
+## Third-party Libraries
 
-ShinaYuu Music is distributed under the GNU General Public License version 3 only (`GPL-3.0-only`). The complete license text is included in `LICENSE`.
+- Electron
+- Three.js
+- GSAP
+- music-tempo
+- NeteaseCloudMusicApi
+- mpg123-decoder
 
-## ShinaYuu Music modifications
+## Community Contributions
 
-ShinaYuu Music adds or modifies functionality including:
+- Cuefield AutoMix planner/runtime: adapted for experimental local testing from [SLYysl/cuefield-mineradio](https://github.com/SLYysl/cuefield-mineradio) (GPL-3.0). The optional remote-feedback component from that repository is not included; Mineradio stores Cuefield ratings locally in the current user's data directory.
+- Wallpaper Engine local-library detection and import UX: independently adapted from the approach used by [ww085213/Mineradio-LX-Music](https://github.com/ww085213/Mineradio-LX-Music) at commit `a5ef80a219709080700be5b1d00f1ea71a5a2576` (GPL-3.0). Mineradio only indexes local `project.json` metadata; it does not execute imported Web/Application projects or replace the user's existing background-media settings.
+- Full-desktop main-window mode and home-dashboard information hierarchy: initially adapted from [ww085213/Mineradio-LX-Music](https://github.com/ww085213/Mineradio-LX-Music) at commit `82826df814c32853d99697c0ee60f749a2fcad79`, with the homepage refreshed against `812e2dc2e18bbc263e61dbd0206cb765e003d6e9` (GPL-3.0). Mineradio keeps its own provider, queue, playlist, listening-history, WorkerW validation, DPI, lifecycle, and cleanup implementations; see `docs/THIRD_PARTY_PORTS.md` in the corresponding source distribution.
 
-- Spotify playback through the Spotify Web Playback SDK inside Castlabs Electron for Content Security.
-- YouTube playback through `yt-dlp` and `youtubei.js`.
-- Spotify-native, YouTube, YouTube Music, LRCLIB, and locally aligned lyrics.
-- Desktop Lyrics, 3D lyrics, visual effects, and beat-reactive rendering.
-- Discord profile display and Rich Presence IPC.
-- Unified master volume across the application audio pipeline and Spotify playback in the Castlabs renderer.
-- Windows packaging, installer customization, Castlabs runtime integration, and audio-session grouping.
+## Third-party Services
 
-The YouTube lyric and forced-alignment implementations in ShinaYuu Music were written for this project. They do not include BetterLyrics integration and do not copy lyric implementation code from MineradioVN.
+Mineradio 可能与网易云音乐、QQ 音乐等第三方音乐服务进行用户自有账号相关的本地客户端交互。
 
-## Major third-party components and services
+Mineradio 不是任何音乐平台的官方客户端，也不隶属于网易云音乐、QQ 音乐或腾讯音乐娱乐集团。请用户自行遵守对应平台的服务协议、版权规则和会员权益规则。
 
-ShinaYuu Music uses or interoperates with independently licensed components and services, including:
+## Original Design
 
-- Castlabs Electron for Content Security, Electron, and Electron Builder.
-- Spotify Web API, Spotify Accounts OAuth, and Spotify Web Playback SDK.
-- Google OAuth, YouTube Data API, YouTube, YouTube Music, `yt-dlp`, and `youtubei.js`.
-- LRCLIB.
-- `whisper.cpp` and Whisper model data for optional local alignment.
-- FFmpeg and `ffmpeg-static`.
-- Three.js, GSAP, music-tempo, mpg123-decoder, extract-zip, music-metadata, chokidar, node-7z, and 7zip-bin.
-- Open-Meteo.
+Mineradio 名称、MR Logo、界面视觉设计、启动动画方向、粒子视觉体验和电影镜头系统的产品表达属于作者原创设计。
 
-Each component remains subject to its own license and terms. Dependency license files distributed with packaged modules must not be removed.
+emily 作为 Mineradio 早期视觉底层想法与 `emily` 视觉预设改进方向的共创者和灵感来源之一，特此致谢。
 
-ShinaYuu Music is not an official client of Spotify, YouTube, LRCLIB, Microsoft, OpenAI, or Open-Meteo and is not affiliated with those organizations. Product names, logos, and trademarks belong to their respective owners.
-
-## Compatibility aliases
-
-Selected internal identifiers inherited from Mineradio, including `netease`, `qq`, and `mineradio`, remain in compatibility paths to avoid destabilizing the existing UI and stored user data. They currently map to ShinaYuu Music behavior and do not restore the original providers.
-
-
-## Castlabs Electron for Content Security
-
-This build uses the Castlabs Electron for Content Security distribution as a replacement for stock Electron to provide Widevine CDM integration. Castlabs Electron is distributed under its own MIT license and third-party notices. The Castlabs runtime and Widevine components are not relicensed under GPL-3.0-only; their original licenses and service terms continue to apply.
+感谢小天才e宝、应春日、锋将军、軌跡、林中、骊、风痕、花椰菜🥦在早期体验、测试反馈和发布准备中的帮助。
