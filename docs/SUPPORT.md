@@ -1,21 +1,7 @@
-# Support
+# Mineradio 作者支持渠道
 
-When reporting an issue, include:
+如果 Mineradio 陪你多听了一首歌，也欢迎通过下面的二维码支持作者继续维护。
 
-- A screenshot or short screen recording.
-- The complete log from application startup until the issue appears.
-- Reproduction steps.
-- The affected track and provider.
-- The application version.
-- Output from `node -v` when running from source.
+![Mineradio 作者支持渠道](./assets/support/mineradio-author-support-poster.png)
 
-## Quick checks
-
-- Spotify Dashboard must contain `http://127.0.0.1:43821/api/spotify/callback` exactly.
-- Look for `[YouTubeEngine] Ready` in the terminal.
-- Look for `[Castlabs] Components ready` when testing Spotify.
-- Use `YTDLP_PATH` when automatic `yt-dlp` provisioning is blocked.
-- Run `npm run setup:castlabs` and `npm run verify:castlabs` when Spotify playback does not initialize from source.
-- Test the in-app master volume before adjusting Windows Volume Mixer.
-
-Never share `spotify-token.json`, cookies, access tokens, or private account data.
+扫码前请确认收款人信息。二维码来自作者提供的支付宝与微信赞赏原图裁切。

@@ -88,7 +88,7 @@ if (changed.length > maxFiles) fail(`Patch contains ${changed.length} files; run
 if (rawBytes > maxRawBytes) fail(`Raw patch content is ${(rawBytes / 1048576).toFixed(2)} MB; keep it below ${(maxRawBytes / 1048576).toFixed(0)} MB.`);
 
 const payload = {
-  type: 'mineradio-resource-patch',
+  type: 'shinayuu-resource-patch',
   product: 'ShinaYuu Music',
   from: fromVersion,
   to: toVersion,
