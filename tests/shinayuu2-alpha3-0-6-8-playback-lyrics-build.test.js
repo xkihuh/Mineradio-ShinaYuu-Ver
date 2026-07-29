@@ -39,8 +39,8 @@ test('Spotify lyrics start from renderer metadata and race QQ/NetEase, native an
   assert.match(providers, /spotifyFastLrclibLyrics/);
   assert.match(providers, /normalizeFastLrclibSpotifyResult/);
   assert.match(providers, /Promise\.any\(\[/);
-  assert.match(providers, /new Promise\(\(resolve\) => setTimeout\(\(\) => resolve\(null\), 620\)\)/);
-  assert.match(providers, /new Promise\(\(resolve\) => setTimeout\(\(\) => resolve\(null\), 900\)\)/);
+  assert.match(providers, /new Promise\(\(resolve\) => setTimeout\(\(\) => resolve\(null\), 220\)\)/);
+  assert.match(providers, /new Promise\(\(resolve\) => setTimeout\(\(\) => resolve\(null\), 520\)\)/);
   assert.match(player, /spotifyExactId: trackId/);
 });
 

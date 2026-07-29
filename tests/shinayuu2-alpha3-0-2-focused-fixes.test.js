@@ -31,8 +31,8 @@ test('AutoMix adopts the audible prepared deck instead of opening and pausing a 
   assert.match(automix, /window\.audio !== incoming/);
   assert.match(automix, /window\.claimCuefieldPreparedAudioForPlayback\s*=\s*function/);
   assert.match(automix, /ensureBeatMap\(toSong, toIndex, false\)/);
-  assert.match(playback, /visualDelay = opts\.autoMixHandoff \? 820/);
-  assert.match(playback, /opts\.autoMixHandoff \? 920/);
+  assert.match(playback, /visualDelay = opts\.autoMixHandoff \? 1040/);
+  assert.match(playback, /opts\.autoMixHandoff \? 1180/);
 });
 
 test('audio proxy respects backpressure and cancels upstream work after client disconnect', () => {

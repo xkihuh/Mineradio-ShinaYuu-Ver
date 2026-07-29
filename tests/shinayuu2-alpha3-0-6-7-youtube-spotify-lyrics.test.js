@@ -57,8 +57,8 @@ test('Spotify native and QQ-NetEase lyrics race concurrently with bounded waits'
   assert.match(providers, /const primaryCrossPromise = crossProviderLyricsFor/);
   assert.match(providers, /spotifyFastLrclibLyrics\(metadata\)/);
   assert.match(providers, /Promise\.any\(\[/);
-  assert.match(providers, /setTimeout\(\(\) => resolve\(null\), 620\)/);
-  assert.match(providers, /setTimeout\(\(\) => resolve\(null\), 900\)/);
+  assert.match(providers, /setTimeout\(\(\) => resolve\(null\), 220\)/);
+  assert.match(providers, /setTimeout\(\(\) => resolve\(null\), 520\)/);
   assert.match(broker, /const DEFAULT_TIMEOUT_MS = 3200/);
   assert.match(broker, /const preferredWindowMs = fast \? 850 : 1500/);
   assert.match(player, /\[420, 900, 1800\]/);

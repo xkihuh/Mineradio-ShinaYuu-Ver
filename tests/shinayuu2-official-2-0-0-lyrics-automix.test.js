@@ -61,12 +61,14 @@ test('automatic stage mode and lyric line controls are silent', () => {
   assert.match(guard, /Lyrics enabled\|Lyrics disabled/);
 });
 
-test('Lyrics mode never reserves the stage with a title fallback', () => {
+test('Lyrics mode uses a delayed title only for genuinely lyric-less tracks', () => {
   const parser = read('public/js/modules/06-lyrics/00-lyrics-fetch-parse.js');
   const actions = read('public/js/modules/05-playback/06-track-detail-lyrics-actions.js');
   assert.match(parser, /function lyricTitleFallbackAllowed\(\)/);
-  assert.match(parser, /\['translation', 'lyrics', 'title', 'hidden'\]/);
-  assert.match(parser, /if \(!lyricTitleFallbackAllowed\(\)\) return \[\]/);
+  assert.match(parser, /return !mode \|\| mode === 'lyrics';/);
+  assert.match(parser, /function lyricFetchStateScore\(state\)/);
+  assert.match(parser, /if \(currentlyUsable && incomingScore < appliedScore\)/);
+  assert.match(parser, /ignoredLowerQuality/);
   assert.match(actions, /typeof lyricTitleFallbackAllowed !== 'function' \|\| lyricTitleFallbackAllowed\(\)/);
 });
 
@@ -122,7 +124,7 @@ test('AutoMix uses display-synchronized ramps and defers heavy handoff work', ()
   assert.match(mix, /shinayuuAutoMixHandoffClock/);
   assert.match(playback, /var smoothAutoMixHandoff = !!\(albumGaplessMixed && opts\.cuefieldAutoMix\)/);
   assert.match(playback, /if \(!qualitySwitch && !smoothAutoMixHandoff/);
-  assert.match(playback, /delay: smoothAutoMixHandoff \? 480 : 130/);
+  assert.match(playback, /delay: smoothAutoMixHandoff \? 720 : 130/);
   assert.match(progress, /function activeAutoMixHandoffClock\(\)/);
 });
 
