@@ -1,5 +1,15 @@
 # ShinaYuu Music Changelog
 
+## 2.0.3
+- Added a unified runtime playback guardian for Spotify, YouTube Music and YouTube Video.
+- A media error, frozen stream, missing Spotify SDK state, persistent wrong-track state or unexpected Spotify pause now triggers automatic recovery instead of leaving the player stopped.
+- Runtime recovery first refreshes the current playback descriptor while preserving the position, then searches the other two platforms, and finally skips the failed queue item so later songs continue.
+- YouTube Music and YouTube Video are now treated as separate fallback surfaces, allowing YM ↔ MV replacement before or alongside Spotify fallback.
+- Fixed cross-provider fallback to Spotify descriptors that do not expose an HTML audio URL and fixed token validation when the Spotify SDK commits asynchronously.
+- Manual track selection failures now continue through the same recovery pipeline instead of silencing the queue.
+- Added stable-playback budget reset so a recovered track can be refreshed again after it has played normally.
+- Bumped package, display, build and installer versions to 2.0.3 / 2.0.3.0.
+
 ## 2.0.2
 - Added a Liquid Glass Home wallpaper content customizer with editable built-in quotes and an unrestricted item list for user-created notes/messages.
 - Added per-quote text, signature, color, font family, font size, weight, italic style, alignment, enabled state, effect and speed controls.
