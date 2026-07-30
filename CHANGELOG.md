@@ -1,3 +1,12 @@
+# Changelog
+
+## 2.0.10
+
+- Đưa toàn bộ cấu hình Discord Rich Presence vào panel Liquid Glass trực tiếp trong phần Nâng cao.
+- Thêm note song ngữ và emoji cho trạng thái có/không có bản cập nhật.
+- Đồng bộ package version, display version, build version, installer metadata, README và tài liệu build.
+- Giữ nguyên AutoMix provider ownership, Discord Rich Presence, Lyrics Sync 2.0 và pipeline build/patch.
+
 # ShinaYuu Music 2.0.9
 
 - Replaced the cramped legacy Discord Application ID controls in Advanced with a definitive Liquid Glass status card and a dedicated Liquid settings modal.

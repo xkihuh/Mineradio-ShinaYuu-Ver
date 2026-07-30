@@ -1,28 +1,12 @@
-# ShinaYuu Music 2.0.9
+# ShinaYuu Music 2.0.10
 
-## AutoMix và nguồn phát
+## Nội dung phát hành
 
-- Tuần tự hóa toàn bộ lệnh volume của Spotify trong AutoMix; không còn lệnh giảm âm cũ hoàn tất muộn rồi kéo bài mới về gần 0.
-- Khôi phục âm lượng theo đúng nguồn đang sở hữu đầu ra: Spotify hoặc HTML Audio/YouTube, không phục hồi đồng thời cả hai.
-- Khi chuyển Spotify → YouTube Music/YouTube Video, Spotify được dừng ở thời điểm đã im lặng trước khi deck HTML được nhận làm nguồn chính.
-- Một phản hồi dừng Spotify đến muộn không còn được phép ghi đè `activePlaybackTransport`, trạng thái phát hoặc nút Play của nguồn HTML mới.
-- HTML playback chờ tác vụ dừng Spotify đang chạy tại ranh giới phát cuối cùng, trong khi phần resolve nguồn vẫn chạy song song để không tăng thời gian chờ không cần thiết.
-- AutoMix chỉ bắt đầu dual-deck khi AudioContext đã chạy; nếu context không thể resume thì bỏ lần mix an toàn thay vì nhận một deck im lặng.
-- Thao tác chọn bài bình thường không còn gọi reset volume toàn cục khi AutoMix không thực sự giữ quyền điều khiển đầu ra.
+- Discord Connect được hiển thị trực tiếp trong panel Liquid Glass ở phần Nâng cao.
+- Giao diện cập nhật có logo ứng dụng, note song ngữ và emoji thay đổi theo trạng thái.
+- Giữ nguyên toàn bộ sửa lỗi AutoMix, ba nguồn phát, Discord Rich Presence và Lyrics Sync 2.0 từ 2.0.9.
 
-## Discord và Lyrics
-
-- Giữ nguyên Discord Rich Presence theo bài đang phát, ảnh bìa, nguồn phát và thanh tiến độ từ 2.0.7.
-- Giữ nguyên UI Discord Application ID theo Liquid Glass.
-- Giữ nguyên Lyrics Sync 2.0 với clock thật, LRC offset, kiểm tra thời lượng/phiên bản và offset riêng từng bài.
-
-## Phiên bản
-
-- Package/display: `2.0.9`
-- Build version: `2.0.9.0`
-- Installer: `ShinaYuu-Music-2.0.9-Setup.exe`
-
-## Build và patch
+## Build installer
 
 ```powershell
 npm ci
@@ -30,13 +14,8 @@ npm run release:preflight
 npm run build:win
 ```
 
-Tạo patch từ bản chính thức 2.0.7:
+## Tạo patch từ 2.0.9
 
 ```powershell
-npm run patch -- "D:\ShinaYuu\ShinaYuu-Music-2.0.7-SOURCE.zip"
+npm run patch -- "D:\ShinaYuu\ShinaYuu-Music-2.0.9-SOURCE.zip"
 ```
-
-
-## 2.0.10
-- Update checker card now shows a bilingual friendly note with emoji artwork for update / no-update states.
-- Discord Rich Presence setup is now embedded as a Liquid Glass inline panel in Advanced, instead of a separate popup.

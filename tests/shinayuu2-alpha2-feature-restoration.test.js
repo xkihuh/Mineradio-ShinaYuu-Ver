@@ -142,15 +142,17 @@ test('track metadata updates immediately and likely next choices are prefetched'
   assert.match(native, /addEventListener\('shinayuu-track-change'/);
 });
 
-test('Discord connection is restored inside Advanced', () => {
+test('Discord connection is restored inside Advanced as an inline Liquid Glass panel', () => {
   const html = read('public/index.html');
   const alpha2 = read('public/js/shinayuu-alpha2-features.js');
   const preload = read('desktop/preload.js');
   assert.match(html, /id="discord-advanced-card"/);
-  assert.match(html, /id="discord-setup-btn"/);
-  assert.match(html, /openShinaYuuDiscordLiquidSettings/);
-  assert.doesNotMatch(html, /id="discord-application-id"/);
-  assert.match(alpha2, /window\.openShinaYuuDiscordLiquidSettings/);
+  assert.match(html, /fx-discord-inline-panel/);
+  assert.match(html, /id="discord-application-id"/);
+  assert.match(html, /id="discord-large-image-key"/);
+  assert.match(html, /saveDiscordAdvancedSettings\(\)/);
+  assert.doesNotMatch(html, /id="discord-setup-btn"/);
+  assert.match(alpha2, /window\.saveDiscordAdvancedSettings/);
   assert.match(alpha2, /window\.reconnectDiscordAdvanced/);
   assert.match(preload, /getDiscordState/);
   assert.match(preload, /configureDiscord/);
