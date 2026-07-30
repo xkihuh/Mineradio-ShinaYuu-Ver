@@ -1,4 +1,25 @@
-# ShinaYuu Music Changelog
+# Changelog
+
+## 2.0.8
+
+- Serialized Spotify SDK/host volume writes during AutoMix so an older low-volume request cannot complete after the final restore and mute later playback.
+- Scoped AutoMix output restoration to the provider that actually owns audio; a successful Spotify-to-YouTube handoff no longer revives Spotify, and a Spotify takeover no longer touches the retired HTML deck.
+- Added explicit Spotify shutdown at the silent boundary before HTML deck adoption, plus an ownership guard so a late Spotify stop cannot clear a newer YouTube/local transport or play state.
+- Made HTML playback await the already-running Spotify stop only at the final audible boundary, avoiding overlap without delaying descriptor resolution.
+- Added AudioContext resume gating before dual-deck and Spotify-to-HTML mixing, and removed no-op global output resets on every ordinary track selection.
+- Retained Discord Rich Presence, Liquid Discord settings, Lyrics Sync 2.0, updater and the signed Windows release/patch pipeline.
+- Bumped package, display, build and installer versions to 2.0.8 / 2.0.8.0.
+
+## 2.0.7
+
+- Restored track-aware Discord Rich Presence for Spotify, YouTube Music, YouTube Video and local playback, including title, artist, source, play/pause state and elapsed/end timestamps.
+- Added immediate Discord refresh on track changes, seek, pause/resume and AutoMix handoff, with uploaded application asset fallback when Discord rejects a remote cover URL.
+- Rebuilt both Discord Application ID interfaces as Liquid Glass panels with connection status, activity preview, cover preference, diagnostics and reconnect controls.
+- Added Lyrics Sync 2.0: actual provider playback clocks, LRC offset tags, strict duration compatibility, match-quality scoring and conservative timeline drift correction.
+- Prevented timestamps from a mismatched live/remix/edit from overriding the audible version; text remains available with an adaptive timeline while exact alignment retries.
+- Unified Spotify/YouTube seek and playback discontinuity handling so lyrics and Discord progress re-anchor immediately.
+- Bumped package, display, build and installer versions to 2.0.7 / 2.0.7.0.
+
 
 ## 2.0.6
 

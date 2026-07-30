@@ -1,8 +1,8 @@
 {
   "name": "shinayuu-music",
   "productName": "ShinaYuu Music",
-  "version": "2.0.6",
-  "description": "ShinaYuu Music 2.0.6: transaction-isolated AutoMix with cancellable provider fades, fail-safe volume restoration and watchdog recovery so one failed mix cannot silence Spotify, YouTube Music or YouTube Video.",
+  "version": "2.0.8",
+  "description": "ShinaYuu Music 2.0.8: provider-owned AutoMix output, serialized Spotify volume ramps and race-safe Spotify/YouTube playback handoff, retaining Discord Rich Presence and Lyrics Sync 2.0.",
   "author": "ShinaYuu",
   "license": "GPL-3.0-only",
   "main": "desktop/main.js",
@@ -103,7 +103,7 @@
       "include": "build/installer.nsh",
       "artifactName": "ShinaYuu-Music-${version}-Setup.${ext}"
     },
-    "buildVersion": "2.0.6.0",
+    "buildVersion": "2.0.8.0",
     "electronDist": "node_modules/electron/dist",
     "publish": [
       {
@@ -136,8 +136,8 @@
     "rcedit": "^5.0.2"
   },
   "shinayuu": {
-    "displayVersion": "2.0.6",
-    "edition": "ShinaYuu Music 2.0.6 Official",
+    "displayVersion": "2.0.8",
+    "edition": "ShinaYuu Music 2.0.8 Official",
     "lineage": {
       "productCore": "ShinaYuu Music 1.1.8.7",
       "visualUiAndLyricsStage": "Mineradio 2.0.2",
@@ -188,7 +188,7 @@
   "engines": {
     "node": ">=22.0.0"
   },
-  "displayVersion": "2.0.6",
+  "displayVersion": "2.0.8",
   "repository": {
     "type": "git",
     "url": "https://github.com/xkihuh/Mineradio-ShinaYuu-Ver.git"

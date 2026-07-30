@@ -1,50 +1,37 @@
-# ShinaYuu Music 2.0.6
+# ShinaYuu Music 2.0.8
 
-## AutoMix chuyển deck không khởi động lại nguồn âm thanh
+## AutoMix và nguồn phát
 
-- Sửa nguyên nhân gây khựng thật tại cuối AutoMix: deck B lúc này vốn đã được giải mã, đang chạy và đang nghe thấy, nên ứng dụng chỉ **chuyển quyền sở hữu** deck đó thành nguồn phát chính; không gọi `play()` lần hai.
-- Không gọi lại `setSinkId()` trong lúc bàn giao. Việc định tuyến lại thiết bị âm thanh của Chromium trước đây có thể tạo một khoảng hụt rất ngắn dù crossfade đã chạy đúng.
-- Giữ nguyên gain curve đã được lên lịch trên AudioContext và nhận lại graph/analyser của deck chuẩn bị, thay vì reset mức âm lượng ngay tại ranh giới đổi bài.
-- Thanh tiến độ, tên bài, avatar và ảnh bìa nhẹ được chuẩn bị ở khoảng 72% thời gian overlap, khi hai deck vẫn đang cùng phát. Vì vậy việc đổi UI không còn dồn đúng vào điểm deck cũ kết thúc.
-- Lyrics, artwork analysis, likes, cinema profile, hydration hàng chờ, listen session và dọn nguồn cũ được giãn ra sau handoff.
-- Dọn Audio cũ chậm hơn một khoảng ngắn để thao tác `pause/remove src/load` không tranh tài nguyên với deck mới ngay thời điểm chuyển quyền.
+- Tuần tự hóa toàn bộ lệnh volume của Spotify trong AutoMix; không còn lệnh giảm âm cũ hoàn tất muộn rồi kéo bài mới về gần 0.
+- Khôi phục âm lượng theo đúng nguồn đang sở hữu đầu ra: Spotify hoặc HTML Audio/YouTube, không phục hồi đồng thời cả hai.
+- Khi chuyển Spotify → YouTube Music/YouTube Video, Spotify được dừng ở thời điểm đã im lặng trước khi deck HTML được nhận làm nguồn chính.
+- Một phản hồi dừng Spotify đến muộn không còn được phép ghi đè `activePlaybackTransport`, trạng thái phát hoặc nút Play của nguồn HTML mới.
+- HTML playback chờ tác vụ dừng Spotify đang chạy tại ranh giới phát cuối cùng, trong khi phần resolve nguồn vẫn chạy song song để không tăng thời gian chờ không cần thiết.
+- AutoMix chỉ bắt đầu dual-deck khi AudioContext đã chạy; nếu context không thể resume thì bỏ lần mix an toàn thay vì nhận một deck im lặng.
+- Thao tác chọn bài bình thường không còn gọi reset volume toàn cục khi AutoMix không thực sự giữ quyền điều khiển đầu ra.
 
-## Spotify trong AutoMix
+## Discord và Lyrics
 
-- Không bật loading overlay và không chạy thêm animation đổi bài riêng của Spotify trong lúc AutoMix.
-- Volume ramp của Spotify chạy theo đồng hồ đều; không chờ tuần tự từng phản hồi volume từ SDK/host, tránh fade bị bước hoặc giật khi phản hồi mạng không đều.
-- Các cập nhật lyrics, track event, cover pipeline và UI nặng của Spotify được đưa ra khỏi cửa sổ bàn giao âm thanh.
+- Giữ nguyên Discord Rich Presence theo bài đang phát, ảnh bìa, nguồn phát và thanh tiến độ từ 2.0.7.
+- Giữ nguyên UI Discord Application ID theo Liquid Glass.
+- Giữ nguyên Lyrics Sync 2.0 với clock thật, LRC offset, kiểm tra thời lượng/phiên bản và offset riêng từng bài.
 
-## Các phần vẫn được giữ
+## Phiên bản
 
-- Cơ chế cô lập playback intent và phục hồi ba nguồn Spotify, YouTube Music, YouTube Video của 2.0.4.
-- UI chỉnh Delay Lyrics ±15 giây, lệch tiến độ riêng từng bài và thời gian chờ tên bài 5–15 giây.
-- Hệ thống nội dung wallpaper Home, updater, patch builder và toàn bộ UI/UX hiện tại.
+- Package/display: `2.0.8`
+- Build version: `2.0.8.0`
+- Installer: `ShinaYuu-Music-2.0.8-Setup.exe`
 
-## Phát hành
-
-- Phiên bản package/display: `2.0.6`
-- Build version: `2.0.6.0`
-- Installer: `ShinaYuu-Music-2.0.6-Setup.exe`
-- Tạo patch từ bản chính thức 2.0.5:
+## Build và patch
 
 ```powershell
-npm run patch -- "D:\ShinaYuu\ShinaYuu-Music-2.0.5-SOURCE.zip"
+npm ci
+npm run release:preflight
+npm run build:win
 ```
 
-## Pipeline build Windows 2.0.6
-
-- `npm run build:win` nay gọi pipeline release chính thức thay vì build NSIS trực tiếp chưa ký VMP.
-- Pipeline package `dist\win-unpacked`, hoàn tất `afterPack`, ký và verify VMP trên bản đã đóng gói, rồi mới tạo NSIS bằng `--prepackaged`.
-- Thêm lệnh quản lý EVS, preflight, package thư mục, ký/verify thủ công, tạo installer từ prepackaged và kiểm tra artifact.
-- Có thể build installer và tạo patch trong cùng một lệnh:
+Tạo patch từ bản chính thức 2.0.7:
 
 ```powershell
-npm run release:win -- --patch-from "D:\ShinaYuu\ShinaYuu-Music-2.0.5-SOURCE.zip"
+npm run patch -- "D:\ShinaYuu\ShinaYuu-Music-2.0.7-SOURCE.zip"
 ```
-
-Xem toàn bộ lệnh trong `docs/WINDOWS_BUILD_A_TO_Z.md`.
-## AutoMix transaction isolation
-
-Bản 2.0.6 hủy mọi fade AutoMix cũ ngay khi người dùng chọn bài mới, phục hồi gain của HTML/Web Audio và Spotify, đồng thời dùng watchdog để giải phóng phiên mix bị treo. Một deck preload lỗi sẽ bị bỏ qua an toàn thay vì làm im lặng hoặc khóa các nguồn còn lại.
-

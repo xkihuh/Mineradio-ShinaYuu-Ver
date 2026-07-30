@@ -15,6 +15,7 @@ const DEFAULT_CONFIG = Object.freeze({
   smallImageKey: '',
   smallImageText: '',
   showTrack: true,
+  preferTrackCover: true,
 });
 
 function safeText(value, max = 128) {
@@ -37,6 +38,7 @@ function normalizeConfig(input = {}) {
     smallImageKey: safeText(input.smallImageKey || '', 64),
     smallImageText: safeText(input.smallImageText || '', 128),
     showTrack: safeBoolean(input.showTrack, DEFAULT_CONFIG.showTrack),
+    preferTrackCover: safeBoolean(input.preferTrackCover, DEFAULT_CONFIG.preferTrackCover),
   };
 }
 
@@ -393,37 +395,66 @@ class DiscordPresenceManager extends EventEmitter {
   }
 
   updateActivity(payload = {}) {
+    // Accept both the original renderer field names and the canonical 2.0.8
+    // payload. Older builds sent details/state/provider/playing/position and
+    // were silently normalized to empty track metadata here, which is why
+    // Discord only showed the generic ShinaYuu activity.
+    const title = payload.title || payload.details || '';
+    const artist = payload.artist || payload.state || '';
+    const source = payload.source || payload.provider || '';
+    const isPlaying = payload.isPlaying != null ? payload.isPlaying : payload.playing;
+    const positionSec = payload.positionSec != null ? payload.positionSec : payload.position;
+    const durationSec = payload.durationSec != null ? payload.durationSec : payload.duration;
     this.activityPayload = {
-      title: safeText(payload.title || '', 120),
-      artist: safeText(payload.artist || '', 120),
+      title: safeText(title, 120),
+      artist: safeText(artist, 120),
       album: safeText(payload.album || '', 120),
-      source: safeText(payload.source || '', 24),
-      isPlaying: !!payload.isPlaying,
-      positionSec: Math.max(0, Number(payload.positionSec) || 0),
-      durationSec: Math.max(0, Number(payload.durationSec) || 0),
+      source: safeText(source, 32),
+      isPlaying: !!isPlaying,
+      positionSec: Math.max(0, Number(positionSec) || 0),
+      durationSec: Math.max(0, Number(durationSec) || 0),
       cover: safeText(payload.cover || '', 500),
+      updatedAt: Date.now(),
     };
-    this.queueActivityUpdate(false);
+    this.queueActivityUpdate(!!payload.immediate);
     return this.publicState();
   }
 
-  buildActivity() {
+  sourceLabel(source) {
+    const key = String(source || '').toLowerCase();
+    if (key === 'spotify') return 'Spotify';
+    if (key === 'youtube-video' || key === 'video') return 'YouTube Video';
+    if (key === 'youtube-music' || key === 'youtube' || key === 'music') return 'YouTube Music';
+    if (key === 'local') return 'Nhạc cục bộ';
+    return 'ShinaYuu Music';
+  }
+
+  buildActivity(options = {}) {
     const p = this.activityPayload || {};
     const hasTrack = !!p.title;
-    const trackText = [p.title, p.artist].filter(Boolean).join(' — ');
+    const sourceText = this.sourceLabel(p.source);
+    const artistText = p.artist || p.album || sourceText;
+    const pausedPrefix = p.isPlaying ? '' : 'Tạm dừng · ';
+    const fallbackImage = this.config.largeImageKey || undefined;
+    const dynamicCover = !options.forceAppAsset && this.config.preferTrackCover && /^https?:\/\//i.test(p.cover || '')
+      ? p.cover
+      : undefined;
     const activity = {
-      details: p.isPlaying && hasTrack ? 'Đang nghe trên ShinaYuu Music' : 'Đang sử dụng ShinaYuu Music',
+      details: this.config.showTrack && hasTrack ? safeText(p.title, 128) : 'ShinaYuu Music',
       state: this.config.showTrack && hasTrack
-        ? safeText(p.isPlaying ? trackText : `Đang tạm dừng · ${trackText}`, 128)
+        ? safeText(`${pausedPrefix}${artistText}${sourceText && artistText !== sourceText ? ` · ${sourceText}` : ''}`, 128)
         : 'Visual Music Experience',
-      largeImageKey: this.config.largeImageKey || undefined,
-      largeImageText: this.config.largeImageKey ? (this.config.largeImageText || 'ShinaYuu Music') : undefined,
+      largeImageKey: dynamicCover || fallbackImage,
+      largeImageText: hasTrack
+        ? safeText([p.title, p.artist].filter(Boolean).join(' — ') || this.config.largeImageText || 'ShinaYuu Music', 128)
+        : (this.config.largeImageText || 'ShinaYuu Music'),
       smallImageKey: this.config.smallImageKey || undefined,
-      smallImageText: this.config.smallImageKey ? (this.config.smallImageText || 'ShinaYuu Music') : undefined,
+      smallImageText: this.config.smallImageKey ? (this.config.smallImageText || sourceText) : undefined,
       instance: false,
     };
     if (p.isPlaying && p.durationSec > 0) {
-      const startMs = Date.now() - Math.round(p.positionSec * 1000);
+      const safePosition = Math.min(p.positionSec, p.durationSec);
+      const startMs = Date.now() - Math.round(safePosition * 1000);
       activity.startTimestamp = new Date(startMs);
       activity.endTimestamp = new Date(startMs + Math.round(p.durationSec * 1000));
     }
@@ -441,11 +472,22 @@ class DiscordPresenceManager extends EventEmitter {
 
   async applyActivity() {
     if (!this.client || !this.state.connected || !this.config.enabled) return this.publicState();
-    const activity = this.buildActivity();
+    let activity = this.buildActivity();
     try {
       await this.client.setActivity(activity, this.processId);
       this.emitState({ activity: this.activityPayload ? { ...this.activityPayload } : null, error: '', errorDetail: '' });
     } catch (error) {
+      // Some Discord desktop versions reject remote cover URLs in raw RPC.
+      // Retry once with the uploaded application asset so track text and the
+      // progress bar remain available instead of losing the whole presence.
+      if (this.activityPayload && /^https?:\/\//i.test(this.activityPayload.cover || '') && this.config.largeImageKey) {
+        try {
+          activity = this.buildActivity({ forceAppAsset: true });
+          await this.client.setActivity(activity, this.processId);
+          this.emitState({ activity: { ...this.activityPayload, coverFallback: true }, error: '', errorDetail: '' });
+          return this.publicState();
+        } catch (_) {}
+      }
       const message = String(error && error.message || error || 'DISCORD_ACTIVITY_FAILED');
       console.warn('[DiscordPresence] Activity update failed:', message);
       this.emitState({ error: 'DISCORD_ACTIVITY_FAILED', errorDetail: message });

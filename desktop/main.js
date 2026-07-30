@@ -3585,6 +3585,24 @@ ipcMain.handle('mineradio-open-update-installer', async (_event, filePath) => {
   }
 });
 
+ipcMain.handle('mineradio-install-update-installer', async (_event, filePath) => {
+  try {
+    const target = path.resolve(String(filePath || ''));
+    const updateDir = path.resolve(getUpdateDownloadDir());
+    if (!target || !target.startsWith(updateDir + path.sep)) {
+      return { ok: false, error: 'INVALID_UPDATE_PATH' };
+    }
+    if (!fs.existsSync(target)) return { ok: false, error: 'UPDATE_FILE_MISSING' };
+    const error = await shell.openPath(target);
+    if (error) return { ok: false, error };
+    const quitTimer = setTimeout(() => app.quit(), 900);
+    if (quitTimer && typeof quitTimer.unref === 'function') quitTimer.unref();
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message || 'INSTALL_UPDATE_FAILED' };
+  }
+});
+
 ipcMain.handle('mineradio-restart-app', async () => {
   try {
     app.relaunch();
