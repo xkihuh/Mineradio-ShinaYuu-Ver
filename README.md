@@ -69,3 +69,11 @@ Kết quả:
 dist\updates\ShinaYuu-Music-2.0.10-to-2.0.11.patch.json
 dist\updates\ShinaYuu-Music-2.0.10-to-2.0.11.patch.json.sha256.txt
 ```
+## Copyright and License
+
+Copyright (C) 2026 XxHuberrr.
+Copyright (C) 2026 X.kihuh (For modifications and maintenance).
+ShinaYuu Music is licensed under `GPL-3.0-only`. Redistribution of source or binaries must preserve the license, copyright notices, attribution, and the corresponding source obligations described by GPLv3.
+This project is licensed under the GPL-3.0 License. See the [LICENSE](./LICENSE) file for details.
+
+The ShinaYuu Logo, the name "ShinaYuu," the UI visual design, and original visual assets belong entirely to the original author. Third-party dependencies and services follow their respective open-source licenses and terms of service.
