@@ -1,4 +1,4 @@
-# ShinaYuu Music 2.0.8
+# ShinaYuu Music 2.0.9
 
 ## AutoMix và nguồn phát
 
@@ -18,9 +18,9 @@
 
 ## Phiên bản
 
-- Package/display: `2.0.8`
-- Build version: `2.0.8.0`
-- Installer: `ShinaYuu-Music-2.0.8-Setup.exe`
+- Package/display: `2.0.9`
+- Build version: `2.0.9.0`
+- Installer: `ShinaYuu-Music-2.0.9-Setup.exe`
 
 ## Build và patch
 

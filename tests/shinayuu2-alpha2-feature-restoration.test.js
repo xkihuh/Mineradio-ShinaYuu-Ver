@@ -147,8 +147,10 @@ test('Discord connection is restored inside Advanced', () => {
   const alpha2 = read('public/js/shinayuu-alpha2-features.js');
   const preload = read('desktop/preload.js');
   assert.match(html, /id="discord-advanced-card"/);
-  assert.match(html, /id="discord-application-id"/);
-  assert.match(alpha2, /window\.saveDiscordAdvancedSettings/);
+  assert.match(html, /id="discord-setup-btn"/);
+  assert.match(html, /openShinaYuuDiscordLiquidSettings/);
+  assert.doesNotMatch(html, /id="discord-application-id"/);
+  assert.match(alpha2, /window\.openShinaYuuDiscordLiquidSettings/);
   assert.match(alpha2, /window\.reconnectDiscordAdvanced/);
   assert.match(preload, /getDiscordState/);
   assert.match(preload, /configureDiscord/);

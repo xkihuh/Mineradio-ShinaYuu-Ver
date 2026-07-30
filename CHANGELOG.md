@@ -1,3 +1,10 @@
+# ShinaYuu Music 2.0.9
+
+- Replaced the cramped legacy Discord Application ID controls in Advanced with a definitive Liquid Glass status card and a dedicated Liquid settings modal.
+- The Advanced Discord card no longer exposes raw browser inputs/buttons; all configuration is opened through the styled modal.
+- Replaced the `SY` update/check-update mark with the actual ShinaYuu Music application logo, including success/error status badges.
+- Kept Discord Rich Presence, Lyrics Sync 2.0, provider-owned AutoMix, updater and Windows release pipeline from 2.0.8.
+
 # Changelog
 
 ## 2.0.8
