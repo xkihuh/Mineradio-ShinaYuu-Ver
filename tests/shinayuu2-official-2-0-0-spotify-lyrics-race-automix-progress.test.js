@@ -55,6 +55,6 @@ test('progress uses a VSync ticker and a compositor-only AutoMix handoff', () =>
 test('AutoMix defers the next lyric request out of the critical handoff frame', () => {
   const playback = read('public/js/modules/05-playback/13-playback-start-audio.js');
   assert.match(playback, /if \(smoothAutoMixHandoff && typeof requestAnimationFrame === 'function'\)/);
-  assert.match(playback, /requestAnimationFrame\(function \(\) \{ setTimeout\(beginFetch, 48\); \}\)/);
+  assert.match(playback, /requestAnimationFrame\(function \(\) \{ setTimeout\(beginFetch, 520\); \}\)/);
   assert.match(playback, /if \(smoothAutoMixHandoff && typeof startPlaybackProgressTicker === 'function'\) startPlaybackProgressTicker\(\)/);
 });

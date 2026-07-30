@@ -10,7 +10,7 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
 test('official GitHub update source is embedded in package metadata', () => {
   const pkg = JSON.parse(read('package.json'));
-  assert.equal(pkg.version, '2.0.3');
+  assert.equal(pkg.version, '2.0.5');
   assert.deepEqual(pkg.repository, {
     type: 'git',
     url: 'https://github.com/xkihuh/Mineradio-ShinaYuu-Ver.git',
@@ -64,8 +64,8 @@ test('noncritical queue and visual work is deferred outside the AutoMix handoff'
   const playback = read('public/js/modules/05-playback/13-playback-start-audio.js');
   assert.match(playback, /deferQueueHydrationForAutoMix/);
   assert.match(playback, /hydrate-song-deferred/);
-  assert.match(playback, /if \(smoothAutoMixHandoff\) setTimeout\(applyTrackVisualMode, 260\)/);
+  assert.match(playback, /if \(smoothAutoMixHandoff\) setTimeout\(applyTrackVisualMode, 480\)/);
   assert.match(playback, /opts\.autoMixUiPrecommitted/);
-  assert.match(playback, /setTimeout\(applyTrackUiCommit, 360\)/);
+  assert.match(playback, /setTimeout\(applyTrackUiCommit, 620\)/);
   assert.match(playback, /delay: smoothAutoMixHandoff \? 720 : 130/);
 });

@@ -1,5 +1,32 @@
 # ShinaYuu Music Changelog
 
+## 2.0.5
+- Replaced the old direct NSIS build path with an official two-stage Windows release pipeline: package `win-unpacked`, complete `afterPack`, VMP sign/verify the packaged app, then create NSIS from `--prepackaged`.
+- Added npm scripts for EVS install/refresh/version, release preflight, unpacked packaging, manual VMP sign/verify, prepackaged installer creation, artifact verification and one-command signed release builds.
+- Added `--patch-from` support so the official release command can create the installer and a version-aware resource patch in the same run.
+- Added a full Vietnamese A-to-Z Windows build and patch guide plus release helper CMD.
+- Removed the real AutoMix boundary restart: an already-audible Cuefield deck is now adopted as the primary deck without calling `HTMLMediaElement.play()` again.
+- Skips `setSinkId()`/output-device routing during seamless adoption, preventing Chromium from briefly rebuilding the audible route at the end of a mix.
+- Preserves the prepared Web Audio gain curve and adopts its analyser/gain graph instead of resetting the new deck's level during ownership transfer.
+- Precommits lightweight title, avatar, cover and progress state at 72% of the overlap while both decks are still audible.
+- Staggers lyrics fetch/reset, artwork analysis, likes, cinema profile, queue hydration and listening-session work after the critical handoff window.
+- Spotify AutoMix no longer opens the loading overlay or starts a second track-switch UI animation during the provider handoff.
+- Spotify volume ramps follow a steady clock without serially waiting for every SDK/host volume acknowledgement.
+- Delays destruction of the outgoing media element so cleanup cannot contend with the incoming deck at the exact ownership boundary.
+- Bumped package, display, build and installer versions to 2.0.5 / 2.0.5.0.
+
+## 2.0.4
+- Added monotonic playback-selection intents so stale Spotify/YouTube recovery tasks cannot overwrite or stop a newer user selection.
+- Cancels provider watchdogs, source fallback transactions and resume retries immediately when a new song, queue row or playlist is selected.
+- Spotify preflight, SDK start, rollback and YouTube fallback now verify the active selection intent.
+- Playlist autoplay carries one intent from first-page loading through playback, preventing late responses from hijacking the queue.
+- User-selected failures return an interactive player after cross-source attempts instead of scanning/terminally clearing the queue.
+- Invalidates failed YouTube Music/YouTube Video descriptors before refreshing while keeping provider caches isolated.
+- Expanded lyrics delay correction to ±15 seconds and added a separate per-track playback-progress offset in the same Liquid timing panel.
+- Added a configurable 5–15 second wait before the song-title fallback appears; real synchronized lyrics replace it immediately.
+- Lyric fetch errors no longer force the title fallback ahead of pending alignment/startup retries.
+- Bumped package, display, build and installer versions to 2.0.4 / 2.0.4.0.
+
 ## 2.0.3
 - Added a unified runtime playback guardian for Spotify, YouTube Music and YouTube Video.
 - A media error, frozen stream, missing Spotify SDK state, persistent wrong-track state or unexpected Spotify pause now triggers automatic recovery instead of leaving the player stopped.
