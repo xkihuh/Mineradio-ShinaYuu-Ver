@@ -1,5 +1,14 @@
 # ShinaYuu Music Changelog
 
+## 2.0.6
+
+- Isolated every AutoMix execution with a monotonic transaction serial so stale HTML/Spotify fade loops cannot mute a later user-selected source.
+- Added a root-playback abort hook that immediately releases AutoMix locks, restores HTML/Web Audio/Spotify volume, resets playback rate and preserves the new selection.
+- Added a 24-second stale-execution watchdog and same-track bypass after a failed mix instead of repeatedly retrying and poisoning the queue.
+- Prevented a prepared deck from being paused or unloaded after it has already become the primary media element.
+- Removed destructive pre-fade behavior from unsupported provider handoffs; failed deck preload now keeps the current song audible and lets normal queue advance continue.
+- Bumped package, display, build and installer versions to 2.0.6 / 2.0.6.0.
+
 ## 2.0.5
 - Replaced the old direct NSIS build path with an official two-stage Windows release pipeline: package `win-unpacked`, complete `afterPack`, VMP sign/verify the packaged app, then create NSIS from `--prepackaged`.
 - Added npm scripts for EVS install/refresh/version, release preflight, unpacked packaging, manual VMP sign/verify, prepackaged installer creation, artifact verification and one-command signed release builds.

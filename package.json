@@ -1,23 +1,37 @@
 {
   "name": "shinayuu-music",
   "productName": "ShinaYuu Music",
-  "version": "2.0.3",
-  "description": "ShinaYuu Music 2.0.3: unified runtime recovery for Spotify, YouTube Music and YouTube Video, automatic cross-source replacement and queue continuation, while retaining the 2.0.2 Home wallpaper content customizer.",
+  "version": "2.0.6",
+  "description": "ShinaYuu Music 2.0.6: transaction-isolated AutoMix with cancellable provider fades, fail-safe volume restoration and watchdog recovery so one failed mix cannot silence Spotify, YouTube Music or YouTube Video.",
   "author": "ShinaYuu",
   "license": "GPL-3.0-only",
   "main": "desktop/main.js",
   "private": true,
   "scripts": {
     "start": "node tools/ensure-castlabs-runtime.js && node tools/build-renderer-bundle.js && electron .",
-    "build:win": "node tools/ensure-castlabs-runtime.js && node tools/verify-castlabs-runtime.js && node tools/ensure-ytdlp-bundle.js && node tools/build-renderer-bundle.js && electron-builder --win nsis --publish never",
-    "build:win:dir": "node tools/ensure-castlabs-runtime.js && node tools/verify-castlabs-runtime.js && node tools/ensure-ytdlp-bundle.js && node tools/build-renderer-bundle.js && electron-builder --win dir",
-    "build:win:internal-beta": "electron-builder --config electron-builder.internal-beta.json --win nsis --publish never",
     "dev": "node tools/ensure-castlabs-runtime.js && node tools/build-renderer-bundle.js && electron .",
+    "clean:dist": "node tools/clean-dist.js",
     "setup:castlabs": "node tools/ensure-castlabs-runtime.js",
     "verify:castlabs": "node tools/verify-castlabs-runtime.js",
     "setup:youtube-engine": "node tools/ensure-ytdlp-bundle.js",
-    "test": "npm run test:shinayuu2",
     "prepare:renderer": "node tools/build-renderer-bundle.js",
+    "evs:install": "node tools/evs-account.js install",
+    "evs:upgrade": "node tools/evs-account.js upgrade",
+    "evs:refresh": "node tools/evs-account.js refresh",
+    "evs:version": "node tools/evs-account.js version",
+    "release:preflight": "node tools/verify-release-environment.js",
+    "package:win:dir": "node tools/package-windows-dir.js",
+    "vmp:sign": "node tools/evs-package.js sign dist/win-unpacked",
+    "vmp:verify": "node tools/evs-package.js verify dist/win-unpacked",
+    "installer:win:prepackaged": "node tools/build-windows-installer.js",
+    "release:verify": "node tools/verify-windows-artifacts.js",
+    "release:win": "node tools/build-windows-release.js",
+    "release:win:skip-tests": "node tools/build-windows-release.js --skip-tests",
+    "release:win:unsigned": "node tools/build-windows-release.js --unsigned",
+    "build:win": "npm run release:win",
+    "build:win:dir": "npm run package:win:dir",
+    "build:win:internal-beta": "electron-builder --config electron-builder.internal-beta.json --win nsis --publish never",
+    "test": "npm run test:shinayuu2",
     "test:shinayuu2": "node tools/audit-public-npm-lock.js && node tools/build-renderer-bundle.js && node tools/audit-i18n.js && node --test tests/shinayuu2-*.test.js",
     "preview:win": "node build/preview-win.js",
     "build:update-patch": "node tools/build-update-patch.js",
@@ -89,7 +103,7 @@
       "include": "build/installer.nsh",
       "artifactName": "ShinaYuu-Music-${version}-Setup.${ext}"
     },
-    "buildVersion": "2.0.3.0",
+    "buildVersion": "2.0.6.0",
     "electronDist": "node_modules/electron/dist",
     "publish": [
       {
@@ -122,8 +136,8 @@
     "rcedit": "^5.0.2"
   },
   "shinayuu": {
-    "displayVersion": "2.0.3",
-    "edition": "ShinaYuu Music 2.0.3 Official",
+    "displayVersion": "2.0.6",
+    "edition": "ShinaYuu Music 2.0.6 Official",
     "lineage": {
       "productCore": "ShinaYuu Music 1.1.8.7",
       "visualUiAndLyricsStage": "Mineradio 2.0.2",
@@ -174,7 +188,7 @@
   "engines": {
     "node": ">=22.0.0"
   },
-  "displayVersion": "2.0.3",
+  "displayVersion": "2.0.6",
   "repository": {
     "type": "git",
     "url": "https://github.com/xkihuh/Mineradio-ShinaYuu-Ver.git"

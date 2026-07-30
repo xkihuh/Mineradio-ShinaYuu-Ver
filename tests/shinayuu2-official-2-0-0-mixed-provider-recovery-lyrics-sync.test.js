@@ -22,7 +22,7 @@ test('AutoMix skips a failed Spotify target and keeps later queue items playable
   const mix = read('public/js/modules/05-playback/18-cuefield-automix-integration.js');
   assert.match(mix, /function markTrackFailure\(song, durationMs\)/);
   assert.match(mix, /state\.failureCooldown\[trackFailureKey\(song\)\] > Date\.now\(\)/);
-  assert.match(mix, /function crossfadeHtmlToSpotify\(pending\)/);
+  assert.match(mix, /function crossfadeHtmlToSpotify\(pending, executionSerial\)/);
   assert.match(mix, /keepOutgoingMedia: true/);
   assert.match(mix, /throwOnPlaybackFailure: true/);
   assert.match(mix, /var fallbackIndex = nextIndex\(Number\(window\.currentIdx\)\)/);
