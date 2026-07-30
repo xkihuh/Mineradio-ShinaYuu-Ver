@@ -1,7 +1,7 @@
 {
   "name": "shinayuu-music",
   "productName": "ShinaYuu Music",
-  "version": "2.0.9",
+  "version": "2.0.10",
   "description": "ShinaYuu Music 2.0.9: definitive Discord Liquid Glass setup surface and real application artwork in update/check-update dialogs, retaining provider-owned AutoMix, Discord Rich Presence and Lyrics Sync 2.0.",
   "author": "ShinaYuu",
   "license": "GPL-3.0-only",
@@ -136,7 +136,7 @@
     "rcedit": "^5.0.2"
   },
   "shinayuu": {
-    "displayVersion": "2.0.9",
+    "displayVersion": "2.0.10",
     "edition": "ShinaYuu Music 2.0.9 Official",
     "lineage": {
       "productCore": "ShinaYuu Music 1.1.8.7",
@@ -183,7 +183,8 @@
       "checkDelayMs": 10000,
       "checkIntervalMs": 21600000,
       "autoPrompt": true
-    }
+    },
+    "buildVersion": "2.0.10.0"
   },
   "engines": {
     "node": ">=22.0.0"

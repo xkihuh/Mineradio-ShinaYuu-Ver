@@ -35,3 +35,8 @@ Tạo patch từ bản chính thức 2.0.7:
 ```powershell
 npm run patch -- "D:\ShinaYuu\ShinaYuu-Music-2.0.7-SOURCE.zip"
 ```
+
+
+## 2.0.10
+- Update checker card now shows a bilingual friendly note with emoji artwork for update / no-update states.
+- Discord Rich Presence setup is now embedded as a Liquid Glass inline panel in Advanced, instead of a separate popup.

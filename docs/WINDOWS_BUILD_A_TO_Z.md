@@ -1,6 +1,6 @@
-# Build Windows và tạo patch từ A–Z — ShinaYuu Music 2.0.8
+# Build Windows và tạo patch từ A–Z — ShinaYuu Music 2.0.9
 
-Tài liệu này áp dụng cho source `ShinaYuu Music 2.0.8` trên Windows 10/11 x64.
+Tài liệu này áp dụng cho source `ShinaYuu Music 2.0.9` trên Windows 10/11 x64.
 
 ## 1. Pipeline chính thức đã được chốt
 
@@ -41,7 +41,7 @@ Không ký `node_modules\electron\dist` khi tạo installer chính thức. Cách
 Mở PowerShell tại thư mục source:
 
 ```powershell
-cd "D:\ShinaYuu\ShinaYuu-Music-2.0.8"
+cd "D:\ShinaYuu\ShinaYuu-Music-2.0.9"
 ```
 
 Cài dependency Node đúng theo `package-lock.json`:
@@ -79,7 +79,7 @@ npm run release:preflight
 Mỗi lần build một release sạch:
 
 ```powershell
-cd "D:\ShinaYuu\ShinaYuu-Music-2.0.8"
+cd "D:\ShinaYuu\ShinaYuu-Music-2.0.9"
 npm ci
 npm run release:preflight
 npm run release:win
@@ -91,9 +91,9 @@ Kết quả chính:
 
 ```text
 dist\win-unpacked\
-dist\ShinaYuu-Music-2.0.8-Setup.exe
-dist\ShinaYuu-Music-2.0.8-Setup.exe.blockmap
-dist\ShinaYuu-Music-2.0.8-Setup.exe.sha256.txt
+dist\ShinaYuu-Music-2.0.9-Setup.exe
+dist\ShinaYuu-Music-2.0.9-Setup.exe.blockmap
+dist\ShinaYuu-Music-2.0.9-Setup.exe.sha256.txt
 dist\latest.yml
 ```
 
@@ -108,7 +108,7 @@ npm run release:win
 
 Đường dẫn sau `--patch-from` phải là source ZIP, source đã giải nén, hoặc thư mục app cũ chính thức mà người dùng đang dùng.
 
-Ví dụ build 2.0.8 và tạo patch từ 2.0.7:
+Ví dụ build 2.0.9 và tạo patch từ 2.0.8:
 
 ```powershell
 npm run release:win -- --patch-from "D:\ShinaYuu\Release-Base\ShinaYuu-Music-2.0.7-SOURCE.zip"
@@ -117,13 +117,13 @@ npm run release:win -- --patch-from "D:\ShinaYuu\Release-Base\ShinaYuu-Music-2.0
 Kết quả patch:
 
 ```text
-dist\updates\ShinaYuu-Music-2.0.7-to-2.0.8.patch.json
-dist\updates\ShinaYuu-Music-2.0.7-to-2.0.8.patch.json.sha256.txt
+dist\updates\ShinaYuu-Music-2.0.8-to-2.0.9.patch.json
+dist\updates\ShinaYuu-Music-2.0.8-to-2.0.9.patch.json.sha256.txt
 ```
 
 ## 5. Chỉ tạo patch, không build lại installer
 
-Tại source mới 2.0.8:
+Tại source mới 2.0.9:
 
 ```powershell
 npm ci

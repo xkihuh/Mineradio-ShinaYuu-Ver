@@ -110,3 +110,8 @@
 - The Lyrics display mode uses the song title only as a delayed fallback when every lyrics provider is empty; synchronized lyrics always replace and outrank it.
 - Removed automatic lyrics-mode and lyric-line-count toast notifications.
 - Windows build identity and artwork remain based on ShinaYuu Music 1.1.7.4.
+
+
+## 2.0.10
+- Update checker card now shows a bilingual friendly note with emoji artwork for update / no-update states.
+- Discord Rich Presence setup is now embedded as a Liquid Glass inline panel in Advanced, instead of a separate popup.
