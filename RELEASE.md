@@ -1,5 +1,6 @@
-# ShinaYuu Music 2.0.11 Release
+# ShinaYuu Music 2.0.12 Release
 
-- Đặt note cập nhật cùng hàng và ngay bên phải logo app.
-- Dựng lại toàn bộ UI Discord Connect bằng component Liquid Glass custom.
-- Giữ nguyên playback, AutoMix, Lyrics Sync 2.0 và updater pipeline.
+This release repairs playback resumption after a paused app loses and regains focus, and redesigns the inline Discord connection controls.
+
+Installer: `ShinaYuu-Music-2.0.12-Setup.exe`
+Build version: `2.0.12.0`
