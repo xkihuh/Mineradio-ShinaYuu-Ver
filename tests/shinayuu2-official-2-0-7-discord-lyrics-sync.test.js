@@ -10,15 +10,15 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 const lyricsSync = require(path.join(root, 'public', 'lyrics-sync.js'));
 const { DiscordPresenceManager, normalizeConfig } = require(path.join(root, 'desktop', 'discord-presence.js'));
 
-test('2.0.11 release identity is synchronized', () => {
+test('2.0.13 release identity is synchronized', () => {
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
-  assert.equal(pkg.version, '2.0.11');
-  assert.equal(pkg.displayVersion, '2.0.11');
-  assert.equal(pkg.shinayuu.displayVersion, '2.0.11');
-  assert.equal(pkg.build.buildVersion, '2.0.11.0');
-  assert.equal(lock.version, '2.0.11');
-  assert.equal(lock.packages[''].version, '2.0.11');
+  assert.equal(pkg.version, '2.0.13');
+  assert.equal(pkg.displayVersion, '2.0.13');
+  assert.equal(pkg.shinayuu.displayVersion, '2.0.13');
+  assert.equal(pkg.build.buildVersion, '2.0.13.0');
+  assert.equal(lock.version, '2.0.13');
+  assert.equal(lock.packages[''].version, '2.0.13');
 });
 
 test('Discord presence accepts legacy renderer metadata and builds track progress timestamps', () => {
@@ -56,7 +56,7 @@ test('Discord config and inline Advanced Liquid Glass controls expose track pres
   const html = read('public/index.html');
   const renderer = read('public/js/shinayuu-v2-native.js');
   const advanced = read('public/js/shinayuu-alpha2-features.js');
-  const css = read('public/css/shinayuu-2.0.11-discord-update.css');
+  const css = read('public/css/shinayuu-alpha3.0.5-fixes.css');
   assert.match(html, /discord-now-title/);
   assert.match(html, /fx-discord-inline-panel/);
   assert.match(html, /discord-prefer-track-cover/);

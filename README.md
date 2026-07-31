@@ -1,17 +1,83 @@
-# ShinaYuu Music 2.0.12
+# ShinaYuu Music 2.0.13
 
-ShinaYuu Music 2.0.12 tiếp tục giữ kiến trúc Electron/Castlabs, giao diện Mineradio 2.0 và hệ thống phát Spotify, YouTube Music, YouTube Video cùng thư viện Local.
+ShinaYuu Music là ứng dụng nghe nhạc desktop hợp nhất cho Windows, hỗ trợ YouTube Music, YouTube Video/MV, Spotify Premium và nhạc cục bộ trong cùng một giao diện.
 
-## Thay đổi chính
+Bản 2.0.13 được xây trực tiếp từ playback core ổn định của 2.0.10. Các file AutoMix, điều khiển phát và Spotify Direct Player được giữ nguyên để tránh lặp lại hiện tượng khựng xuất hiện ở 2.0.12.
 
-- Sửa lỗi tạm dừng bài hát, chuyển sang ứng dụng khác rồi quay lại khiến nút Phát không khôi phục được âm thanh.
-- Khi người dùng nhấn Phát sau khi quay lại, ứng dụng tái kích hoạt AudioContext, thiết bị đầu ra và media pipeline trong chính thao tác người dùng.
-- Spotify Web Playback SDK được kích hoạt lại, xác nhận trạng thái phát và tự dựng lại player nếu phiên SDK đã mất khả năng phát.
-- HTML Audio/YouTube được kiểm tra media clock; nếu nguồn cũ bị treo, ứng dụng tải lại URL phát và tiếp tục từ vị trí đã tạm dừng.
-- Làm lại khu Discord Connect theo Liquid Glass rõ ràng hơn. Hai ô Application ID và Tên App/Image Key không còn nền input HTML trắng.
-- Bốn nút Discord được bố trí thành lưới 2 × 2 cân xứng để giảm chiều cao panel.
+## Thay đổi trong 2.0.13
 
-## Build
+### Khôi phục playback và AutoMix 2.0.10
+
+- Giữ nguyên `public/js/modules/05-playback/18-cuefield-automix-integration.js` từ 2.0.10.
+- Giữ nguyên `public/js/modules/05-playback/14-player-controls.js` từ 2.0.10.
+- Giữ nguyên `public/spotify-direct-player.js` từ 2.0.10.
+- Loại bỏ foreground-resume wrapper của 2.0.12 vì wrapper này thay thế `togglePlay` và có thể chạy thêm recovery sau thao tác phát.
+- Không tự đổi nguồn, không gọi lại `playQueueAt`, không reset Spotify và không chạy recovery trong giai đoạn AutoMix.
+
+### Khôi phục phát sau khi quay lại ứng dụng
+
+`public/js/shinayuu-2.0.13-foreground-prewarm.js` chỉ chạy trong thao tác nhấn nút Phát sau khi người dùng quay lại app:
+
+- Prewarm audio graph và thiết bị đầu ra cho YouTube/HTML Audio.
+- Gọi Spotify `activateElement()` trong thao tác người dùng khi Spotify đang là nguồn phát.
+- Không thay thế `togglePlay`.
+- Không tự phát nhạc, không đổi bài và không can thiệp AutoMix.
+
+### Discord Connect Liquid Glass
+
+Khung Discord trong phần Nâng cao được dựng trực tiếp bằng component riêng:
+
+- Header Discord và trạng thái kết nối.
+- Preview bài đang hiển thị trên Discord.
+- Input shell Liquid Glass cho Application ID và Tên App/Image Key.
+- Toggle ảnh bìa custom, không dùng checkbox mặc định.
+- Bốn nút theo lưới 2 × 2:
+  - Lưu và kết nối.
+  - Kết nối lại.
+  - Developer Portal.
+  - Sao chép User ID.
+
+Style quan trọng được đặt trong `public/css/shinayuu-alpha3.0.5-fixes.css`, là stylesheet luôn được tải bởi app, thay vì phụ thuộc vào một file CSS bổ sung có thể không được áp dụng trong runtime cũ.
+
+### Giao diện cập nhật
+
+- Logo app và note nằm cùng hàng.
+- Note nằm ngay bên phải logo.
+- Emoji thay đổi theo trạng thái có hoặc không có phiên bản mới.
+- Hỗ trợ tiếng Việt và tiếng Anh.
+
+## Chức năng được giữ nguyên
+
+- AutoMix hai deck và crossfade theo provider ownership.
+- Spotify OAuth PKCE và Spotify Web Playback SDK.
+- YouTube Music, YouTube Video/MV và fallback playback.
+- Lyrics Sync 2.0, delay chung và offset riêng từng bài.
+- Discord Rich Presence theo bài hát và tiến độ.
+- Home Dashboard, Daily Mix, Listening Profile và wallpaper content.
+- Media background, MV background và Desktop Wallpaper.
+- Updater trong ứng dụng và công cụ tạo patch.
+
+## Yêu cầu
+
+- Windows 10/11 x64.
+- Node.js 22 trở lên.
+- Python 3 cho Castlabs EVS khi build release.
+- Spotify Premium để kiểm tra Spotify Direct Playback.
+
+## Chạy source
+
+```powershell
+npm ci
+npm start
+```
+
+## Chạy kiểm thử
+
+```powershell
+npm test
+```
+
+## Build installer Windows
 
 ```powershell
 npm ci
@@ -19,23 +85,22 @@ npm run release:preflight
 npm run build:win
 ```
 
-## Kiểm thử
+Installer được tạo theo tên:
+
+```text
+ShinaYuu-Music-2.0.13-Setup.exe
+```
+
+## Tạo patch từ 2.0.10
 
 ```powershell
-npm test
+npm run patch -- "D:\ShinaYuu\ShinaYuu-Music-2.0.10-SOURCE.zip"
 ```
 
 ## Phiên bản
 
-- Package: `2.0.12`
-- Display: `2.0.12`
-- Build: `2.0.12.0`
-
-## Copyright and License
-
-Copyright (C) 2026 XxHuberrr.
-Copyright (C) 2026 X.kihuh (For modifications and maintenance).
-ShinaYuu Music is licensed under `GPL-3.0-only`. Redistribution of source or binaries must preserve the license, copyright notices, attribution, and the corresponding source obligations described by GPLv3.
-This project is licensed under the GPL-3.0 License. See the [LICENSE](./LICENSE) file for details.
-
-The ShinaYuu Logo, the name "ShinaYuu," the UI visual design, and original visual assets belong entirely to the original author. Third-party dependencies and services follow their respective open-source licenses and terms of service.
+```text
+Package version : 2.0.13
+Display version : 2.0.13
+Build version   : 2.0.13.0
+```

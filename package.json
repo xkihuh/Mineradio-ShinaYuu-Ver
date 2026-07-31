@@ -1,8 +1,8 @@
 {
   "name": "shinayuu-music",
   "productName": "ShinaYuu Music",
-  "version": "2.0.12",
-  "description": "ShinaYuu Music 2.0.11: Discord Connect Liquid Glass rebuilt inline, update note placed beside the app logo, provider-owned AutoMix recovery, Discord Rich Presence and Lyrics Sync 2.0.",
+  "version": "2.0.13",
+  "description": "ShinaYuu Music 2.0.10: embedded Discord Liquid Glass configuration, bilingual update notes with emoji artwork, provider-owned AutoMix recovery, Discord Rich Presence and Lyrics Sync 2.0.",
   "author": "ShinaYuu",
   "license": "GPL-3.0-only",
   "main": "desktop/main.js",
@@ -103,7 +103,7 @@
       "include": "build/installer.nsh",
       "artifactName": "ShinaYuu-Music-${version}-Setup.${ext}"
     },
-    "buildVersion": "2.0.12.0",
+    "buildVersion": "2.0.13.0",
     "electronDist": "node_modules/electron/dist",
     "publish": [
       {
@@ -136,8 +136,8 @@
     "rcedit": "^5.0.2"
   },
   "shinayuu": {
-    "displayVersion": "2.0.12",
-    "edition": "ShinaYuu Music 2.0.12 Official",
+    "displayVersion": "2.0.13",
+    "edition": "ShinaYuu Music 2.0.13 Official",
     "lineage": {
       "productCore": "ShinaYuu Music 1.1.8.7",
       "visualUiAndLyricsStage": "Mineradio 2.0.2",
@@ -184,12 +184,12 @@
       "checkIntervalMs": 21600000,
       "autoPrompt": true
     },
-    "buildVersion": "2.0.12.0"
+    "buildVersion": "2.0.13.0"
   },
   "engines": {
     "node": ">=22.0.0"
   },
-  "displayVersion": "2.0.12",
+  "displayVersion": "2.0.13",
   "repository": {
     "type": "git",
     "url": "https://github.com/xkihuh/Mineradio-ShinaYuu-Ver.git"
