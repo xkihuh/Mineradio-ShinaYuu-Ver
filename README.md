@@ -121,18 +121,18 @@ Installer được tạo theo tên:
 ShinaYuu-Music-2.0.13-Setup.exe
 ```
 
-## Tạo patch từ 2.0.10
+## Tạo patch từ 2.x.x
 
 ```powershell
-npm run patch -- "D:\ShinaYuu\ShinaYuu-Music-2.0.10-SOURCE.zip"
+npm run patch -- "D:\ShinaYuu\ShinaYuu-Music-2.x.x-SOURCE.zip"
 ```
 
 ## Phiên bản
 
 ```text
-Package version : 2.0.13
-Display version : 2.0.13
-Build version   : 2.0.13.0
+Package version : 2.0.14
+Display version : 2.0.14
+Build version   : 2.0.14.0
 ```
 
 ## Acknowledgments
