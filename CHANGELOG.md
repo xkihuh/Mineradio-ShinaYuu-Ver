@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.16
+
+- Fixed the updater app logo rendering at its intrinsic image size.
+- Added explicit width, height, min/max constraints and overflow protection for the updater icon.
+- Preserved all lyrics, AutoMix and playback behavior from 2.0.15.
+- Bumped package/display/build identity to 2.0.16 / 2.0.16.0.
+
 ## 2.0.15
 
 - Restored the complete 2.0.13 lyrics timing/provider system instead of the direct-clock rewrite introduced in 2.0.14.

@@ -1,17 +1,5 @@
-# ShinaYuu Music 2.0.15
+# ShinaYuu Music 2.0.16
 
-## Nội dung phát hành
-
-- Khôi phục toàn bộ hệ thống đồng bộ lyrics của 2.0.13.
-- Giữ thanh Delay lyrics, lệch tiến độ từng bài và toàn bộ nút chỉnh nhanh.
-- Chỉ xóa mục cấu hình thời gian chờ trước khi hiện tên bài.
-- Tên bài fallback không còn chờ 5–15 giây; lyrics thật thay thế ngay khi tải xong.
-- Giữ nguyên playback core và AutoMix của 2.0.13.
-
-## Build installer
-
-```powershell
-npm ci
-npm run release:preflight
-npm run build:win
-```
+- Fixed the native updater app icon overflowing the update dialog.
+- Locked the updater logo container to 52 × 52 px and the icon image to 42 × 42 px.
+- Preserved the 2.0.15 old lyrics timing system, lyric correction controls, AutoMix and playback core.

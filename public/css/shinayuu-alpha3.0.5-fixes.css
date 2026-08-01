@@ -116,3 +116,7 @@ body.sy-automix-cover-swap #thumb-cover{
 
 /* inline Discord setup panel compatibility marker */
 .fx-discord-inline-panel{display:grid!important}
+
+/* 2.0.16 — keep the native updater app icon at the compact app-logo size. */
+#shinayuu-native-modal[data-kind="update"] .shinayuu-update-logo{position:relative!important;display:grid!important;place-items:center!important;overflow:hidden!important;flex:0 0 52px!important;width:52px!important;min-width:52px!important;max-width:52px!important;height:52px!important;min-height:52px!important;max-height:52px!important}
+#shinayuu-native-modal[data-kind="update"] .shinayuu-update-logo>img{display:block!important;width:42px!important;height:42px!important;min-width:0!important;min-height:0!important;max-width:42px!important;max-height:42px!important;object-fit:contain!important;object-position:center!important;border:0!important;border-radius:12px!important;margin:0!important;padding:0!important;box-shadow:none!important}
