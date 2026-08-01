@@ -1,0 +1,769 @@
+/* ShinaYuu Music v6 integration layer.
+   Overrides branding, provider login, responsive layout and playlist performance.
+   The lyric stage remains based on the original Mineradio rendering architecture. */
+
+:root {
+  --sy-safe-top: 48px;
+  --sy-edge: clamp(14px, 1.5vw, 28px);
+  --sy-panel-gap: clamp(12px, 1.2vw, 22px);
+  --sy-bottom-reserve: clamp(102px, 13vh, 142px);
+  --sy-login-surface: rgba(12, 15, 24, .88);
+  --sy-login-card: rgba(255, 255, 255, .055);
+  --sy-login-border: rgba(255, 255, 255, .105);
+}
+
+/* ---------- Branding ---------- */
+.shinayuu-splash-wordmark {
+  display: flex !important;
+  align-items: baseline;
+  justify-content: center;
+  gap: clamp(10px, 1.2vw, 20px);
+  letter-spacing: -.045em;
+  text-transform: none !important;
+}
+
+.shinayuu-splash-wordmark .splash-word-shinayuu {
+  font-family: "Cinzel Decorative", serif;
+  font-size: clamp(35px, 5.2vw, 78px);
+  font-weight: 900;
+  line-height: .96;
+}
+
+.shinayuu-splash-wordmark .splash-word-music {
+  font-family: Inter, sans-serif;
+  font-size: clamp(13px, 1.35vw, 22px);
+  font-weight: 500;
+  letter-spacing: .44em;
+  opacity: .72;
+}
+
+.splash-signal-line {
+  width: min(240px, 34vw);
+  height: 1px;
+  margin: 21px auto 15px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.82), transparent);
+  opacity: .72;
+}
+
+/* ---------- Clean provider login ---------- */
+#login-modal {
+  padding: clamp(14px, 3vw, 34px);
+}
+
+#login-modal .provider-login-modal {
+  width: min(880px, calc(100vw - 28px));
+  max-height: min(820px, calc(100vh - 28px));
+  padding: 0;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid rgba(255,255,255,.12);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(255, 34, 92, .11), transparent 34%),
+    radial-gradient(circle at 96% 8%, rgba(29, 185, 84, .10), transparent 32%),
+    var(--sy-login-surface);
+  box-shadow: 0 34px 110px rgba(0,0,0,.62), inset 0 1px 0 rgba(255,255,255,.075);
+  backdrop-filter: blur(26px) saturate(1.18);
+  -webkit-backdrop-filter: blur(26px) saturate(1.18);
+}
+
+#login-modal .provider-login-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 70px;
+  padding: 15px 18px 15px 22px;
+  border-bottom: 1px solid rgba(255,255,255,.075);
+  background: rgba(255,255,255,.025);
+}
+
+#login-modal .provider-login-head > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+#login-modal .provider-login-head b {
+  font-size: 16px;
+  letter-spacing: .01em;
+}
+
+#login-modal .provider-login-head small {
+  color: rgba(255,255,255,.52);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+#login-modal .login-reset-all-btn,
+#login-modal .login-panel-close {
+  appearance: none;
+  border: 1px solid rgba(255,255,255,.105);
+  color: rgba(255,255,255,.76);
+  background: rgba(255,255,255,.045);
+  border-radius: 11px;
+  transition: background .16s ease, border-color .16s ease, color .16s ease;
+}
+
+#login-modal .login-reset-all-btn {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 11px;
+}
+
+#login-modal .login-panel-close {
+  width: 34px;
+  height: 34px;
+  font-size: 21px;
+}
+
+#login-modal .login-reset-all-btn:hover,
+#login-modal .login-panel-close:hover {
+  background: rgba(255,255,255,.10);
+  border-color: rgba(255,255,255,.18);
+  color: #fff;
+}
+
+#login-modal .provider-login-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 18px 20px 0;
+}
+
+#login-modal .provider-login-card {
+  appearance: none;
+  min-width: 0;
+  min-height: 84px;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  text-align: left;
+  color: #fff;
+  border: 1px solid var(--sy-login-border);
+  border-radius: 17px;
+  background: var(--sy-login-card);
+  box-shadow: none;
+  cursor: pointer;
+  transition: transform .16s ease, background .16s ease, border-color .16s ease;
+}
+
+#login-modal .provider-login-card:hover {
+  transform: translateY(-1px);
+  background: rgba(255,255,255,.078);
+  border-color: rgba(255,255,255,.17);
+}
+
+#login-modal .provider-login-card.active.youtube {
+  border-color: rgba(255, 58, 92, .48);
+  background: linear-gradient(135deg, rgba(255, 42, 86, .14), rgba(255,255,255,.052));
+}
+
+#login-modal .provider-login-card.active.spotify {
+  border-color: rgba(29, 185, 84, .48);
+  background: linear-gradient(135deg, rgba(29, 185, 84, .14), rgba(255,255,255,.052));
+}
+
+#login-modal .provider-login-logo {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  font: 800 12px/1 Inter, sans-serif;
+  letter-spacing: -.03em;
+  background: rgba(255,255,255,.09);
+  border: 1px solid rgba(255,255,255,.12);
+}
+
+#login-modal .youtube .provider-login-logo {
+  background: rgba(255, 0, 55, .18);
+  color: #ffcfda;
+}
+
+#login-modal .spotify .provider-login-logo {
+  background: rgba(29, 185, 84, .18);
+  color: #c8ffda;
+}
+
+#login-modal .provider-login-copy {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+#login-modal .provider-login-copy b {
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+#login-modal .provider-login-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255,255,255,.52);
+  font-size: 10px;
+}
+
+#login-modal .provider-login-state,
+#login-modal .provider-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 27px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.12);
+  color: rgba(255,255,255,.62);
+  background: rgba(0,0,0,.18);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+#login-modal .provider-login-card.connected .provider-login-state,
+#login-modal .provider-status-badge.connected {
+  color: #d8ffe5;
+  border-color: rgba(73, 220, 125, .36);
+  background: rgba(29, 185, 84, .13);
+}
+
+#login-modal .provider-login-workspace {
+  margin: 14px 20px 0;
+  border: 1px solid rgba(255,255,255,.085);
+  border-radius: 18px;
+  background: rgba(0,0,0,.16);
+  overflow: hidden;
+}
+
+#login-modal .provider-login-summary {
+  padding: 18px;
+}
+
+#login-modal .provider-login-title-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+}
+
+#login-modal .provider-login-title-row h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+#login-modal .provider-login-title-row .desc {
+  max-width: 680px;
+  color: rgba(255,255,255,.56);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+#login-modal #qr-status {
+  min-height: 21px;
+  margin-top: 14px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.035);
+  color: rgba(255,255,255,.65);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+#login-modal .provider-login-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+#login-modal .provider-login-actions .modal-btn {
+  min-height: 36px;
+  margin: 0;
+}
+
+#login-modal .provider-login-actions .danger {
+  color: #ffc7d2;
+  border-color: rgba(255, 88, 117, .22);
+}
+
+#login-modal .provider-config-shell {
+  border-top: 1px solid rgba(255,255,255,.07);
+}
+
+#login-modal .provider-config-toggle {
+  width: 100%;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 18px;
+  border: 0;
+  color: #fff;
+  background: rgba(255,255,255,.018);
+  text-align: left;
+  cursor: pointer;
+}
+
+#login-modal .provider-config-toggle > span:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+#login-modal .provider-config-toggle b { font-size: 12px; }
+#login-modal .provider-config-toggle small { color: rgba(255,255,255,.45); font-size: 10px; }
+
+#login-modal .provider-config-panel {
+  display: none;
+  max-height: 310px;
+  overflow: auto;
+  padding: 0 18px 18px;
+}
+
+#login-modal .provider-config-shell.open .provider-config-panel {
+  display: block;
+}
+
+#login-modal .provider-config-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px 12px;
+}
+
+#login-modal .provider-config-group[hidden] { display: none !important; }
+
+#login-modal .provider-config-group label {
+  align-self: end;
+  color: rgba(255,255,255,.65);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+#login-modal .provider-config-group label span { color: rgba(255,255,255,.38); }
+
+#login-modal .provider-config-group input {
+  width: 100%;
+  min-width: 0;
+  height: 37px;
+  padding: 0 11px;
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 10px;
+  outline: none;
+  background: rgba(0,0,0,.20);
+}
+
+#login-modal .provider-config-group input:focus {
+  border-color: rgba(var(--fc-accent-rgb), .48);
+  box-shadow: 0 0 0 3px rgba(var(--fc-accent-rgb), .08);
+}
+
+#login-modal .provider-config-uri {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.035);
+  font-size: 10px;
+}
+
+#login-modal .provider-config-uri code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255,255,255,.68);
+}
+
+#login-modal .provider-config-uri button {
+  border: 0;
+  color: rgba(255,255,255,.72);
+  background: transparent;
+  cursor: pointer;
+}
+
+#login-modal .provider-config-group > .modal-btn {
+  grid-column: 1 / -1;
+  justify-self: start;
+  margin: 2px 0 0;
+}
+
+#login-modal .provider-login-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 20px 18px;
+}
+
+#login-modal .provider-login-footer .modal-btn { margin: 0; }
+#login-modal .provider-login-footer span { color: rgba(255,255,255,.40); font-size: 10px; text-align: right; }
+
+/* ---------- Responsive shell ---------- */
+body.desktop-shell #search-area {
+  max-width: min(760px, calc(100vw - 390px));
+}
+
+body.desktop-shell.ui-wide #search-area.peek,
+body.desktop-shell.desktop-fullscreen #search-area.peek,
+html:fullscreen body.desktop-shell #search-area.peek {
+  left: 50% !important;
+  right: auto !important;
+  width: min(720px, 48vw) !important;
+  max-width: calc(100vw - 520px) !important;
+  transform: translate3d(-50%, 0, 0) !important;
+}
+
+body.desktop-shell.ui-windowed #search-area.peek {
+  left: clamp(184px, 19vw, 300px) !important;
+  right: clamp(205px, 20vw, 330px) !important;
+  width: auto !important;
+  max-width: none !important;
+  transform: translate3d(0, 0, 0) !important;
+}
+
+body.desktop-shell #top-right {
+  right: var(--sy-edge) !important;
+  max-width: min(390px, 38vw);
+}
+
+body.desktop-shell #bottom-bar,
+body.desktop-shell #bottom-bar.stage-mode,
+body.desktop-shell.simple-mode #bottom-bar,
+body.desktop-shell.diy-mode #bottom-bar,
+body.desktop-shell.diy-mode #bottom-bar.stage-mode {
+  width: min(1180px, calc(100vw - 2 * var(--sy-edge))) !important;
+  max-width: none !important;
+  left: 50% !important;
+  right: auto !important;
+  transform: translate3d(-50%, var(--bottom-bar-shift-y, 0), 0) !important;
+}
+
+body.desktop-shell #controls,
+body.desktop-shell.simple-mode #controls,
+body.desktop-shell.diy-mode #controls {
+  min-width: 0;
+  grid-template-columns: minmax(250px, 1fr) auto minmax(250px, 1fr) !important;
+  column-gap: clamp(9px, 1.2vw, 18px) !important;
+}
+
+body.desktop-shell #controls .control-cluster { min-width: 0; }
+body.desktop-shell #controls .actions { justify-self: stretch; }
+body.desktop-shell #controls .transport { justify-self: center; }
+body.desktop-shell #controls .modes { justify-self: end; }
+body.desktop-shell .control-track { min-width: 0; }
+body.desktop-shell .control-meta { min-width: 0; }
+body.desktop-shell .control-title,
+body.desktop-shell .control-artist { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+body.desktop-shell #playlist-panel {
+  top: clamp(62px, 7vh, 82px) !important;
+  left: var(--sy-edge) !important;
+  width: clamp(310px, 26vw, 390px) !important;
+  max-height: calc(100vh - var(--sy-bottom-reserve)) !important;
+}
+
+body.desktop-shell #fx-panel {
+  right: var(--sy-edge) !important;
+  max-width: min(390px, calc(100vw - 2 * var(--sy-edge))) !important;
+  max-height: calc(100vh - var(--sy-bottom-reserve)) !important;
+}
+
+body.desktop-shell.ui-short #playlist-panel,
+body.desktop-shell.ui-short #fx-panel {
+  top: 55px !important;
+  max-height: calc(100vh - 82px) !important;
+}
+
+body.desktop-shell.ui-compact #search-area.peek {
+  left: 170px !important;
+  right: 205px !important;
+}
+
+body.desktop-shell.ui-compact #bottom-bar,
+body.desktop-shell.ui-compact #bottom-bar.stage-mode,
+body.desktop-shell.ui-compact.simple-mode #bottom-bar,
+body.desktop-shell.ui-compact.diy-mode #bottom-bar,
+body.desktop-shell.ui-compact.diy-mode #bottom-bar.stage-mode {
+  width: calc(100vw - 22px) !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+body.desktop-shell.ui-compact #controls,
+body.desktop-shell.ui-compact.simple-mode #controls,
+body.desktop-shell.ui-compact.diy-mode #controls {
+  grid-template-columns: minmax(210px, 1fr) auto !important;
+  grid-template-areas:
+    "actions transport"
+    "modes modes";
+  row-gap: 8px !important;
+}
+
+body.desktop-shell.ui-compact #controls .actions { grid-area: actions; }
+body.desktop-shell.ui-compact #controls .transport { grid-area: transport; }
+body.desktop-shell.ui-compact #controls .modes {
+  grid-area: modes;
+  width: 100%;
+  justify-self: stretch;
+  justify-content: flex-end;
+}
+
+body.desktop-shell.ui-narrow #search-area.peek {
+  top: 54px !important;
+  left: 12px !important;
+  right: 12px !important;
+  width: auto !important;
+  transform: none !important;
+}
+
+body.desktop-shell.ui-narrow #top-right {
+  top: 8px !important;
+  right: 10px !important;
+  max-width: calc(100vw - 100px);
+}
+
+body.desktop-shell.ui-narrow #playlist-panel,
+body.desktop-shell.ui-narrow #fx-panel {
+  top: 104px !important;
+  width: min(380px, calc(100vw - 24px)) !important;
+  max-height: calc(100vh - 126px) !important;
+}
+
+body.desktop-shell.ui-narrow #playlist-panel { left: 12px !important; }
+body.desktop-shell.ui-narrow #fx-panel { right: 12px !important; }
+
+body.desktop-shell.ui-narrow #controls,
+body.desktop-shell.ui-narrow.simple-mode #controls,
+body.desktop-shell.ui-narrow.diy-mode #controls {
+  grid-template-columns: minmax(0,1fr) !important;
+  grid-template-areas:
+    "actions"
+    "transport"
+    "modes";
+  row-gap: 7px !important;
+}
+
+body.desktop-shell.ui-narrow #controls .actions,
+body.desktop-shell.ui-narrow #controls .transport,
+body.desktop-shell.ui-narrow #controls .modes {
+  width: 100%;
+  justify-self: stretch;
+  justify-content: center;
+}
+
+body.desktop-shell.ui-narrow #controls .actions { justify-content: flex-start; }
+body.desktop-shell.ui-narrow #controls .modes { overflow-x: auto; scrollbar-width: none; }
+body.desktop-shell.ui-narrow #controls .modes::-webkit-scrollbar { display: none; }
+
+body.desktop-shell.ui-short #bottom-bar,
+body.desktop-shell.ui-short #bottom-bar.stage-mode {
+  bottom: 8px !important;
+}
+
+body.desktop-shell.ui-short #controls,
+body.desktop-shell.ui-short.simple-mode #controls,
+body.desktop-shell.ui-short.diy-mode #controls {
+  row-gap: 5px !important;
+}
+
+/* ---------- Playlist scrolling performance ---------- */
+/* Keep only compositor/virtual-list hints here. Visual surface properties are
+   intentionally inherited from the original Mineradio repository index.css,
+   so the playlist retains its original color, glass opacity, border and blur. */
+#playlist-panel {
+  scroll-behavior: auto !important;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+  overflow-anchor: none;
+  contain: layout paint style;
+  content-visibility: auto;
+}
+
+#playlist-panel .playlist-panel-sticky,
+#playlist-panel .queue-toolbar {
+  contain: layout paint style;
+}
+
+#playlist-panel .queue-item,
+#playlist-panel .pl-card,
+#playlist-panel .pl-detail-row,
+#playlist-panel .podcast-child-row {
+  contain: layout paint style;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 58px;
+}
+
+#playlist-panel img {
+  content-visibility: auto;
+  contain: paint;
+  object-fit: cover;
+}
+
+#playlist-panel.is-scrolling *,
+#playlist-panel.is-scrolling *::before,
+#playlist-panel.is-scrolling *::after {
+  animation: none !important;
+  transition: none !important;
+  text-shadow: none !important;
+  filter: none !important;
+}
+
+#playlist-panel.is-scrolling .queue-item:hover,
+#playlist-panel.is-scrolling .pl-card:hover,
+#playlist-panel.is-scrolling .pl-detail-row:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.playlist-empty-state {
+  padding: 22px 14px;
+  text-align: center;
+  color: rgba(255,255,255,.48);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #playlist-panel *,
+  #login-modal * {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}
+
+@media (max-width: 760px), (max-height: 620px) {
+  #login-modal .provider-login-modal {
+    max-height: calc(100vh - 16px);
+    overflow: auto;
+    border-radius: 18px;
+  }
+
+  #login-modal .provider-login-grid {
+    grid-template-columns: 1fr;
+    padding: 12px 12px 0;
+  }
+
+  #login-modal .provider-login-workspace { margin: 12px 12px 0; }
+  #login-modal .provider-login-footer { padding: 12px; align-items: flex-start; }
+  #login-modal .provider-login-footer span { display: none; }
+  #login-modal .provider-config-group { grid-template-columns: 1fr; }
+  #login-modal .provider-config-uri,
+  #login-modal .provider-config-group > .modal-btn { grid-column: 1; }
+}
+
+@media (max-width: 540px) {
+  #login-modal .provider-login-head {
+    grid-template-columns: minmax(0,1fr) auto;
+  }
+  #login-modal .login-reset-all-btn { display: none; }
+  #login-modal .provider-login-card {
+    grid-template-columns: 38px minmax(0,1fr);
+  }
+  #login-modal .provider-login-state { grid-column: 2; justify-self: start; }
+  #login-modal .provider-login-title-row { grid-template-columns: 1fr; }
+  #login-modal .provider-status-badge { justify-self: start; }
+}
+
+/* Keep the language selector clear of account controls in every window state. */
+#shinayuu-language-control {
+  top: auto !important;
+  right: var(--sy-edge) !important;
+  bottom: clamp(104px, 13vh, 142px) !important;
+  z-index: 100001 !important;
+}
+body.ui-short #shinayuu-language-control { bottom: 92px !important; }
+body.ui-narrow #shinayuu-language-control {
+  right: 10px !important;
+  bottom: 92px !important;
+}
+
+body.desktop-shell.ui-fullscreen #search-area.peek {
+  left: 50% !important;
+  right: auto !important;
+  width: min(720px, 48vw) !important;
+  max-width: calc(100vw - 520px) !important;
+  transform: translate3d(-50%, 0, 0) !important;
+}
+body.desktop-shell.ui-fullscreen #playlist-panel {
+  width: clamp(340px, 22vw, 430px) !important;
+}
+
+
+/* ---------- Extra window/fullscreen compaction ---------- */
+body.desktop-shell.ui-ultrawide #bottom-bar,
+body.desktop-shell.ui-ultrawide #bottom-bar.stage-mode {
+  width: min(1320px, calc(100vw - 2 * var(--sy-edge))) !important;
+}
+
+body.desktop-shell.ui-ultrawide #search-area.peek {
+  width: min(820px, 44vw) !important;
+}
+
+body.desktop-shell.ui-windowed.ui-compact #playlist-panel {
+  width: clamp(292px, 28vw, 350px) !important;
+}
+
+body.desktop-shell.ui-windowed.ui-compact #fx-panel {
+  width: clamp(300px, 30vw, 360px) !important;
+}
+
+body.desktop-shell.ui-very-short #playlist-panel,
+body.desktop-shell.ui-very-short #fx-panel {
+  top: 48px !important;
+  max-height: calc(100vh - 64px) !important;
+}
+
+body.desktop-shell.ui-very-short #bottom-bar,
+body.desktop-shell.ui-very-short #bottom-bar.stage-mode {
+  bottom: 4px !important;
+  padding-top: 7px !important;
+  padding-bottom: 7px !important;
+}
+
+body.desktop-shell.ui-very-short #controls,
+body.desktop-shell.ui-very-short.simple-mode #controls,
+body.desktop-shell.ui-very-short.diy-mode #controls {
+  row-gap: 3px !important;
+}
+
+body.desktop-shell.ui-fullscreen #fx-panel,
+body.desktop-shell.ui-fullscreen #playlist-panel {
+  top: clamp(66px, 7vh, 90px) !important;
+  max-height: calc(100vh - clamp(112px, 13vh, 154px)) !important;
+}
+
+@media (max-width: 1100px) and (min-width: 901px) {
+  body.desktop-shell #search-area.peek {
+    left: 150px !important;
+    right: 176px !important;
+  }
+  body.desktop-shell #top-right { max-width: 330px; }
+}
+
+
+/* ShinaYuu .9 staged startup: avoid expensive glass composition while the
+   first renderer frame, provider state and playlist cache are settling. */
+html.startup-settling #playlist-panel,
+html.startup-settling #fx-panel,
+html.startup-settling #bottom-bar,
+html.startup-settling #search-area,
+html.startup-settling .home-dashboard-shell,
+html.startup-settling .playlist-detail-shell {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+html.startup-settling #playlist-panel *,
+html.startup-settling #fx-panel *,
+html.startup-settling .home-dashboard-shell * {
+  transition-duration: 1ms !important;
+  transition-delay: 0ms !important;
+}

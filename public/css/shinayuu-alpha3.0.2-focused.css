@@ -1,0 +1,80 @@
+/* ShinaYuu Music 2.0 alpha.3.0.2 — focused runtime corrections only. */
+
+/* Search: old fullscreen .peek rules carried more specificity than the
+   alpha.3.0.1 base rule and left the outer area at left:50%/720px.  Reset the
+   exact visible states to the full host width, then center only the inner stack. */
+html body.desktop-shell #search-area,
+html body.desktop-shell #search-area.peek,
+html body.desktop-shell.ui-wide #search-area,
+html body.desktop-shell.ui-wide #search-area.peek,
+html body.desktop-shell.ui-windowed #search-area,
+html body.desktop-shell.ui-windowed #search-area.peek,
+html body.desktop-shell.ui-compact #search-area,
+html body.desktop-shell.ui-compact #search-area.peek,
+html body.desktop-shell.ui-narrow #search-area,
+html body.desktop-shell.ui-narrow #search-area.peek,
+html body.desktop-shell.ui-fullscreen #search-area,
+html body.desktop-shell.ui-fullscreen #search-area.peek,
+html body.desktop-shell.ui-ultrawide #search-area,
+html body.desktop-shell.ui-ultrawide #search-area.peek,
+html body.desktop-shell.desktop-fullscreen #search-area,
+html body.desktop-shell.desktop-fullscreen #search-area.peek,
+html:fullscreen body.desktop-shell #search-area,
+html:fullscreen body.desktop-shell #search-area.peek {
+  position: fixed !important;
+  inset-inline: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100vw !important;
+  max-width: none !important;
+  margin: 0 !important;
+  transform: none !important;
+  display: block !important;
+  pointer-events: none !important;
+}
+
+html body.desktop-shell #search-stack,
+html body.desktop-shell #search-area.stage-mode #search-stack {
+  position: absolute !important;
+  left: 50% !important;
+  right: auto !important;
+  width: min(620px, calc(100vw - 150px)) !important;
+  max-width: 620px !important;
+  margin: 0 !important;
+  transform: translate3d(-50%, -112px, 0) !important;
+  transform-origin: 50% 0 !important;
+}
+
+html body.desktop-shell #search-area.peek #search-stack,
+html body.desktop-shell.ui-fullscreen #search-area.peek #search-stack,
+html body.desktop-shell.desktop-fullscreen #search-area.peek #search-stack,
+html:fullscreen body.desktop-shell #search-area.peek #search-stack {
+  transform: translate3d(-50%, 0, 0) !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+html body.desktop-shell #upload-actions,
+html body.desktop-shell #search-area.peek #upload-actions {
+  left: calc(50% + 322px) !important;
+  right: auto !important;
+}
+
+@media (max-width: 820px) {
+  html body.desktop-shell #search-stack,
+  html body.desktop-shell #search-area.stage-mode #search-stack {
+    width: calc(100vw - 96px) !important;
+  }
+  html body.desktop-shell #upload-actions,
+  html body.desktop-shell #search-area.peek #upload-actions {
+    left: auto !important;
+    right: 7px !important;
+  }
+}
+
+@media (max-width: 560px) {
+  html body.desktop-shell #search-stack,
+  html body.desktop-shell #search-area.stage-mode #search-stack {
+    width: calc(100vw - 20px) !important;
+  }
+}

@@ -1,0 +1,98 @@
+/* ShinaYuu Music 2.0 alpha.3.0.4
+   Focused UI adjustments only:
+   - Keep provider/language tabs and search results tightly attached to Search.
+   - Add a persisted surface-opacity control for the visual and playlist panels.
+   - Do not alter button geometry, panel positions, playback UI or animations. */
+
+ :root {
+  --sy-control-panel-alpha: .90;
+  --sy-control-panel-sticky-alpha: .86;
+  --sy-control-panel-card-alpha: .72;
+  --sy-left-shelf-alpha: .90;
+  --sy-left-shelf-sticky-alpha: .86;
+  --sy-left-shelf-card-alpha: .72;
+}
+
+/* The complete Search stack should read as one compact unit, matching the
+   established ShinaYuu 1.1.8.x hierarchy. */
+#search-mode-tabs,
+#search-area .search-mode-tabs {
+  margin-top: -2px !important;
+  position: relative !important;
+  z-index: 3 !important;
+}
+
+#search-stack > #search-results,
+#search-results,
+#search-results.show,
+#search-results.search-history-surface {
+  margin-top: 3px !important;
+}
+
+/* Liquid Glass changes only glass surface alpha. Text, buttons, layout,
+   hitboxes and animation geometry remain untouched. */
+html.sy-control-panel-opacity-custom #fx-panel {
+  background-color: rgba(0, 0, 0, var(--sy-control-panel-alpha)) !important;
+}
+html.sy-control-panel-opacity-custom #fx-panel .fx-console-group,
+html.sy-control-panel-opacity-custom #fx-panel .fx-fold {
+  background-color: rgba(0, 0, 0, var(--sy-control-panel-sticky-alpha)) !important;
+}
+html.sy-control-panel-opacity-custom #fx-panel .preset-card,
+html.sy-control-panel-opacity-custom #fx-panel .lyric-color-row,
+html.sy-control-panel-opacity-custom #fx-panel .fx-toggle,
+html.sy-control-panel-opacity-custom #fx-panel .quality-option {
+  background-color: rgba(0, 0, 0, var(--sy-control-panel-card-alpha)) !important;
+}
+
+html.sy-left-shelf-opacity-custom #playlist-panel {
+  background-color: rgba(0, 0, 0, var(--sy-left-shelf-alpha)) !important;
+}
+html.sy-left-shelf-opacity-custom #playlist-panel .playlist-panel-sticky,
+html.sy-left-shelf-opacity-custom #playlist-panel .queue-toolbar {
+  background-color: rgba(0, 0, 0, var(--sy-left-shelf-sticky-alpha)) !important;
+}
+html.sy-left-shelf-opacity-custom #playlist-panel .pl-card,
+html.sy-left-shelf-opacity-custom #playlist-panel .queue-item,
+html.sy-left-shelf-opacity-custom #playlist-panel .pl-detail-row,
+html.sy-left-shelf-opacity-custom #playlist-panel .podcast-child-row {
+  background-color: rgba(0, 0, 0, var(--sy-left-shelf-card-alpha)) !important;
+}
+
+/* Keep the new slider visually identical to existing FX sliders. */
+#sy-panel-opacity-control,
+#sy-left-shelf-opacity-control,
+#sy-right-shelf-opacity-control {
+  scroll-margin-top: 14px;
+}
+
+/* The update checker is deliberately the final Advanced block and keeps
+   the compact two-column button language from ShinaYuu 1.1.8.x. */
+#shinayuu-update-last-section {
+  margin-top: 14px;
+  padding-top: 2px;
+}
+#fx-check-update-btn {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 11px;
+  border: 1px solid rgba(var(--fc-accent-rgb), .22);
+  border-radius: 10px;
+  background: rgba(var(--fc-accent-rgb), .065);
+  color: rgba(255,255,255,.88);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .18s, border-color .18s, transform .18s, opacity .18s;
+}
+#fx-check-update-btn:hover {
+  background: rgba(var(--fc-accent-rgb), .11);
+  border-color: rgba(var(--fc-accent-rgb), .38);
+  transform: translateY(-1px);
+}
+#fx-check-update-btn:disabled { cursor: wait; opacity: .64; transform: none; }
+#fx-check-update-main { font-size: 11.5px; font-weight: 760; letter-spacing: .25px; text-align: left; }
+#fx-check-update-status { font-size: 9.5px; color: rgba(255,255,255,.42); text-align: right; max-width: 58%; line-height: 1.35; }

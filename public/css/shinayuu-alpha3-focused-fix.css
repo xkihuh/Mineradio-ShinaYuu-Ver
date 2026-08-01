@@ -1,0 +1,403 @@
+/* ShinaYuu Music 2.0 alpha.3.0.1
+   Focused corrections only: provider login layout and exact Search centering.
+   No global button, panel, glass, playback-bar, playlist or Home restyle. */
+
+/* -------------------------------------------------------------------------
+   Provider login
+   The legacy .login-panel-head rule in index.css is position:absolute. Alpha 3
+   did not reset the head itself, so the title/reset/close row was painted on
+   top of the provider cards. Keep the existing visual language, but restore a
+   normal document-flow layout and remove the forced empty modal height.
+   ------------------------------------------------------------------------- */
+#login-modal {
+  box-sizing: border-box !important;
+  padding: clamp(10px, 2.1vw, 20px) !important;
+  overflow: hidden !important;
+}
+
+#login-modal .provider-login-modal {
+  width: min(820px, calc(100vw - 24px)) !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: calc(100vh - 24px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  overflow: hidden !important;
+}
+
+#login-modal .provider-login-head {
+  position: relative !important;
+  inset: auto !important;
+  top: auto !important;
+  right: auto !important;
+  left: auto !important;
+  bottom: auto !important;
+  width: 100% !important;
+  min-height: 58px !important;
+  box-sizing: border-box !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto auto !important;
+  align-items: center !important;
+  justify-content: initial !important;
+  gap: 8px !important;
+  padding: 12px 14px 11px 16px !important;
+  margin: 0 !important;
+  flex: 0 0 auto !important;
+}
+
+#login-modal .provider-login-head > div:first-child {
+  display: block !important;
+  min-width: 0 !important;
+  position: static !important;
+}
+
+#login-modal .provider-login-head > div:first-child b,
+#login-modal .provider-login-head > div:first-child small {
+  display: block !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+#login-modal .login-reset-all-btn,
+#login-modal .login-panel-close {
+  position: static !important;
+  inset: auto !important;
+  transform: none !important;
+  margin: 0 !important;
+  flex: 0 0 auto !important;
+}
+
+#login-modal .provider-login-grid {
+  position: relative !important;
+  inset: auto !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  padding: 10px 14px 0 !important;
+  margin: 0 !important;
+  flex: 0 0 auto !important;
+}
+
+#login-modal .provider-login-card {
+  position: relative !important;
+  inset: auto !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 68px !important;
+  height: auto !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 9px 10px !important;
+  display: grid !important;
+  grid-template-columns: 40px minmax(0, 1fr) !important;
+  grid-template-rows: auto auto !important;
+  align-items: center !important;
+  column-gap: 9px !important;
+  row-gap: 2px !important;
+  overflow: hidden !important;
+}
+
+#login-modal .provider-login-logo {
+  grid-column: 1 !important;
+  grid-row: 1 / 3 !important;
+}
+
+#login-modal .provider-login-copy {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  min-width: 0 !important;
+}
+
+#login-modal .provider-login-copy b,
+#login-modal .provider-login-copy small,
+#login-modal .provider-login-state {
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+#login-modal .provider-login-state {
+  grid-column: 2 !important;
+  grid-row: 2 !important;
+  justify-self: start !important;
+}
+
+#login-modal .provider-login-workspace {
+  position: relative !important;
+  inset: auto !important;
+  width: auto !important;
+  min-height: 0 !important;
+  max-height: min(430px, calc(100vh - 248px)) !important;
+  box-sizing: border-box !important;
+  margin: 10px 14px 0 !important;
+  padding: 0 3px 2px 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  flex: 0 1 auto !important;
+}
+
+#login-modal .provider-login-summary,
+#login-modal .provider-config-shell {
+  position: relative !important;
+  inset: auto !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+#login-modal .provider-login-title-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: start !important;
+  gap: 9px !important;
+}
+
+#login-modal .provider-login-actions {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 7px !important;
+}
+
+#login-modal .provider-login-actions .modal-btn {
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  white-space: normal !important;
+}
+
+#login-modal .provider-config-toggle,
+#login-modal .provider-config-panel,
+#login-modal .provider-config-group {
+  position: relative !important;
+  inset: auto !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+#login-modal .provider-config-panel {
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+#login-modal .provider-config-group {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 7px !important;
+}
+
+#login-modal .provider-config-group input {
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+#login-modal .provider-config-uri {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 7px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+#login-modal .provider-config-uri code {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+#login-modal .provider-login-footer {
+  position: relative !important;
+  inset: auto !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin: 0 !important;
+  padding: 10px 14px 13px !important;
+  flex: 0 0 auto !important;
+}
+
+#login-modal .provider-login-footer span {
+  min-width: 0 !important;
+  text-align: right !important;
+  overflow-wrap: anywhere !important;
+}
+
+@media (max-width: 700px), (max-height: 640px) {
+  #login-modal { padding: 7px !important; overflow: auto !important; }
+  #login-modal .provider-login-modal {
+    width: calc(100vw - 14px) !important;
+    max-height: calc(100vh - 14px) !important;
+  }
+  #login-modal .provider-login-head {
+    min-height: 50px !important;
+    padding: 9px 10px !important;
+  }
+  #login-modal .provider-login-head > div:first-child small { display: none !important; }
+  #login-modal .provider-login-grid {
+    grid-template-columns: 1fr !important;
+    padding: 7px 9px 0 !important;
+    gap: 6px !important;
+  }
+  #login-modal .provider-login-card { min-height: 58px !important; }
+  #login-modal .provider-login-workspace {
+    max-height: none !important;
+    margin: 7px 9px 0 !important;
+    overflow: visible !important;
+  }
+  #login-modal .provider-login-title-row { grid-template-columns: 1fr !important; }
+  #login-modal .provider-status-badge { justify-self: start !important; }
+  #login-modal .provider-login-actions { grid-template-columns: 1fr !important; }
+  #login-modal .provider-config-uri { grid-template-columns: minmax(0, 1fr) auto !important; }
+  #login-modal .provider-config-uri > span { grid-column: 1 / -1 !important; }
+  #login-modal .provider-login-footer {
+    grid-template-columns: 1fr !important;
+    padding: 8px 9px 10px !important;
+  }
+  #login-modal .provider-login-footer span { display: none !important; }
+}
+
+/* -------------------------------------------------------------------------
+   Search
+   Keep the outer fixed layer at full viewport width. Only the centered inner
+   stack moves vertically, so windowed/fullscreen entrance never acquires an X
+   transition and the bar's measured center is always exactly 50vw.
+   ------------------------------------------------------------------------- */
+#search-area,
+body.desktop-shell #search-area,
+body.desktop-shell.ui-wide #search-area,
+body.desktop-shell.ui-windowed #search-area,
+body.desktop-shell.ui-compact #search-area,
+body.desktop-shell.ui-narrow #search-area,
+body.desktop-shell.ui-fullscreen #search-area,
+body.desktop-shell.ui-ultrawide #search-area,
+body.desktop-shell.desktop-fullscreen #search-area,
+html:fullscreen body.desktop-shell #search-area {
+  --sy-focused-search-width: min(620px, calc(100vw - 150px));
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: 25px !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block !important;
+  transform: none !important;
+  opacity: 1 !important;
+  pointer-events: none !important;
+  contain: layout style !important;
+}
+
+body.desktop-shell.ui-fullscreen #search-area,
+body.desktop-shell.desktop-fullscreen #search-area,
+html:fullscreen body.desktop-shell #search-area {
+  top: 15px !important;
+}
+
+#search-stack,
+#search-area.stage-mode #search-stack {
+  position: relative !important;
+  left: 50% !important;
+  right: auto !important;
+  width: var(--sy-focused-search-width) !important;
+  max-width: 620px !important;
+  margin: 0 !important;
+  transform: translate3d(-50%, -112px, 0) !important;
+  opacity: 0 !important;
+  transition: transform .44s cubic-bezier(.16, 1, .30, 1), opacity .28s ease !important;
+  will-change: transform, opacity !important;
+  backface-visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+#search-area.peek #search-stack,
+body.desktop-shell #search-area.peek #search-stack,
+body.desktop-shell.ui-fullscreen #search-area.peek #search-stack,
+body.desktop-shell.desktop-fullscreen #search-area.peek #search-stack,
+html:fullscreen body.desktop-shell #search-area.peek #search-stack {
+  transform: translate3d(-50%, 0, 0) !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+#search-area.peek,
+body.desktop-shell #search-area.peek,
+body.desktop-shell.ui-fullscreen #search-area.peek,
+body.desktop-shell.desktop-fullscreen #search-area.peek,
+html:fullscreen body.desktop-shell #search-area.peek {
+  transform: none !important;
+  opacity: 1 !important;
+  pointer-events: none !important;
+}
+
+#search-box { width: 100% !important; box-sizing: border-box !important; }
+
+#search-mode-tabs,
+#search-area .search-mode-tabs {
+  margin: 2px auto 0 !important;
+}
+
+#search-area #shinayuu-language-control,
+#shinayuu-language-control {
+  position: static !important;
+  inset: auto !important;
+  margin: 0 0 0 3px !important;
+  transform: none !important;
+}
+
+#upload-actions,
+body.desktop-shell:not(.desktop-fullscreen) #upload-actions,
+body.desktop-shell.desktop-fullscreen #upload-actions,
+html:fullscreen body.desktop-shell #upload-actions {
+  position: absolute !important;
+  top: 0 !important;
+  left: calc(50% + 322px) !important;
+  right: auto !important;
+  margin: 0 !important;
+  transform: translate3d(0, -112px, 0) !important;
+  opacity: 0 !important;
+  transition: transform .44s cubic-bezier(.16, 1, .30, 1), opacity .28s ease !important;
+  pointer-events: none !important;
+}
+
+#search-area.peek #upload-actions {
+  transform: translate3d(0, 0, 0) !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+@media (max-width: 820px) {
+  #search-area,
+  body.desktop-shell #search-area,
+  body.desktop-shell.ui-narrow #search-area,
+  body.desktop-shell.ui-compact #search-area {
+    --sy-focused-search-width: calc(100vw - 96px);
+    top: 50px !important;
+  }
+  #upload-actions { left: auto !important; right: 7px !important; }
+}
+
+@media (max-width: 560px) {
+  #search-area,
+  body.desktop-shell #search-area,
+  body.desktop-shell.ui-narrow #search-area {
+    --sy-focused-search-width: calc(100vw - 20px);
+  }
+  #upload-actions { display: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #search-stack,
+  #upload-actions { transition-duration: .01ms !important; }
+}

@@ -1,0 +1,366 @@
+/* ShinaYuu Music 2.0 alpha.3 — runtime, OAuth, metadata and glass UI fixes */
+
+:root{
+  --sy-glass-bg:linear-gradient(145deg,rgba(255,255,255,.105),rgba(16,20,29,.52) 46%,rgba(4,6,11,.46));
+  --sy-glass-bg-soft:linear-gradient(145deg,rgba(255,255,255,.075),rgba(11,14,22,.42) 50%,rgba(2,4,8,.38));
+  --sy-glass-border:rgba(255,255,255,.13);
+  --sy-glass-shadow:0 18px 58px rgba(0,0,0,.30),inset 0 1px 0 rgba(255,255,255,.16),inset 0 -1px 0 rgba(255,255,255,.05);
+  --sy-glass-filter:blur(17px) saturate(1.24) brightness(1.04);
+}
+
+/* Search is centered without translateX. Its entrance owns only the Y axis,
+   matching the original ShinaYuu vertical reveal in windowed and fullscreen. */
+#search-area,
+body.desktop-shell #search-area,
+body.desktop-shell.desktop-fullscreen #search-area,
+html:fullscreen body.desktop-shell #search-area{
+  left:0!important;
+  right:0!important;
+  top:25px!important;
+  margin-inline:auto!important;
+  width:min(760px,calc(100vw - 44px))!important;
+  max-width:760px!important;
+  transform:translate3d(0,-118px,0)!important;
+  opacity:0!important;
+  transition:transform .44s cubic-bezier(.16,1,.30,1),opacity .28s ease!important;
+  will-change:transform,opacity!important;
+  backface-visibility:hidden!important;
+  contain:layout style!important;
+}
+#search-area.peek,
+body.desktop-shell #search-area.peek,
+body.desktop-shell.desktop-fullscreen #search-area.peek,
+html:fullscreen body.desktop-shell #search-area.peek{
+  transform:translate3d(0,0,0)!important;
+  opacity:1!important;
+  pointer-events:auto!important;
+}
+body.desktop-shell.desktop-fullscreen #search-area,
+html:fullscreen body.desktop-shell #search-area{top:15px!important}
+#search-area.stage-mode,
+#search-area.stage-mode.peek{top:18px!important}
+#search-stack,
+#search-area.stage-mode #search-stack{
+  width:min(620px,calc(100% - 94px))!important;
+  max-width:620px!important;
+  margin:0 auto!important;
+  gap:0!important;
+}
+#search-box{
+  width:100%!important;
+  height:54px!important;
+  border-radius:20px!important;
+  background:var(--sy-glass-bg)!important;
+  border:1px solid var(--sy-glass-border)!important;
+  box-shadow:var(--sy-glass-shadow)!important;
+  backdrop-filter:var(--sy-glass-filter)!important;
+  -webkit-backdrop-filter:var(--sy-glass-filter)!important;
+  transform:translateZ(0)!important;
+}
+#search-mode-tabs,
+#search-area .search-mode-tabs{
+  width:max-content!important;
+  max-width:100%!important;
+  margin:2px auto 0!important;
+  padding:3px!important;
+  gap:3px!important;
+  flex-wrap:nowrap!important;
+  overflow-x:auto!important;
+  overflow-y:hidden!important;
+  overscroll-behavior-inline:contain!important;
+  scrollbar-width:none!important;
+  background:rgba(7,10,16,.36)!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  box-shadow:0 8px 26px rgba(0,0,0,.20),inset 0 1px 0 rgba(255,255,255,.10)!important;
+  backdrop-filter:blur(13px) saturate(1.18)!important;
+  -webkit-backdrop-filter:blur(13px) saturate(1.18)!important;
+}
+#search-mode-tabs::-webkit-scrollbar{display:none!important}
+#search-mode-tabs>button,
+#shinayuu-language-control button{
+  height:23px!important;
+  padding:0 8px!important;
+  font-size:9.2px!important;
+  white-space:nowrap!important;
+  flex:0 0 auto!important;
+}
+#shinayuu-language-control{
+  margin:0!important;
+  padding:2px!important;
+  gap:2px!important;
+  border-color:rgba(255,255,255,.10)!important;
+  background:rgba(255,255,255,.055)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08)!important;
+}
+#upload-actions{top:0!important;right:0!important;transform:translateZ(0)!important}
+#search-results{top:60px!important}
+
+@media(max-width:760px){
+  #search-area,body.desktop-shell #search-area{top:54px!important;width:calc(100vw - 18px)!important}
+  #search-stack,#search-area.stage-mode #search-stack{width:calc(100% - 72px)!important}
+  #search-mode-tabs>button,#shinayuu-language-control button{padding:0 7px!important;font-size:8.8px!important}
+}
+@media(max-width:540px){
+  #search-stack,#search-area.stage-mode #search-stack{width:calc(100% - 62px)!important}
+  #search-mode-tabs{justify-content:flex-start!important;max-width:100%!important}
+}
+@media(prefers-reduced-motion:reduce){
+  #search-area,#playlist-panel{transition-duration:.01ms!important}
+}
+
+/* Login: one strict responsive grid. No inherited absolute positioning or
+   flex sizing may place controls on top of each other. */
+#login-modal{padding:18px!important;overflow:auto!important;overscroll-behavior:contain!important}
+#login-modal .provider-login-modal{
+  width:min(850px,calc(100vw - 36px))!important;
+  max-width:850px!important;
+  height:min(760px,calc(100vh - 36px))!important;
+  max-height:min(760px,calc(100vh - 36px))!important;
+  min-height:0!important;
+  padding:0!important;
+  display:grid!important;
+  grid-template-rows:auto auto minmax(0,1fr) auto!important;
+  gap:0!important;
+  overflow:hidden!important;
+  border:1px solid var(--sy-glass-border)!important;
+  border-radius:25px!important;
+  background:var(--sy-glass-bg)!important;
+  box-shadow:0 34px 110px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.17)!important;
+  backdrop-filter:blur(22px) saturate(1.26)!important;
+  -webkit-backdrop-filter:blur(22px) saturate(1.26)!important;
+}
+#login-modal .provider-login-head{
+  margin:0!important;
+  padding:16px 18px!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto auto!important;
+  align-items:center!important;
+  gap:9px!important;
+  border-bottom:1px solid rgba(255,255,255,.075)!important;
+}
+#login-modal .provider-login-head>*{position:static!important;inset:auto!important;transform:none!important;min-width:0!important}
+#login-modal .provider-login-head>div:first-child{min-width:0!important}
+#login-modal .login-reset-all-btn,#login-modal .login-panel-close{margin:0!important;align-self:center!important}
+#login-modal .provider-login-grid{
+  margin:0!important;
+  padding:12px 16px 0!important;
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:10px!important;
+  min-width:0!important;
+}
+#login-modal .provider-login-card{
+  position:relative!important;
+  inset:auto!important;
+  width:100%!important;
+  min-width:0!important;
+  min-height:76px!important;
+  height:auto!important;
+  margin:0!important;
+  padding:11px!important;
+  display:grid!important;
+  grid-template-columns:42px minmax(0,1fr)!important;
+  grid-template-rows:auto auto!important;
+  gap:3px 9px!important;
+  align-items:center!important;
+  overflow:hidden!important;
+  background:var(--sy-glass-bg-soft)!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10)!important;
+}
+#login-modal .provider-login-logo{grid-column:1!important;grid-row:1/3!important}
+#login-modal .provider-login-copy{grid-column:2!important;grid-row:1!important;min-width:0!important}
+#login-modal .provider-login-copy b,#login-modal .provider-login-copy small{display:block!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
+#login-modal .provider-login-state{grid-column:2!important;grid-row:2!important;justify-self:start!important;max-width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
+#login-modal .provider-login-workspace{
+  margin:12px 16px 0!important;
+  padding:0 3px 4px 0!important;
+  min-height:0!important;
+  overflow:auto!important;
+  overscroll-behavior:contain!important;
+  display:block!important;
+}
+#login-modal .provider-login-summary,#login-modal .provider-config-shell{
+  min-width:0!important;
+  padding:13px!important;
+  border-radius:16px!important;
+  background:rgba(255,255,255,.045)!important;
+  border:1px solid rgba(255,255,255,.08)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07)!important;
+}
+#login-modal .provider-login-title-row{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  align-items:start!important;
+  gap:10px!important;
+}
+#login-modal .provider-login-title-row>*{min-width:0!important}
+#login-modal .provider-login-actions{
+  margin-top:11px!important;
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:8px!important;
+}
+#login-modal .provider-login-actions .modal-btn{
+  width:100%!important;
+  min-width:0!important;
+  min-height:38px!important;
+  margin:0!important;
+  padding:8px 10px!important;
+  white-space:normal!important;
+  line-height:1.25!important;
+}
+#login-modal .provider-config-shell{margin-top:10px!important}
+#login-modal .provider-config-toggle{width:100%!important;position:static!important;inset:auto!important}
+#login-modal .provider-config-panel{position:static!important;inset:auto!important;width:100%!important;max-height:none!important;overflow:visible!important}
+#login-modal .provider-config-group{
+  width:100%!important;
+  min-width:0!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  gap:7px!important;
+}
+#login-modal .provider-config-group input{width:100%!important;min-width:0!important;box-sizing:border-box!important}
+#login-modal .provider-config-uri{
+  width:100%!important;
+  min-width:0!important;
+  display:grid!important;
+  grid-template-columns:auto minmax(0,1fr) auto!important;
+  align-items:center!important;
+  gap:7px!important;
+}
+#login-modal .provider-config-uri code{min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
+#login-modal .provider-config-group>.modal-btn{width:max-content!important;max-width:100%!important;margin-top:2px!important}
+#login-modal .provider-login-footer{
+  margin:0!important;
+  padding:12px 16px 15px!important;
+  display:grid!important;
+  grid-template-columns:auto minmax(0,1fr)!important;
+  align-items:center!important;
+  gap:12px!important;
+  border-top:1px solid rgba(255,255,255,.065)!important;
+}
+#login-modal .provider-login-footer .modal-btn{margin:0!important;white-space:normal!important}
+#login-modal .provider-login-footer span{min-width:0!important;text-align:right!important;overflow-wrap:anywhere!important}
+@media(max-width:700px){
+  #login-modal{padding:8px!important}
+  #login-modal .provider-login-modal{width:calc(100vw - 16px)!important;height:calc(100vh - 16px)!important;max-height:calc(100vh - 16px)!important;border-radius:18px!important}
+  #login-modal .provider-login-head{grid-template-columns:minmax(0,1fr) auto!important;padding:12px!important}
+  #login-modal .provider-login-head>div:first-child{grid-column:1!important;grid-row:1!important}
+  #login-modal .provider-login-head .login-panel-close{grid-column:2!important;grid-row:1!important}
+  #login-modal .login-reset-all-btn{grid-column:1/-1!important;grid-row:2!important;justify-self:start!important}
+  #login-modal .provider-login-grid{grid-template-columns:1fr!important;padding:9px 10px 0!important;gap:7px!important}
+  #login-modal .provider-login-workspace{margin:9px 10px 0!important}
+  #login-modal .provider-login-title-row{grid-template-columns:1fr!important}
+  #login-modal .provider-status-badge{justify-self:start!important}
+  #login-modal .provider-login-actions{grid-template-columns:1fr!important}
+  #login-modal .provider-config-uri{grid-template-columns:minmax(0,1fr) auto!important}
+  #login-modal .provider-config-uri>span{grid-column:1/-1!important}
+  #login-modal .provider-login-footer{grid-template-columns:1fr!important;padding:9px 10px 11px!important}
+  #login-modal .provider-login-footer span{text-align:left!important}
+}
+
+/* Discord uses the same compact glass settings language as the other
+   Advanced sections instead of looking like a separate profile widget. */
+.fx-discord-card{
+  margin-top:8px!important;
+  padding:12px!important;
+  border:1px solid rgba(255,255,255,.09)!important;
+  border-radius:14px!important;
+  background:var(--sy-glass-bg-soft)!important;
+  box-shadow:var(--sy-glass-shadow)!important;
+  backdrop-filter:blur(14px) saturate(1.18)!important;
+  -webkit-backdrop-filter:blur(14px) saturate(1.18)!important;
+}
+.fx-discord-summary{grid-template-columns:36px minmax(0,1fr) auto!important;gap:10px!important}
+.fx-discord-avatar-wrap{width:34px!important;height:34px!important;border-radius:10px!important;background:rgba(var(--fc-accent-rgb),.18)!important;border:1px solid rgba(var(--fc-accent-rgb),.25)!important}
+.fx-discord-avatar{border-radius:8px!important;background:rgba(255,255,255,.055)!important}
+.fx-discord-settings-btn,.fx-discord-actions .discord-card-btn{
+  min-height:30px!important;
+  padding:0 10px!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  border-radius:9px!important;
+  background:rgba(255,255,255,.055)!important;
+  color:rgba(255,255,255,.84)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07)!important;
+}
+.fx-discord-settings-btn:hover,.fx-discord-actions .discord-card-btn:hover{background:rgba(var(--fc-accent-rgb),.11)!important;border-color:rgba(var(--fc-accent-rgb),.30)!important;color:#fff!important}
+.fx-discord-details{border-top-color:rgba(255,255,255,.07)!important}
+.fx-discord-card .discord-input,.discord-setup-diagnostic{
+  background:rgba(3,6,12,.34)!important;
+  border:1px solid rgba(255,255,255,.09)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.045)!important;
+}
+
+/* Playlist panel: a single compositor transform and restrained blur prevent
+   the left shelf from hitching when it enters. */
+#playlist-panel{
+  --playlist-panel-open-ms:360ms!important;
+  --playlist-panel-close-ms:220ms!important;
+  transform:translate3d(calc(-100% - 42px),0,0)!important;
+  opacity:0!important;
+  transition:transform var(--playlist-panel-motion-ms) cubic-bezier(.16,1,.30,1),opacity calc(var(--playlist-panel-motion-ms) * .72) ease!important;
+  will-change:transform,opacity!important;
+  backface-visibility:hidden!important;
+  perspective:1000px!important;
+  contain:layout paint style!important;
+}
+#playlist-panel.show,#playlist-panel.peek{transform:translate3d(0,0,0)!important;opacity:1!important}
+#playlist-panel .queue-item,#playlist-panel .pl-card,#playlist-panel .pl-detail-row{content-visibility:auto!important;contain-intrinsic-size:62px!important;transform:translateZ(0)!important}
+
+/* Keep the feature-specific cards glassy, but let the player bar, playlist,
+   visual control panel and search results use the exact Mineradio repository
+   surface colors/opacity from index.css. */
+.modal,.home-hero,.home-card,.home-tile,.home-mosaic-cell,
+.home-dashboard-tool,.home-dashboard-modal-dialog,.provider-login-card,
+.lyric-timing-popover,.quality-popover,.volume-popover,.mini-queue-popover,
+.control-source-switcher,.track-detail-modal,.cover-crop-stage,#cuefield-feedback{
+  border-color:rgba(255,255,255,.10)!important;
+  background:var(--sy-glass-bg-soft)!important;
+  box-shadow:var(--sy-glass-shadow)!important;
+  backdrop-filter:var(--sy-glass-filter)!important;
+  -webkit-backdrop-filter:var(--sy-glass-filter)!important;
+}
+
+/* AutoMix must visibly communicate disabled/preparing/ready/mixing states. */
+#cuefield-automix-btn{position:relative!important;overflow:visible!important}
+#cuefield-automix-btn::after{
+  content:'';
+  position:absolute;
+  right:3px;
+  top:3px;
+  width:5px;
+  height:5px;
+  border-radius:50%;
+  background:rgba(255,255,255,.20);
+  box-shadow:0 0 0 2px rgba(0,0,0,.22);
+  transition:background .2s ease,box-shadow .2s ease,transform .2s ease;
+}
+#cuefield-automix-btn.active::after{background:#f2bd55;box-shadow:0 0 9px rgba(242,189,85,.70)}
+#cuefield-automix-btn.cuefield-ready::after{background:#4fe5a7;box-shadow:0 0 11px rgba(79,229,167,.82);animation:sy-am-dot 1.25s ease-in-out infinite}
+#cuefield-automix-btn.busy::after{background:#7bb9ff;box-shadow:0 0 14px rgba(123,185,255,.92);animation:sy-am-dot .52s ease-in-out infinite}
+@keyframes sy-am-dot{50%{transform:scale(1.55);opacity:.64}}
+
+/* ShinaYuu Music 2.0.8 · Discord Liquid Glass panel */
+.fx-discord-card{
+  position:relative!important;
+  overflow:hidden!important;
+  background:linear-gradient(145deg,rgba(48,39,78,.46),rgba(9,12,22,.42))!important;
+  border-color:rgba(190,176,255,.19)!important;
+  box-shadow:0 18px 54px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.08)!important;
+  backdrop-filter:blur(24px) saturate(1.32)!important;
+  -webkit-backdrop-filter:blur(24px) saturate(1.32)!important;
+}
+.fx-discord-card::before{
+  content:'';position:absolute;inset:-45% 38% 48% -18%;pointer-events:none;
+  background:radial-gradient(circle,rgba(133,105,255,.20),transparent 68%);
+}
+.fx-discord-summary,.fx-discord-now-playing,.fx-discord-details{position:relative;z-index:1}
+.fx-discord-kicker{display:block;margin-bottom:4px;font:750 7px/1 Inter,sans-serif;letter-spacing:.15em;color:rgba(182,198,255,.58)}
+.fx-discord-now-playing{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:9px;margin-top:10px;padding:9px 10px;border:1px solid rgba(255,255,255,.075);border-radius:12px;background:rgba(3,5,12,.24)}
+.fx-discord-now-icon{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:linear-gradient(145deg,rgba(126,96,230,.88),rgba(71,178,225,.80));font:800 8px/1 Inter,sans-serif;color:#fff;box-shadow:0 8px 20px rgba(0,0,0,.20)}
+.fx-discord-now-playing>span:nth-child(2){min-width:0}.fx-discord-now-playing strong,.fx-discord-now-playing small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fx-discord-now-playing strong{font:680 9.5px/1.35 Inter,sans-serif;color:rgba(255,255,255,.90)}.fx-discord-now-playing small{font:500 8px/1.35 Inter,sans-serif;color:rgba(255,255,255,.43)}
+.fx-discord-now-playing em{font:700 7.5px/1 Inter,sans-serif;font-style:normal;color:rgba(151,226,255,.70)}
+.fx-discord-field{display:grid!important;gap:4px!important;padding:9px!important;border:1px solid rgba(255,255,255,.075)!important;border-radius:12px!important;background:rgba(255,255,255,.025)!important}.fx-discord-field>small{min-height:22px;font:500 7.5px/1.4 Inter,sans-serif;color:rgba(255,255,255,.36)}
+.fx-discord-cover-toggle{display:flex;align-items:flex-start;gap:8px;margin-top:9px;padding:9px 10px;border:1px solid rgba(255,255,255,.075);border-radius:12px;background:rgba(255,255,255,.025);cursor:pointer}.fx-discord-cover-toggle input{margin-top:2px;accent-color:#8c7dff}.fx-discord-cover-toggle strong,.fx-discord-cover-toggle small{display:block}.fx-discord-cover-toggle strong{font:650 8.5px/1.3 Inter,sans-serif;color:rgba(255,255,255,.77)}.fx-discord-cover-toggle small{margin-top:2px;font:500 7.5px/1.4 Inter,sans-serif;color:rgba(255,255,255,.36)}
+.fx-discord-actions .discord-card-btn.primary{background:linear-gradient(135deg,rgba(105,198,255,.18),rgba(135,104,255,.17))!important;border-color:rgba(127,201,255,.28)!important;color:#fff!important}

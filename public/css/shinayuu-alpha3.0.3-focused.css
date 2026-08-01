@@ -1,0 +1,92 @@
+/* ShinaYuu Music 2.0 alpha.3.0.3 — narrow, regression-focused fixes. */
+
+/* The Alpha 3 stylesheet positioned results at top:60px while the element is
+   already inside #search-stack. That doubled the vertical offset. Return the
+   history/results surface to normal document flow directly below the tabs. */
+#search-stack > #search-results,
+#search-results,
+#search-results.show,
+#search-results.search-history-surface {
+  position: relative !important;
+  inset: auto !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 8px 0 0 !important;
+  transform: none !important;
+  box-sizing: border-box !important;
+}
+
+/* Media library is the one new liquid-glass window requested by the user.
+   It does not alter the visual language of the existing controls. */
+#shinayuu-native-modal[data-kind="media"] {
+  background: rgba(0,0,0,.38) !important;
+  backdrop-filter: blur(14px) saturate(1.08) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(1.08) !important;
+}
+#shinayuu-native-modal[data-kind="media"] .shinayuu-native-dialog {
+  background: linear-gradient(155deg,rgba(27,30,39,.82),rgba(9,11,17,.74) 54%,rgba(3,5,9,.70)) !important;
+  border-color: rgba(255,255,255,.16) !important;
+  box-shadow: 0 34px 100px rgba(0,0,0,.58), inset 0 1px 0 rgba(255,255,255,.16) !important;
+  backdrop-filter: blur(36px) saturate(1.28) !important;
+  -webkit-backdrop-filter: blur(36px) saturate(1.28) !important;
+}
+.shinayuu-media-folder-meta {
+  flex: 1 1 100%; min-width: 0; display:flex; align-items:center; justify-content:space-between; gap:12px;
+  color:rgba(255,255,255,.48); font:500 10px/1.35 Inter,Segoe UI,sans-serif;
+}
+.shinayuu-media-folder-meta span:first-child { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.shinayuu-media-card video { display:block; width:100%; height:110px; object-fit:cover; background:#090b10; pointer-events:none; }
+
+/* Folder-backed background media library. This is the dedicated 1.1.8.x
+   interaction requested by the user: select a folder, browse its media and
+   click a card to apply it. It does not restyle the surrounding repo UI. */
+#background-media-library{
+  position:fixed;inset:0;z-index:3200;display:none;align-items:center;justify-content:center;
+  padding:28px;background:rgba(0,0,0,.22);backdrop-filter:blur(8px) saturate(1.08);
+  -webkit-backdrop-filter:blur(8px) saturate(1.08)
+}
+#background-media-library.open{display:flex;animation:bgMediaLibraryFade .2s ease-out}
+@keyframes bgMediaLibraryFade{from{opacity:0}to{opacity:1}}
+.bg-media-library-shell{
+  position:relative;width:min(1120px,calc(100vw - 56px));height:min(780px,calc(100vh - 56px));
+  display:flex;flex-direction:column;overflow:hidden;border:1px solid rgba(255,255,255,.19);
+  border-radius:30px;background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.014) 44%,rgba(0,0,0,.035));
+  box-shadow:0 30px 110px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.20),inset 0 -1px 0 rgba(255,255,255,.035);
+  backdrop-filter:blur(34px) saturate(1.34) contrast(1.035);-webkit-backdrop-filter:blur(34px) saturate(1.34) contrast(1.035)
+}
+.bg-media-library-shell::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(circle at var(--bg-media-x,18%) var(--bg-media-y,12%),rgba(255,255,255,.16),transparent 34%),linear-gradient(115deg,rgba(var(--fc-accent-rgb),.075),transparent 34%,rgba(255,255,255,.025) 67%,transparent);
+  mix-blend-mode:screen;opacity:.72
+}
+.bg-media-library-head,.bg-media-library-tools,.bg-media-library-foot{position:relative;z-index:1;display:flex;align-items:center;gap:12px;padding:18px 22px}
+.bg-media-library-head{border-bottom:1px solid rgba(255,255,255,.085)}
+.bg-media-library-title{min-width:0;flex:1}.bg-media-library-title strong{display:block;font-size:19px;letter-spacing:.01em}.bg-media-library-title small{display:block;margin-top:4px;color:rgba(255,255,255,.48);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bg-media-library-btn{height:36px;padding:0 14px;border:1px solid rgba(255,255,255,.13);border-radius:12px;background:rgba(255,255,255,.035);color:rgba(255,255,255,.82);font:inherit;cursor:pointer;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);transition:transform .18s ease,border-color .18s ease,background .18s ease}
+.bg-media-library-btn:hover{transform:translateY(-1px);border-color:rgba(var(--fc-accent-rgb),.38);background:rgba(var(--fc-accent-rgb),.09)}
+.bg-media-library-btn.icon{width:36px;padding:0;font-size:20px}
+.bg-media-library-tools{padding-top:14px;padding-bottom:14px}
+.bg-media-library-search{flex:1;height:38px;padding:0 14px;border:1px solid rgba(255,255,255,.11);border-radius:13px;outline:0;background:rgba(0,0,0,.09);color:#fff;font:inherit;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.bg-media-library-search:focus{border-color:rgba(var(--fc-accent-rgb),.42);box-shadow:0 0 0 3px rgba(var(--fc-accent-rgb),.07)}
+.bg-media-library-filters{display:flex;gap:6px;padding:4px;border:1px solid rgba(255,255,255,.09);border-radius:14px;background:rgba(0,0,0,.08)}
+.bg-media-library-filter{height:30px;padding:0 12px;border:0;border-radius:10px;background:transparent;color:rgba(255,255,255,.53);font:inherit;cursor:pointer}
+.bg-media-library-filter.active{background:rgba(var(--fc-accent-rgb),.14);color:#fff;box-shadow:inset 0 0 0 1px rgba(var(--fc-accent-rgb),.23)}
+.bg-media-library-body{position:relative;z-index:1;flex:1;min-height:0;overflow:auto;padding:4px 22px 22px;scrollbar-width:thin;overscroll-behavior:contain}
+.bg-media-library-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(176px,1fr));gap:14px;contain:layout style paint}
+.bg-media-card{position:relative;min-width:0;overflow:hidden;border:1px solid rgba(255,255,255,.105);border-radius:18px;background:linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.012));box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 12px 30px rgba(0,0,0,.10);cursor:pointer;transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease;content-visibility:auto;contain:layout paint style;contain-intrinsic-size:224px}
+.bg-media-card:hover{transform:translateY(-3px) scale(1.008);border-color:rgba(var(--fc-accent-rgb),.34);box-shadow:0 18px 42px rgba(0,0,0,.24),0 0 0 1px rgba(var(--fc-accent-rgb),.08),inset 0 1px 0 rgba(255,255,255,.15)}
+.bg-media-card.selected{border-color:rgba(var(--fc-accent-rgb),.62);box-shadow:0 0 0 2px rgba(var(--fc-accent-rgb),.14),0 18px 46px rgba(0,0,0,.26)}
+.bg-media-card-preview{position:relative;aspect-ratio:16/10;overflow:hidden;background:rgba(0,0,0,.15)}
+.bg-media-card-preview img,.bg-media-card-preview video{width:100%;height:100%;display:block;object-fit:cover;background:#08090a;transform:translateZ(0)}
+.bg-media-card-preview::after{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,transparent 54%,rgba(0,0,0,.38));opacity:.72}
+.bg-media-card-type{position:absolute;left:9px;top:9px;z-index:2;padding:4px 8px;border:1px solid rgba(255,255,255,.15);border-radius:999px;background:rgba(0,0,0,.30);color:rgba(255,255,255,.82);font-size:10px;letter-spacing:.08em;text-transform:uppercase;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.bg-media-card-check{position:absolute;right:9px;top:9px;z-index:2;width:24px;height:24px;display:none;align-items:center;justify-content:center;border-radius:50%;background:rgb(var(--fc-accent-rgb));color:#07100f;font-weight:900;box-shadow:0 0 24px rgba(var(--fc-accent-rgb),.42)}
+.bg-media-card.selected .bg-media-card-check{display:flex}
+.bg-media-card-meta{padding:11px 12px 13px}.bg-media-card-name{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bg-media-card-path{margin-top:4px;color:rgba(255,255,255,.38);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bg-media-library-empty{display:none;min-height:260px;align-items:center;justify-content:center;flex-direction:column;text-align:center;color:rgba(255,255,255,.48);gap:8px}.bg-media-library-empty.visible{display:flex}.bg-media-library-empty strong{color:rgba(255,255,255,.82);font-size:16px}
+.bg-media-library-foot{min-height:48px;border-top:1px solid rgba(255,255,255,.075);color:rgba(255,255,255,.42);font-size:11px}.bg-media-library-foot span:first-child{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.bg-media-library-open #fx-panel{pointer-events:none}
+@media(max-width:760px){#background-media-library{padding:12px}.bg-media-library-shell{width:100%;height:100%;border-radius:22px}.bg-media-library-head,.bg-media-library-tools{flex-wrap:wrap;padding-left:14px;padding-right:14px}.bg-media-library-search{min-width:100%;order:2}.bg-media-library-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.bg-media-library-body{padding-left:14px;padding-right:14px}}

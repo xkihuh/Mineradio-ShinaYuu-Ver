@@ -17,21 +17,21 @@
     return clamp(Number.parseInt(match[1], 10) / 1000, -10, 10);
   }
 
-  function normalizeDelaySeconds(value, fallback = 0.35) {
+  function normalizeDelaySeconds(value, fallback = 0) {
     const parsed = Number(value);
     const defaultValue = Number(fallback);
-    return clamp(Number.isFinite(parsed) ? parsed : (Number.isFinite(defaultValue) ? defaultValue : 0.35), -15, 15);
+    return clamp(Number.isFinite(parsed) ? parsed : (Number.isFinite(defaultValue) ? defaultValue : 0), -15, 15);
   }
 
   function resolveDelaySeconds(defaultDelay, trackDelay) {
     const hasTrackDelay = trackDelay !== null && trackDelay !== undefined && trackDelay !== '';
     const parsedTrack = Number(trackDelay);
-    return normalizeDelaySeconds(hasTrackDelay && Number.isFinite(parsedTrack) ? parsedTrack : defaultDelay, 0.35);
+    return normalizeDelaySeconds(hasTrackDelay && Number.isFinite(parsedTrack) ? parsedTrack : defaultDelay, 0);
   }
 
   function compensatedPlaybackSeconds(currentSeconds, delaySeconds) {
     const current = Math.max(0, Number(currentSeconds) || 0);
-    const delay = normalizeDelaySeconds(delaySeconds, 0.35);
+    const delay = normalizeDelaySeconds(delaySeconds, 0);
     return Math.max(0, current - delay);
   }
 
