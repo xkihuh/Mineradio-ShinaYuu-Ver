@@ -10,16 +10,16 @@ const { execFileSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('official 2.0.13 package and public assets are versioned consistently', () => {
+test('official 2.0.14 package and public assets are versioned consistently', () => {
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
   const html = read('public/index.html');
-  assert.equal(pkg.version, '2.0.13');
-  assert.equal(pkg.build.buildVersion, '2.0.13.0');
+  assert.equal(pkg.version, '2.0.14');
+  assert.equal(pkg.build.buildVersion, '2.0.14.0');
   assert.equal(lock.version, pkg.version);
   assert.equal(lock.packages[''].version, pkg.version);
   assert.match(html, /shinayuu-alpha3\.0\.3-focused\.css\?v=2\.0\.0-alpha\.3\.0\.3/);
-  assert.match(html, /shinayuu-background-media-library\.js\?v=2\.0\.13/);
+  assert.match(html, /shinayuu-background-media-library\.js\?v=2\.0\.14/);
   assert.match(html, /shinayuu-alpha3\.0\.4-focused\.css\?v=2\.0\.0-alpha\.3\.0\.4/);
 });
 

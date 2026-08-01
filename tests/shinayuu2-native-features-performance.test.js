@@ -53,8 +53,8 @@ test('renderer bundle contains the modular visual UI and official version', () =
   assert.match(bundle, /14-stage-lyrics-rendering\.js/);
   assert.match(bundle, /03-wallpaper-engine-library\.js/);
   assert.match(bundle, /currentVersion:\s*'2\.0\.13'/);
-  assert.match(html, /shinayuu-index-bundle\.js\?v=2\.0\.13/);
-  assert.match(html, /shinayuu-v2-native\.js\?v=2\.0\.13/);
+  assert.match(html, /shinayuu-index-bundle\.js\?v=2\.0\.14/);
+  assert.match(html, /shinayuu-v2-native\.js\?v=2\.0\.14/);
 });
 
 test('all application JavaScript parses successfully', () => {

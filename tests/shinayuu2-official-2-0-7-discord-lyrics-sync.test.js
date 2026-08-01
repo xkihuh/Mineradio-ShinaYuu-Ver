@@ -10,15 +10,15 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 const lyricsSync = require(path.join(root, 'public', 'lyrics-sync.js'));
 const { DiscordPresenceManager, normalizeConfig } = require(path.join(root, 'desktop', 'discord-presence.js'));
 
-test('2.0.13 release identity is synchronized', () => {
+test('2.0.14 release identity is synchronized', () => {
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
-  assert.equal(pkg.version, '2.0.13');
-  assert.equal(pkg.displayVersion, '2.0.13');
-  assert.equal(pkg.shinayuu.displayVersion, '2.0.13');
-  assert.equal(pkg.build.buildVersion, '2.0.13.0');
-  assert.equal(lock.version, '2.0.13');
-  assert.equal(lock.packages[''].version, '2.0.13');
+  assert.equal(pkg.version, '2.0.14');
+  assert.equal(pkg.displayVersion, '2.0.14');
+  assert.equal(pkg.shinayuu.displayVersion, '2.0.14');
+  assert.equal(pkg.build.buildVersion, '2.0.14.0');
+  assert.equal(lock.version, '2.0.14');
+  assert.equal(lock.packages[''].version, '2.0.14');
 });
 
 test('Discord presence accepts legacy renderer metadata and builds track progress timestamps', () => {
@@ -91,8 +91,8 @@ test('Lyrics rendering uses the live provider clock, exact matching and per-trac
   assert.match(parse, /durationCompatible/);
   assert.match(parse, /adaptive-estimated/);
   assert.match(parse, /setLyricAutomaticSyncProfile/);
-  assert.match(timing, /mapPlaybackToLyricSeconds/);
-  assert.match(timing, /getActiveLyricTimingOffsetSeconds/);
+  assert.match(timing, /Direct, single-source lyric clock/);
+  assert.match(timing, /function getActiveLyricTimingOffsetSeconds\(\) \{ return 0; \}/);
   assert.match(progress, /html-progress-seek/);
   assert.match(desktop, /getPlaybackCurrentSeconds/);
   assert.match(desktop, /getPlaybackDurationSeconds/);

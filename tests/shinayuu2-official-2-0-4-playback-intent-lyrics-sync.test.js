@@ -9,7 +9,7 @@ const vm = require('node:vm');
 const root = path.resolve(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('2.0.13 isolates every root playback selection from stale provider recovery', () => {
+test('2.0.14 isolates every root playback selection from stale provider recovery', () => {
   const fallback = read('public/js/modules/05-playback/11-provider-fallback.js');
   const controls = read('public/js/modules/05-playback/14-player-controls.js');
   const spotify = read('public/spotify-direct-player.js');
@@ -46,25 +46,28 @@ test('failed descriptors are invalidated before a same-track provider refresh', 
   assert.match(controls, /invalidatePlaybackDescriptorForSong\(song\)/);
 });
 
-test('combined Liquid lyrics timing UI exposes ±15s delay, per-track progress correction and 5–15s title wait', () => {
+test('2.0.14 removes every manual lyric delay and title-wait control', () => {
   const html = read('public/index.html');
   const timing = read('public/js/modules/06-lyrics/06-lyric-timing-offset.js');
   const lyrics = read('public/js/modules/06-lyrics/00-lyrics-fetch-parse.js');
-  assert.match(html, /id="lyric-delay-slider" max="15" min="-15"/);
-  assert.match(html, /id="lyric-progress-offset-slider" max="15" min="-15"/);
-  assert.match(html, /id="lyric-title-wait-slider" max="15" min="5"/);
-  assert.match(timing, /var LYRIC_TIMING_RANGE_SECONDS = 15/);
-  assert.match(timing, /t - getLyricGlobalDelaySeconds\(\) \+ getActiveLyricTimingOffsetSeconds\(\)/);
-  assert.match(lyrics, /getLyricTitleFallbackDelayMs\(\)/);
-  assert.doesNotMatch(lyrics, /cancelPendingTrackFallbackLyrics\(\);\s*var fallbackLines = withLyricFallbackForSong/);
+  assert.doesNotMatch(html, /lyric-delay-slider|lyric-progress-offset-slider|lyric-title-wait-slider/);
+  assert.match(html, /id="lyric-sync-clock-status"/);
+  assert.match(timing, /function getLyricGlobalDelaySeconds\(\) \{ return 0; \}/);
+  assert.match(timing, /function getActiveLyricTimingOffsetSeconds\(\) \{ return 0; \}/);
+  assert.match(timing, /function getLyricTitleFallbackDelayMs\(\) \{ return 0; \}/);
+  assert.match(lyrics, /no configurable title wait/);
 });
 
-test('lyrics clock combines provider time, global delay and per-track correction deterministically', () => {
+test('2.0.14 lyric clock follows the provider time without rate or offset drift', () => {
   const source = read('public/js/modules/06-lyrics/06-lyric-timing-offset.js');
-  const storage = new Map();
-  const emptyNodeList = [];
+  const storage = new Map([
+    ['shinayuu-lyric-global-delay-v1', '8'],
+    ['mineradio-lyric-timing-offsets-v1', '{"track":4}'],
+    ['shinayuu-lyric-title-fallback-wait-v1', '15'],
+  ]);
   const context = {
     console,
+    window: { appLanguage: 'vi' },
     localStorage: {
       getItem: (key) => storage.has(key) ? storage.get(key) : null,
       setItem: (key, value) => storage.set(key, String(value)),
@@ -73,36 +76,33 @@ test('lyrics clock combines provider time, global delay and per-track correction
     document: {
       readyState: 'loading',
       addEventListener() {},
+      dispatchEvent() {},
       getElementById() { return null; },
-      querySelectorAll() { return emptyNodeList; },
       activeElement: null,
     },
+    CustomEvent: function CustomEvent() {},
     setTimeout,
     clearTimeout,
-    clampRange(value, min, max) { return Math.max(min, Math.min(max, Number(value) || 0)); },
     currentIdx: 0,
     playQueue: [{ provider: 'youtube', id: 'track-1', name: 'Track', artist: 'Artist' }],
     currentLocalSong: null,
     currentCoverSong() { return context.playQueue[context.currentIdx]; },
-    queueItemKey(song) { return `${song.provider}:${song.id}`; },
     stageLyrics: null,
-    showToast() {},
   };
+  context.window = context;
   vm.createContext(context);
   vm.runInContext(source, context);
-  context.setLyricGlobalDelaySeconds(2, { silent: true });
-  context.setCurrentLyricTimingOffset(1.5, { silent: true });
-  assert.equal(context.getAdjustedLyricPlaybackTime(10), 9.5);
-  context.setLyricGlobalDelaySeconds(99, { silent: true });
-  assert.equal(context.getLyricGlobalDelaySeconds(), 15);
-  context.setLyricTitleFallbackWaitSeconds(99, { silent: true });
-  assert.equal(context.getLyricTitleFallbackDelayMs(), 15000);
+  assert.equal(context.getAdjustedLyricPlaybackTime(10.25), 10.25);
+  assert.equal(context.getLyricGlobalDelaySeconds(), 0);
+  assert.equal(context.getActiveLyricTimingOffsetSeconds(), 0);
+  context.setLyricAutomaticSyncProfile({ rate: 1.03, offset: 4, anchor: 12, exact: false });
+  assert.equal(context.getAdjustedLyricPlaybackTime(140.5), 140.5);
 });
 
-test('release identity is consistently bumped to 2.0.13', () => {
+test('release identity is consistently bumped to 2.0.14', () => {
   const pkg = JSON.parse(read('package.json'));
-  assert.equal(pkg.version, '2.0.13');
-  assert.equal(pkg.displayVersion, '2.0.13');
-  assert.equal(pkg.shinayuu.displayVersion, '2.0.13');
-  assert.equal(pkg.build.buildVersion, '2.0.13.0');
+  assert.equal(pkg.version, '2.0.14');
+  assert.equal(pkg.displayVersion, '2.0.14');
+  assert.equal(pkg.shinayuu.displayVersion, '2.0.14');
+  assert.equal(pkg.build.buildVersion, '2.0.14.0');
 });

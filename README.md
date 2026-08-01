@@ -1,4 +1,34 @@
-# ShinaYuu Music 2.0.13
+# ShinaYuu Music 2.0.14
+
+Bản 2.0.14 tập trung sửa đồng bộ lyrics. Lyrics sử dụng trực tiếp đồng hồ phát thật của Spotify hoặc media deck YouTube/Local, không còn cộng delay chung, offset riêng từng bài hoặc kéo giãn timeline theo chênh lệch thời lượng.
+
+## Thay đổi chính của 2.0.14
+
+- Bỏ hoàn toàn mục **Thời gian chờ trước khi hiện tên bài**.
+- Bỏ các thanh **Delay lyrics** và **Lệch tiến độ bài** để tránh cộng chồng nhiều lớp bù thời gian.
+- Tự xóa các giá trị căn chỉnh cũ đã lưu trong Local Storage.
+- Timestamp `[offset:+/-ms]` của LRC chỉ được áp dụng một lần khi parse file lời.
+- Không còn automatic timeline stretch gây lệch tăng dần về cuối bài.
+- Khi seek, đổi nguồn hoặc AutoMix bàn giao, lyrics đọc lại ngay clock thật của nguồn đang phát.
+- Không thay đổi playback core và AutoMix của 2.0.13.
+
+## Build
+
+```powershell
+npm ci
+npm run release:preflight
+npm run build:win
+```
+
+## Tạo patch 2.0.13 → 2.0.14
+
+```powershell
+npm run patch -- "D:\ShinaYuu\ShinaYuu-Music-2.0.13-SOURCE.zip"
+```
+
+---
+
+## Nền tảng kế thừa từ 2.0.13
 
 ShinaYuu Music là ứng dụng nghe nhạc desktop hợp nhất cho Windows, hỗ trợ YouTube Music, YouTube Video/MV, Spotify Premium và nhạc cục bộ trong cùng một giao diện.
 
@@ -104,17 +134,3 @@ Package version : 2.0.13
 Display version : 2.0.13
 Build version   : 2.0.13.0
 ```
-## Acknowledgments
-
-Mineradio was originally designed and developed by XxHuberrr, and is now being maintained and localized for global users by x.kihuh. Special thanks to **emily**, who co-created early concepts for the visual foundation and inspired the optimization direction for the `emily` visual preset.
-
-We also want to thank akimiya7742 and MIKUHOLIC for their support during the development of the application.
-
-## Copyright and License
-
-Copyright (C) 2026 XxHuberrr.
-Copyright (C) 2026 X.kihuh (For modifications and maintenance).
-ShinaYuu Music is licensed under `GPL-3.0-only`. Redistribution of source or binaries must preserve the license, copyright notices, attribution, and the corresponding source obligations described by GPLv3.
-This project is licensed under the GPL-3.0 License. See the [LICENSE](./LICENSE) file for details.
-
-The ShinaYuu Logo, the name "ShinaYuu," the UI visual design, and original visual assets belong entirely to the original author. Third-party dependencies and services follow their respective open-source licenses and terms of service.

@@ -1,3 +1,10 @@
+## 2.0.14
+
+- Removed title-fallback wait control and all manual lyric delay/offset layers.
+- Lyrics now follow the provider playback clock directly.
+- Cleared stored legacy timing corrections and disabled automatic timeline stretching.
+- Preserved the 2.0.13 playback and AutoMix core.
+
 # Changelog
 
 ## 2.0.10
