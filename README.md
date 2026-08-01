@@ -60,13 +60,45 @@ npm run build:win
 Installer được tạo theo tên:
 
 ```text
+<<<<<<< HEAD
 ShinaYuu-Music-2.0.15-Setup.exe
+=======
+ShinaYuu-Music-2.0.13-Setup.exe
+```
+
+## Tạo patch từ 2.x.x
+
+```powershell
+npm run patch -- "D:\ShinaYuu\ShinaYuu-Music-2.x.x-SOURCE.zip"
+>>>>>>> ff9bfecefeb4fd4ca93ca8631197f81a15825ac2
 ```
 
 ## Phiên bản
 
 ```text
+<<<<<<< HEAD
 Package version : 2.0.15
 Display version : 2.0.15
 Build version   : 2.0.15.0
 ```
+=======
+Package version : 2.0.14
+Display version : 2.0.14
+Build version   : 2.0.14.0
+```
+
+## Acknowledgments
+
+Mineradio was originally designed and developed by XxHuberrr, and is now being maintained and localized for global users by x.kihuh. Special thanks to **emily**, who co-created early concepts for the visual foundation and inspired the optimization direction for the `emily` visual preset.
+
+We also want to thank akimiya7742 and MIKUHOLIC for their support during the development of the application.
+
+## Copyright and License
+
+Copyright (C) 2026 XxHuberrr.
+Copyright (C) 2026 X.kihuh (For modifications and maintenance).
+ShinaYuu Music is licensed under `GPL-3.0-only`. Redistribution of source or binaries must preserve the license, copyright notices, attribution, and the corresponding source obligations described by GPLv3.
+This project is licensed under the GPL-3.0 License. See the [LICENSE](./LICENSE) file for details.
+
+The ShinaYuu Logo, the name "ShinaYuu," the UI visual design, and original visual assets belong entirely to the original author. Third-party dependencies and services follow their respective open-source licenses and terms of service.
+>>>>>>> ff9bfecefeb4fd4ca93ca8631197f81a15825ac2
