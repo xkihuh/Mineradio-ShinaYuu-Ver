@@ -5803,11 +5803,6 @@ body:not(.controls-visible) .lyric-timing-control::before,
   background: rgba(255, 246, 200, .08)
 }
 
-.lyric-title-wait-section small {
-  font-size: 9px;
-  line-height: 1.35;
-  color: rgba(255, 255, 255, .38)
-}
 
 .lyric-timing-actions {
   display: grid;

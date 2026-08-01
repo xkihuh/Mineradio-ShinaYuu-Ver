@@ -1,11 +1,13 @@
-## 2.0.14
-
-- Removed title-fallback wait control and all manual lyric delay/offset layers.
-- Lyrics now follow the provider playback clock directly.
-- Cleared stored legacy timing corrections and disabled automatic timeline stretching.
-- Preserved the 2.0.13 playback and AutoMix core.
-
 # Changelog
+
+## 2.0.15
+
+- Restored the complete 2.0.13 lyrics timing/provider system instead of the direct-clock rewrite introduced in 2.0.14.
+- Preserved the global ±15-second lyrics delay, per-track ±15-second progress correction and all quick adjustment buttons.
+- Removed only the configurable 5–15-second song-title fallback wait and its saved preference.
+- Reduced the title fallback to renderer warmup only (110–220 ms); synchronized lyrics still replace it immediately.
+- Kept the 2.0.13 playback core, Spotify Direct Player and AutoMix files unchanged.
+- Bumped package/display/build identity to 2.0.15 / 2.0.15.0.
 
 ## 2.0.10
 

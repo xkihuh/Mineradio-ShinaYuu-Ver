@@ -4277,6 +4277,9 @@ const server = http.createServer(async (req, res) => {
         repo: UPDATE_CONFIG.repo,
         preview: UPDATE_CONFIG.preview,
         manifestOverride: !!UPDATE_CONFIG.manifest,
+        autoPrompt: UPDATE_CONFIG.autoPrompt,
+        checkDelayMs: UPDATE_CONFIG.checkDelayMs,
+        checkIntervalMs: UPDATE_CONFIG.checkIntervalMs,
       },
     });
     return;

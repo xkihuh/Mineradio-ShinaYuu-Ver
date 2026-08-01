@@ -3040,7 +3040,7 @@ function buildStageLyricPlaybackPayload(index) {
 
 function findStageLyricIndexAtTime(t) {
   if (!lyricsLines || !lyricsLines.length) return -1;
-  var target = Math.max(0, Number(t) || 0);
+  var target = (Number(t) || 0) + 0.05;
   var lo = 0;
   var hi = lyricsLines.length - 1;
   var ans = -1;

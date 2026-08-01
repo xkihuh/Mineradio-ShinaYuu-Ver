@@ -20,7 +20,7 @@
 <link href="css/shinayuu-alpha3.0.2-focused.css?v=2.0.0-alpha.3.0.3" rel="stylesheet"/>
 <link href="css/shinayuu-alpha3.0.3-focused.css?v=2.0.0-alpha.3.0.3" rel="stylesheet"/>
 <link href="css/shinayuu-alpha3.0.4-focused.css?v=2.0.0-alpha.3.0.4" rel="stylesheet"/>
-<link rel="stylesheet" href="css/shinayuu-alpha3.0.5-fixes.css?v=2.0.14">
+<link rel="stylesheet" href="css/shinayuu-alpha3.0.5-fixes.css?v=2.0.15">
 </head>
 <body>
 <div id="desktop-window-shell">
@@ -1137,15 +1137,34 @@
 </div>
 </div>
 <div class="lyric-timing-control" id="lyric-timing-control">
-<button class="ctrl-btn text-badge" id="lyrics-sync-btn" title="Trạng thái đồng bộ lyrics" type="button"><span aria-hidden="true">≈</span></button>
-<div class="lyric-timing-popover lyric-sync-status-popover" id="lyric-timing-popover" onclick="event.stopPropagation()">
-<div class="lyric-timing-head"><span>Đồng bộ lyrics</span><strong id="lyric-timing-value">LIVE</strong></div>
+<button class="ctrl-btn text-badge" id="lyrics-sync-btn" title="Delay và đồng bộ tiến độ lyrics" type="button"><span aria-hidden="true">±</span></button>
+<div class="lyric-timing-popover" id="lyric-timing-popover" onclick="event.stopPropagation()">
+<div class="lyric-timing-head"><span>Đồng bộ lyrics</span><strong id="lyric-timing-value">0.0s</strong></div>
 <div class="lyric-timing-song" id="lyric-timing-song">Bài hát hiện tại</div>
-<div class="lyric-sync-direct-card">
-<div class="lyric-sync-direct-icon" aria-hidden="true">⌁</div>
-<div class="lyric-sync-direct-copy"><strong id="lyric-sync-clock-title">Đồng hồ phát trực tiếp</strong><span id="lyric-sync-clock-status">Lyrics đang bám theo thời gian thật của nguồn phát</span><small id="lyric-sync-clock-note">Không áp dụng delay chung, lệch từng bài hoặc kéo giãn timeline.</small></div>
+
+<div class="lyric-timing-section">
+<div class="lyric-timing-section-head"><span>Delay lyrics</span><strong id="lyric-delay-value">0.0s</strong></div>
+<div class="lyric-timing-range-row">
+<span>-15s</span><input aria-label="Delay lyrics" id="lyric-delay-slider" max="15" min="-15" step="0.1" type="range" value="0"/><span>+15s</span>
 </div>
-<button class="lyric-timing-reset-wide" data-lyric-sync-reset="" type="button">Xóa dữ liệu căn chỉnh cũ</button>
+<button class="lyric-timing-reset-wide" data-lyric-delay-reset="" type="button">Đặt lại delay chung</button>
+</div>
+
+<div class="lyric-timing-section">
+<div class="lyric-timing-section-head"><span>Lệch tiến độ bài</span><strong id="lyric-progress-offset-value">0.0s</strong></div>
+<div class="lyric-timing-range-row">
+<span>-15s</span><input aria-label="Lệch tiến độ bài cho lyrics" id="lyric-progress-offset-slider" max="15" min="-15" step="0.1" type="range" value="0"/><span>+15s</span>
+</div>
+<div class="lyric-timing-actions">
+<button data-lyric-offset-step="-1" title="Bù trễ tiến độ 1 giây" type="button">-1.0</button>
+<button data-lyric-offset-step="-0.1" title="Bù trễ tiến độ 0,1 giây" type="button">-0.1</button>
+<button data-lyric-offset-reset="" title="Đặt lại lệch tiến độ bài hiện tại" type="button">0</button>
+<button data-lyric-offset-step="0.1" title="Bù sớm tiến độ 0,1 giây" type="button">+0.1</button>
+<button data-lyric-offset-step="1" title="Bù sớm tiến độ 1 giây" type="button">+1.0</button>
+</div>
+</div>
+
+
 </div>
 </div>
 <div class="volume-control" id="volume-control">
@@ -1597,15 +1616,15 @@ Có thể không dùng mốc thời gian; mỗi dòng sẽ tự dàn theo thời
 </div>
 </div>
 <script src="js/shinayuu-i18n.js"></script>
-<script src="js/shinayuu-index-bundle.js?v=2.0.14"></script>
-<script src="js/shinayuu-home-smart-queue.js?v=2.0.14"></script>
-<script src="js/shinayuu-v2-native.js?v=2.0.14"></script>
-<script src="js/shinayuu-background-media-library.js?v=2.0.14"></script>
-<script src="js/shinayuu-alpha2-features.js?v=2.0.14"></script>
+<script src="js/shinayuu-index-bundle.js?v=2.0.15"></script>
+<script src="js/shinayuu-home-smart-queue.js?v=2.0.15"></script>
+<script src="js/shinayuu-v2-native.js?v=2.0.15"></script>
+<script src="js/shinayuu-background-media-library.js?v=2.0.15"></script>
+<script src="js/shinayuu-alpha2-features.js?v=2.0.15"></script>
 <script src="js/shinayuu-ui-v6.js"></script>
-<script src="spotify-direct-player.js?v=2.0.14"></script>
-<script src="js/shinayuu-2.0.13-foreground-prewarm.js?v=2.0.14"></script>
-<script src="js/shinayuu-alpha3.0.4-ui.js?v=2.0.14"></script>
-<script src="js/shinayuu-alpha3.0.5-fixes.js?v=2.0.14"></script>
+<script src="spotify-direct-player.js?v=2.0.15"></script>
+<script src="js/shinayuu-2.0.15-foreground-prewarm.js?v=2.0.15"></script>
+<script src="js/shinayuu-alpha3.0.4-ui.js?v=2.0.15"></script>
+<script src="js/shinayuu-alpha3.0.5-fixes.js?v=2.0.15"></script>
 </body>
 </html>

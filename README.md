@@ -1,98 +1,40 @@
-# ShinaYuu Music 2.0.14
-
-Bản 2.0.14 tập trung sửa đồng bộ lyrics. Lyrics sử dụng trực tiếp đồng hồ phát thật của Spotify hoặc media deck YouTube/Local, không còn cộng delay chung, offset riêng từng bài hoặc kéo giãn timeline theo chênh lệch thời lượng.
-
-## Thay đổi chính của 2.0.14
-
-- Bỏ hoàn toàn mục **Thời gian chờ trước khi hiện tên bài**.
-- Bỏ các thanh **Delay lyrics** và **Lệch tiến độ bài** để tránh cộng chồng nhiều lớp bù thời gian.
-- Tự xóa các giá trị căn chỉnh cũ đã lưu trong Local Storage.
-- Timestamp `[offset:+/-ms]` của LRC chỉ được áp dụng một lần khi parse file lời.
-- Không còn automatic timeline stretch gây lệch tăng dần về cuối bài.
-- Khi seek, đổi nguồn hoặc AutoMix bàn giao, lyrics đọc lại ngay clock thật của nguồn đang phát.
-- Không thay đổi playback core và AutoMix của 2.0.13.
-
-## Build
-
-```powershell
-npm ci
-npm run release:preflight
-npm run build:win
-```
-
-## Tạo patch 2.0.13 → 2.0.14
-
-```powershell
-npm run patch -- "D:\ShinaYuu\ShinaYuu-Music-2.0.13-SOURCE.zip"
-```
-
----
-
-## Nền tảng kế thừa từ 2.0.13
+# ShinaYuu Music 2.0.15
 
 ShinaYuu Music là ứng dụng nghe nhạc desktop hợp nhất cho Windows, hỗ trợ YouTube Music, YouTube Video/MV, Spotify Premium và nhạc cục bộ trong cùng một giao diện.
 
-Bản 2.0.13 được xây trực tiếp từ playback core ổn định của 2.0.10. Các file AutoMix, điều khiển phát và Spotify Direct Player được giữ nguyên để tránh lặp lại hiện tượng khựng xuất hiện ở 2.0.12.
+Bản 2.0.15 được xây trực tiếp từ source 2.0.13 để khôi phục đúng hệ thống lyrics cũ và giữ nguyên playback/AutoMix ổn định. Bản 2.0.14 không được dùng làm nền cho hệ thống lyrics của bản này.
 
-## Thay đổi trong 2.0.13
+## Thay đổi trong 2.0.15
 
-### Khôi phục playback và AutoMix 2.0.10
+### Khôi phục hệ thống lyrics 2.0.13
 
-- Giữ nguyên `public/js/modules/05-playback/18-cuefield-automix-integration.js` từ 2.0.10.
-- Giữ nguyên `public/js/modules/05-playback/14-player-controls.js` từ 2.0.10.
-- Giữ nguyên `public/spotify-direct-player.js` từ 2.0.10.
-- Loại bỏ foreground-resume wrapper của 2.0.12 vì wrapper này thay thế `togglePlay` và có thể chạy thêm recovery sau thao tác phát.
-- Không tự đổi nguồn, không gọi lại `playQueueAt`, không reset Spotify và không chạy recovery trong giai đoạn AutoMix.
+- Khôi phục clock lyrics, provider matching, automatic sync profile và cách hiệu chỉnh của 2.0.13.
+- Giữ nguyên thanh `Delay lyrics` từ `-15s` đến `+15s`.
+- Giữ nguyên `Lệch tiến độ bài` riêng cho từng bài từ `-15s` đến `+15s`.
+- Giữ nguyên các nút `-1.0`, `-0.1`, `0`, `+0.1`, `+1.0`.
+- Không xóa dữ liệu delay chung hoặc offset riêng từng bài của người dùng.
 
-### Khôi phục phát sau khi quay lại ứng dụng
+### Chỉ bỏ thời gian chờ tên bài
 
-`public/js/shinayuu-2.0.13-foreground-prewarm.js` chỉ chạy trong thao tác nhấn nút Phát sau khi người dùng quay lại app:
+- Xóa đúng mục `Thời gian chờ trước khi hiện tên bài` khỏi panel lyrics.
+- Xóa slider 5–15 giây và preference `shinayuu-lyric-title-fallback-wait-v1`.
+- Tên bài fallback chỉ chờ warmup renderer 110–220 ms, không còn chờ cấu hình nhiều giây.
+- Lyrics thật vẫn thay thế tên bài ngay khi provider trả dữ liệu và tiếp tục theo thời gian phát hiện tại.
 
-- Prewarm audio graph và thiết bị đầu ra cho YouTube/HTML Audio.
-- Gọi Spotify `activateElement()` trong thao tác người dùng khi Spotify đang là nguồn phát.
-- Không thay thế `togglePlay`.
-- Không tự phát nhạc, không đổi bài và không can thiệp AutoMix.
+### Playback và AutoMix
 
-### Discord Connect Liquid Glass
-
-Khung Discord trong phần Nâng cao được dựng trực tiếp bằng component riêng:
-
-- Header Discord và trạng thái kết nối.
-- Preview bài đang hiển thị trên Discord.
-- Input shell Liquid Glass cho Application ID và Tên App/Image Key.
-- Toggle ảnh bìa custom, không dùng checkbox mặc định.
-- Bốn nút theo lưới 2 × 2:
-  - Lưu và kết nối.
-  - Kết nối lại.
-  - Developer Portal.
-  - Sao chép User ID.
-
-Style quan trọng được đặt trong `public/css/shinayuu-alpha3.0.5-fixes.css`, là stylesheet luôn được tải bởi app, thay vì phụ thuộc vào một file CSS bổ sung có thể không được áp dụng trong runtime cũ.
-
-### Giao diện cập nhật
-
-- Logo app và note nằm cùng hàng.
-- Note nằm ngay bên phải logo.
-- Emoji thay đổi theo trạng thái có hoặc không có phiên bản mới.
-- Hỗ trợ tiếng Việt và tiếng Anh.
+- Giữ nguyên playback core và AutoMix từ 2.0.13.
+- Không thêm wrapper mới vào `togglePlay`.
+- Không thay đổi provider ownership, crossfade hoặc Spotify Direct Player.
+- `public/js/shinayuu-2.0.15-foreground-prewarm.js` tiếp tục chỉ prewarm nguồn phát trong thao tác nhấn Phát.
 
 ## Chức năng được giữ nguyên
 
-- AutoMix hai deck và crossfade theo provider ownership.
 - Spotify OAuth PKCE và Spotify Web Playback SDK.
-- YouTube Music, YouTube Video/MV và fallback playback.
-- Lyrics Sync 2.0, delay chung và offset riêng từng bài.
-- Discord Rich Presence theo bài hát và tiến độ.
+- YouTube Music, YouTube Video/MV và nhạc cục bộ.
+- Discord Rich Presence và Discord Connect Liquid Glass.
 - Home Dashboard, Daily Mix, Listening Profile và wallpaper content.
-- Media background, MV background và Desktop Wallpaper.
 - Updater trong ứng dụng và công cụ tạo patch.
-
-## Yêu cầu
-
-- Windows 10/11 x64.
-- Node.js 22 trở lên.
-- Python 3 cho Castlabs EVS khi build release.
-- Spotify Premium để kiểm tra Spotify Direct Playback.
 
 ## Chạy source
 
@@ -118,34 +60,13 @@ npm run build:win
 Installer được tạo theo tên:
 
 ```text
-ShinaYuu-Music-2.0.13-Setup.exe
-```
-
-## Tạo patch từ 2.0.10
-
-```powershell
-npm run patch -- "D:\ShinaYuu\ShinaYuu-Music-2.0.10-SOURCE.zip"
+ShinaYuu-Music-2.0.15-Setup.exe
 ```
 
 ## Phiên bản
 
 ```text
-Package version : 2.0.13
-Display version : 2.0.13
-Build version   : 2.0.13.0
+Package version : 2.0.15
+Display version : 2.0.15
+Build version   : 2.0.15.0
 ```
-
-## Acknowledgments
-
-Mineradio was originally designed and developed by XxHuberrr, and is now being maintained and localized for global users by x.kihuh. Special thanks to **emily**, who co-created early concepts for the visual foundation and inspired the optimization direction for the `emily` visual preset.
-
-We also want to thank akimiya7742 and MIKUHOLIC for their support during the development of the application.
-
-## Copyright and License
-
-Copyright (C) 2026 XxHuberrr.
-Copyright (C) 2026 X.kihuh (For modifications and maintenance).
-ShinaYuu Music is licensed under `GPL-3.0-only`. Redistribution of source or binaries must preserve the license, copyright notices, attribution, and the corresponding source obligations described by GPLv3.
-This project is licensed under the GPL-3.0 License. See the [LICENSE](./LICENSE) file for details.
-
-The ShinaYuu Logo, the name "ShinaYuu," the UI visual design, and original visual assets belong entirely to the original author. Third-party dependencies and services follow their respective open-source licenses and terms of service.

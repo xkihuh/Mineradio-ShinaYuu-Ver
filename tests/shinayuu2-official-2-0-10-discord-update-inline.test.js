@@ -5,7 +5,7 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('2.0.14 embeds Discord Liquid Glass configuration directly in Advanced', () => {
+test('2.0.15 embeds Discord Liquid Glass configuration directly in Advanced', () => {
   const html = read('public/index.html');
   const alpha = read('public/js/shinayuu-alpha2-features.js');
   const css = read('public/css/shinayuu-alpha3.0.5-fixes.css');
@@ -18,7 +18,7 @@ test('2.0.14 embeds Discord Liquid Glass configuration directly in Advanced', ()
   assert.match(css, /\.fx-discord-inline-panel/);
 });
 
-test('2.0.14 update checker uses the real app logo, bilingual note and emoji artwork', () => {
+test('2.0.15 update checker uses the real app logo, bilingual note and emoji artwork', () => {
   const html = read('public/index.html');
   const native = read('public/js/shinayuu-v2-native.js');
   const css = read('public/css/shinayuu-alpha3.0.5-fixes.css');

@@ -116,10 +116,3 @@ body.sy-automix-cover-swap #thumb-cover{
 
 /* inline Discord setup panel compatibility marker */
 .fx-discord-inline-panel{display:grid!important}
-
-
-/* ShinaYuu Music 2.0.14 · direct-clock lyrics sync */
-.lyric-sync-status-popover{min-width:286px!important}
-.lyric-sync-direct-card{display:grid;grid-template-columns:38px minmax(0,1fr);align-items:center;gap:10px;margin:9px 0;padding:11px;border:1px solid rgba(120,214,255,.16);border-radius:13px;background:linear-gradient(135deg,rgba(62,175,230,.08),rgba(134,91,221,.08));box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
-.lyric-sync-direct-icon{display:grid;place-items:center;width:38px;height:38px;border:1px solid rgba(139,220,255,.22);border-radius:12px;background:rgba(4,10,20,.42);color:#9de8ff;font:800 22px/1 Inter,Segoe UI,sans-serif;box-shadow:0 8px 22px rgba(0,0,0,.22)}
-.lyric-sync-direct-copy{min-width:0;display:grid;gap:3px}.lyric-sync-direct-copy strong{font:700 9.2px/1.25 Inter,Segoe UI,sans-serif;color:#fff}.lyric-sync-direct-copy span{font:570 8px/1.4 Inter,Segoe UI,sans-serif;color:rgba(255,255,255,.68)}.lyric-sync-direct-copy small{font:500 7.4px/1.45 Inter,Segoe UI,sans-serif;color:rgba(255,255,255,.40)}

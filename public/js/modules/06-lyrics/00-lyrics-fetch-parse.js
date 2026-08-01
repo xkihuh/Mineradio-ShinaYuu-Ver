@@ -338,10 +338,12 @@ function buildLyricAutomaticSyncProfile(song, response, lines, timingSource) {
   var compatibility = helper && typeof helper.durationCompatibility === 'function'
     ? helper.durationCompatibility(sourceDuration, targetDuration)
     : { compatible: !sourceDuration || !targetDuration || Math.abs(sourceDuration - targetDuration) <= Math.max(8, targetDuration * 0.055), delta: Math.abs(sourceDuration - targetDuration), tolerance: Math.max(8, targetDuration * 0.055) };
-  // The real provider clock is authoritative. Do not stretch the lyric
-  // timeline from duration metadata; that introduces progressive drift.
-  var rate = 1;
-  var anchorValue = 0;
+  var rate = helper && typeof helper.automaticTimelineRate === 'function'
+    ? helper.automaticTimelineRate(sourceDuration, targetDuration, Math.max(score, exact ? 100 : 0))
+    : 1;
+  var anchorValue = helper && typeof helper.lyricTimelineAnchor === 'function'
+    ? helper.lyricTimelineAnchor(lines)
+    : 0;
   return {
     rate: rate,
     anchor: anchorValue,
@@ -453,11 +455,11 @@ function resetLyricsForTrackSwitch(song, token) {
 }
 function scheduleTrackSwitchFallbackLyrics(song, token, delay) {
   cancelPendingTrackFallbackLyrics();
+  // No configurable song-title wait. Keep only the renderer warmup so the title
+  // placeholder cannot postpone the real lyric timeline. Synchronized lyrics
+  // still replace this fallback immediately through the original 2.0.13 path.
   var multiLineDelay = (typeof stageLyricMultiLineWarmupLoad === 'function' && stageLyricMultiLineWarmupLoad()) ? 220 : 110;
-  // 2.0.14: no configurable title wait. The title fallback may appear after
-  // one short render warmup and is replaced immediately by real lyrics.
-  var fallbackDelay = Number(delay);
-  if (!isFinite(fallbackDelay) || fallbackDelay < 0) fallbackDelay = 0;
+  var fallbackDelay = multiLineDelay;
   pendingTrackFallbackLyricTimer = setTimeout(function () {
     pendingTrackFallbackLyricTimer = 0;
     if (token != null && token !== trackSwitchToken) return;
@@ -512,8 +514,9 @@ async function fetchLyric(songOrId, token, attempt, fetchOptions) {
     // A secondary exact-ID retry may fail after QQ/NetEase already supplied
     // usable lyrics. Do not erase the good state or put the title back on top.
     if (!hasUsableLyricLines(originalLyricsState && originalLyricsState.lines)) {
-      // Keep retries active, but do not wait several seconds before showing
-      // the title fallback. Real timed lyrics replace it as soon as they arrive.
+      // Keep the stage in a neutral pending state while startup/alignment
+      // retries continue. The configurable 5–15s fallback timer will show the
+      // title only when every lyric source really remains unavailable.
       if (!pendingTrackFallbackLyricTimer) {
         scheduleTrackSwitchFallbackLyrics(song || currentLyricSong(), token, 0);
       }
