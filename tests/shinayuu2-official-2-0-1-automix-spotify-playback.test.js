@@ -6,11 +6,11 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('2.0.16 version and update repository are configured', () => {
+test('2.0.17 version and update repository are configured', () => {
   const pkg = JSON.parse(read('package.json'));
-  assert.equal(pkg.version, '2.0.16');
-  assert.equal(pkg.build.buildVersion, '2.0.16.0');
-  assert.equal(pkg.shinayuu.displayVersion, '2.0.16');
+  assert.equal(pkg.version, '2.0.17');
+  assert.equal(pkg.build.buildVersion, '2.0.17.0');
+  assert.equal(pkg.shinayuu.displayVersion, '2.0.17');
   assert.equal(pkg.shinayuu.update.owner, 'xkihuh');
   assert.equal(pkg.shinayuu.update.repo, 'Mineradio-ShinaYuu-Ver');
 });
@@ -23,7 +23,7 @@ test('AutoMix predecodes and precommits artwork/progress', () => {
   assert.match(src, /sy-automix-cover-swap/);
   assert.match(src, /function commitAutoMixUiHandoff\(/);
   assert.match(src, /autoMixUiPrecommitted/);
-  assert.match(src, /await commitAutoMixUiHandoff\(pending, incoming\)/);
+  assert.match(src, /await commitAutoMixUiHandoff\(pending, incoming, executionSerial\)/);
 });
 
 test('progress handoff ghost is reused and text writes are isolated', () => {

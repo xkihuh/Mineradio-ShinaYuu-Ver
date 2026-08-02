@@ -10,7 +10,7 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
 test('official GitHub update source is embedded in package metadata', () => {
   const pkg = JSON.parse(read('package.json'));
-  assert.equal(pkg.version, '2.0.16');
+  assert.equal(pkg.version, '2.0.17');
   assert.deepEqual(pkg.repository, {
     type: 'git',
     url: 'https://github.com/xkihuh/Mineradio-ShinaYuu-Ver.git',
@@ -45,7 +45,7 @@ test('AutoMix uses an audio-thread gain curve and yields before queue metadata c
   assert.match(mix, /setValueCurveAtTime\(incomingCurve, startAt, durationSec\)/);
   assert.match(mix, /window\.shinayuuAutoMixCriticalUntil = performance\.now\(\) \+ 900/);
   assert.match(mix, /await waitForVisualFrames\(1\)/);
-  assert.match(mix, /function commitAutoMixUiHandoff\(pending, media\)/);
+  assert.match(mix, /function commitAutoMixUiHandoff\(pending, media, executionSerial\)/);
   assert.match(mix, /sy-automix-cover-swap/);
 });
 

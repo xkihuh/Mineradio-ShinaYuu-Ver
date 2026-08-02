@@ -867,6 +867,20 @@ async function playQueueAt(idx, opts) {
   }
   if (!playbackIntentStillCurrent()) return false;
   if (idx < 0 || idx >= playQueue.length) return false;
+  var manualSelectionRoot = !!(
+    (opts.manual || opts.userInitiated)
+    && !opts.cuefieldAutoMix
+    && !opts.autoMixHandoff
+    && !opts.autoMixRecovery
+    && !opts.sourceFallbackRecovery
+    && !opts.fallbackDepth
+    && !opts.qualitySwitch
+    && !opts.resumeRecovery
+  );
+  if (manualSelectionRoot && typeof window.awaitCuefieldAutoMixReleaseForPlaybackSelection === 'function') {
+    await window.awaitCuefieldAutoMixReleaseForPlaybackSelection('manual-track-selection');
+    if (!playbackIntentStillCurrent()) return false;
+  }
   var deferQueueHydrationForAutoMix = !!(opts.autoMixHandoff || opts.cuefieldAutoMix);
   if (typeof ensurePlaylistQueueHydratedAhead === 'function') {
     if (deferQueueHydrationForAutoMix) {

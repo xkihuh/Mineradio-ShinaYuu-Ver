@@ -1,5 +1,6 @@
-# ShinaYuu Music 2.0.16
+# ShinaYuu Music 2.0.17
 
-- Fixed the native updater app icon overflowing the update dialog.
-- Locked the updater logo container to 52 × 52 px and the icon image to 42 × 42 px.
-- Preserved the 2.0.15 old lyrics timing system, lyric correction controls, AutoMix and playback core.
+- Fixed manual song selection during an active AutoMix crossfade.
+- Manual selection now waits for the cancelled AutoMix/provider transaction to settle before starting the chosen track.
+- Stale AutoMix code can no longer call `playQueueAt`, `nextTrack`, restore old volume, or stop the newly selected provider after losing ownership.
+- Preserved the restored lyrics timing controls and updater-logo fix from 2.0.15–2.0.16.

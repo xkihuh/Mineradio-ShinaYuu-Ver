@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.0.17
+
+- Fixed a race where selecting another song during the audible AutoMix overlap could leave the new song unplayable and lock the playback engine.
+- Added an awaited manual-selection release barrier so in-flight AutoMix provider/deck work settles before the selected track starts.
+- Added execution-serial guards before every AutoMix queue commit, provider handoff, prepared-deck adoption and fallback `nextTrack` call.
+- Made stale AutoMix catch paths inert after cancellation so they cannot restore the old deck, overwrite volume or stop a newer provider.
+- Cancels AutoMix handoff UI state, cover ghosts, progress clocks and gain curves when manual playback takes ownership.
+- Preserved the 2.0.15 lyrics system and 2.0.16 updater-logo correction.
+- Bumped package/display/build identity to 2.0.17 / 2.0.17.0.
+
 ## 2.0.16
 
 - Fixed the updater app logo rendering at its intrinsic image size.

@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '2.0.10';
+  var VERSION = '2.0.17';
   var STORE_KEY = 'shinayuu-cuefield-automix-v2';
   var GAPLESS_STORE_KEY = 'shinayuu-album-gapless-v1';
   var PREPARE_DELAY_MS = 950;
@@ -29,7 +29,11 @@
     bypassToken: -1,
     lastAbortReason: '',
     outputDirty: false,
-    lastOutputOwner: ''
+    lastOutputOwner: '',
+    activeExecutionPromise: null,
+    activeExecutionPending: null,
+    lastAbortPromise: null,
+    manualReleaseSerial: 0
   };
 
   function vi(viText, enText) {
@@ -469,6 +473,7 @@
   function abortExecution(reason, options) {
     options = options || {};
     var restoreOwner = options.owner || activeOutputOwner();
+    var pendingExecution = state.activeExecutionPending;
     state.executionSerial++;
     state.executionStartedAt = 0;
     state.lastAbortReason = String(reason || 'aborted');
@@ -478,10 +483,61 @@
     state.preparing = false;
     clearPrepareTimer();
     if (!options.preservePreparedAudio) stopPreparedAudio();
-    restoreAutoMixOutput(reason || 'aborted', { owner: restoreOwner });
+    cancelAutoMixUiHandoff(pendingExecution);
+    var abortPromise = Promise.resolve(
+      restoreAutoMixOutput(reason || 'aborted', { owner: restoreOwner })
+    ).catch(function () { return false; });
+    state.lastAbortPromise = abortPromise;
+    abortPromise.then(function () {
+      if (state.lastAbortPromise === abortPromise) state.lastAbortPromise = null;
+    }, function () {
+      if (state.lastAbortPromise === abortPromise) state.lastAbortPromise = null;
+    });
     if (!options.keepBypass) state.bypassToken = -1;
     setStatus(state.enabled ? 'waiting' : 'disabled');
     updateUi();
+    return state.lastAbortPromise;
+  }
+
+  async function releaseAutoMixForManualSelection(reason) {
+    var releaseSerial = ++state.manualReleaseSerial;
+    var executionSettled = state.activeExecutionPromise;
+    var releasePromise = state.lastAbortPromise;
+    if (state.executing || state.preparing || state.pending || state.preparedAudio || state.outputDirty) {
+      releasePromise = abortExecution(reason || 'manual-selection');
+      executionSettled = executionSettled || state.activeExecutionPromise;
+    }
+    var waits = [];
+    if (releasePromise && typeof releasePromise.then === 'function') waits.push(releasePromise);
+    if (executionSettled && typeof executionSettled.then === 'function') waits.push(executionSettled);
+    if (!waits.length) return true;
+    if (waits.length) {
+      await Promise.race([
+        Promise.allSettled(waits),
+        delay(2800)
+      ]);
+    }
+    if (releaseSerial !== state.manualReleaseSerial) return false;
+    try {
+      if (typeof window.clearAudioFadeTimers === 'function') window.clearAudioFadeTimers();
+      if (typeof window.audioFadeSerial === 'number') window.audioFadeSerial++;
+    } catch (_) { }
+    cancelAutoMixUiHandoff(state.activeExecutionPending);
+    var savedVolume = clamp(window.targetVolume == null ? 1 : window.targetVolume, 0, 1);
+    setMainGain(savedVolume);
+    try {
+      if (window.audio) {
+        window.audio.muted = false;
+        window.audio.playbackRate = 1;
+        if (!window.gainNode) window.audio.volume = savedVolume;
+        else window.audio.volume = 1;
+      }
+    } catch (_) { }
+    if (window.spotifyDirectState && window.spotifyDirectState.active) {
+      await Promise.race([setSpotifyVolume(savedVolume), delay(900)]);
+    }
+    state.outputDirty = false;
+    return true;
   }
 
   function reset(reason, preservePrepared) {
@@ -542,6 +598,19 @@
     if (pending) pending.uiCoverGhost = null;
   }
 
+  function cancelAutoMixUiHandoff(pending) {
+    removeAutoMixCoverGhost(pending);
+    try {
+      document.body.classList.remove('sy-automix-handoff', 'sy-automix-ui-precommitted', 'sy-automix-cover-swap');
+    } catch (_) { }
+    if (window.shinayuuAutoMixHandoffClock) {
+      if (!pending || !pending.toIndex || Number(window.shinayuuAutoMixHandoffClock.toIndex) === Number(pending.toIndex)) {
+        window.shinayuuAutoMixHandoffClock.active = false;
+        window.shinayuuAutoMixHandoffClock = null;
+      }
+    }
+  }
+
   function createAutoMixCoverGhost(pending) {
     removeAutoMixCoverGhost(pending);
     if (!pending || !pending.uiCoverSrc) return null;
@@ -589,11 +658,12 @@
     } catch (_) { removeAutoMixCoverGhost(pending); }
   }
 
-  function commitAutoMixUiHandoff(pending, media) {
-    if (!pending) return Promise.resolve(false);
+  function commitAutoMixUiHandoff(pending, media, executionSerial) {
+    if (!pending || (executionSerial != null && !executionActive(executionSerial))) return Promise.resolve(false);
     var raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : function (fn) { return setTimeout(fn, 16); };
     return new Promise(function (resolve) {
       raf(function () {
+        if (executionSerial != null && !executionActive(executionSerial)) return resolve(false);
         try {
           window.shinayuuAutoMixCriticalUntil = performance.now() + 1050;
           document.body.classList.add('sy-automix-handoff', 'sy-automix-ui-precommitted');
@@ -610,6 +680,7 @@
 
           pending.uiPrecommitted = true;
           setTimeout(function () {
+            if (executionSerial != null && !executionActive(executionSerial)) return;
             var title = document.getElementById('thumb-title');
             var artist = document.getElementById('thumb-artist');
             if (title) title.textContent = pending.uiTitle || '';
@@ -621,6 +692,7 @@
           }, 34);
 
           setTimeout(function () {
+            if (executionSerial != null && !executionActive(executionSerial)) return;
             var thumb = document.getElementById('thumb-cover');
             if (pending.uiCoverSrc && thumb && thumb.src !== pending.uiCoverSrc) thumb.src = pending.uiCoverSrc;
             if (pending.uiCoverSrc && typeof window.setControlCoverSrc === 'function') window.setControlCoverSrc(pending.uiCoverSrc);
@@ -1073,10 +1145,11 @@
     } catch (_) { }
   }
 
-  function waitForPrimaryStart(index, timeoutMs) {
+  function waitForPrimaryStart(index, timeoutMs, executionSerial) {
     var started = Date.now();
     return new Promise(function (resolve) {
       (function check() {
+        if (executionSerial != null && !executionActive(executionSerial)) return resolve(false);
         var activeSpotify = window.spotifyDirectState && window.spotifyDirectState.active && window.spotifyDirectState.isPlaying;
         var activeHtml = window.audio && window.audio.src && !window.audio.paused && !window.audio.ended;
         if (Number(window.currentIdx) === Number(index) && (activeSpotify || activeHtml)) return resolve(true);
@@ -1086,7 +1159,8 @@
     });
   }
 
-  async function bridgeIncomingToPrimary(pending, incoming) {
+  async function bridgeIncomingToPrimary(pending, incoming, executionSerial) {
+    if (executionSerial != null && !executionActive(executionSerial)) return false;
     var savedVolume = clamp(window.targetVolume, 0, 1);
     var resumeAt = Math.max(0, Number(incoming.currentTime) || pending.bStart || 0);
     var playbackData = pending && pending.descriptor && pending.descriptor.playbackData;
@@ -1099,7 +1173,8 @@
       // without interrupting the media clock that is already playing.
       var incomingDuration = playbackDuration(pending.toSong) || Number(incoming.duration) || 0;
       if (pending.uiPrecommitPromise) await pending.uiPrecommitPromise;
-      else if (!pending.uiPrecommitted) await commitAutoMixUiHandoff(pending, incoming);
+      else if (!pending.uiPrecommitted) await commitAutoMixUiHandoff(pending, incoming, executionSerial);
+      if (executionSerial != null && !executionActive(executionSerial)) return false;
       window.shinayuuAutoMixHandoffClock = {
         active: true,
         media: incoming,
@@ -1113,6 +1188,7 @@
       // used to occur exactly when the progress bar wrapped to the next track.
       window.shinayuuAutoMixCriticalUntil = performance.now() + 900;
       await waitForVisualFrames(1);
+      if (executionSerial != null && !executionActive(executionSerial)) return false;
       var result = window.playQueueAt(pending.toIndex, {
         preserveHomeState: true,
         resumeAt: resumeAt,
@@ -1131,7 +1207,8 @@
         deferPreviousAudioCleanupMs: 520
       });
       await Promise.resolve(result);
-      var started = await waitForPrimaryStart(pending.toIndex, 2600);
+      if (executionSerial != null && !executionActive(executionSerial)) return false;
+      var started = await waitForPrimaryStart(pending.toIndex, 2600, executionSerial);
       if (!started || window.audio !== incoming) throw new Error('AUTOMIX_PRIMARY_ADOPTION_TIMEOUT');
       window.targetVolume = savedVolume;
       try {
@@ -1278,7 +1355,7 @@
       // still audible. The old implementation waited until the exact end of the
       // curve, so even a tiny layout task looked like the music had hit a bump.
       if (!pending.uiPrecommitPromise && p >= 0.72) {
-        pending.uiPrecommitPromise = Promise.resolve(commitAutoMixUiHandoff(pending, incoming)).catch(function () { return false; });
+        pending.uiPrecommitPromise = Promise.resolve(commitAutoMixUiHandoff(pending, incoming, executionSerial)).catch(function () { return false; });
       }
       if (p >= 1) break;
       await nextMixFrame();
@@ -1330,14 +1407,14 @@
       tempoRatio: pending.tempoRatio
     });
     var mixed = await runAudibleDualDeckMix(pending, outgoing, incoming, userVolume, executionSerial);
-    if (!mixed) {
+    if (!mixed || !executionActive(executionSerial)) {
       outgoing.onended = originalEnded;
       stopPreparedAudio(incoming);
       return false;
     }
     setMainGain(0);
-    var bridged = await bridgeIncomingToPrimary(pending, incoming);
-    if (!bridged && Number(window.trackSwitchToken) === pending.token && Number(window.currentIdx) === pending.fromIndex) {
+    var bridged = await bridgeIncomingToPrimary(pending, incoming, executionSerial);
+    if (!bridged && executionActive(executionSerial) && Number(window.trackSwitchToken) === pending.token && Number(window.currentIdx) === pending.fromIndex) {
       outgoing.onended = originalEnded;
       setMainGain(userVolume);
       try { await window.nextTrack(); } catch (_) { }
@@ -1366,7 +1443,8 @@
     var originalEnded = outgoing.onended;
     outgoing.onended = null;
     try {
-      await commitAutoMixUiHandoff(pending, null);
+      await commitAutoMixUiHandoff(pending, null, executionSerial);
+      if (!executionActive(executionSerial)) return false;
       var started = await window.playQueueAt(pending.toIndex, {
         preserveHomeState: true,
         autoMixHandoff: true,
@@ -1398,6 +1476,7 @@
       return true;
     } catch (error) {
       outgoing.onended = originalEnded;
+      if (!executionActive(executionSerial)) return false;
       window.targetVolume = savedVolume;
       setMainGain(savedVolume);
       await setSpotifyVolume(savedVolume);
@@ -1441,7 +1520,8 @@
       await incoming.play();
       if (!await waitForSecondaryProgress(incoming, 2200)) throw new Error('AUTOMIX_SECONDARY_NOT_PROGRESSING');
       var incomingDuration = playbackDuration(pending.toSong) || Number(incoming.duration) || 0;
-      if (!pending.uiPrecommitted) await commitAutoMixUiHandoff(pending, incoming);
+      if (!pending.uiPrecommitted) await commitAutoMixUiHandoff(pending, incoming, executionSerial);
+      if (!executionActive(executionSerial)) return false;
       var fadeMs = pending.gapless ? 420 : Math.max(1050, Math.min(1800, Number(pending.fadeSec || 1.4) * 1000));
       var fadeResults = await Promise.all([
         rampSpotifyVolume(savedVolume, 0, fadeMs, executionSerial),
@@ -1454,11 +1534,12 @@
       var spotifyStopped = await stopSpotifyForHtmlOwnership('automix-spotify-to-html', executionSerial);
       if (!spotifyStopped) return false;
       pending.spotifyProviderAlreadyStopped = true;
-      var bridged = await bridgeIncomingToPrimary(pending, incoming);
+      var bridged = await bridgeIncomingToPrimary(pending, incoming, executionSerial);
       if (!bridged) throw new Error('AUTOMIX_PRIMARY_ADOPTION_TIMEOUT');
       window.targetVolume = savedVolume;
       return true;
     } catch (error) {
+      if (!executionActive(executionSerial)) return false;
       window.targetVolume = savedVolume;
       await setSpotifyVolume(savedVolume);
       stopPreparedAudio(incoming);
@@ -1482,7 +1563,8 @@
         pending.spotifyPrepared = await window.prepareSpotifyDirectForSong(pending.toSong, {});
       }
       if (!executionActive(executionSerial)) return false;
-      await commitAutoMixUiHandoff(pending, null);
+      await commitAutoMixUiHandoff(pending, null, executionSerial);
+      if (!executionActive(executionSerial)) return false;
       var result = await window.playQueueAt(pending.toIndex, {
         preserveHomeState: true,
         autoMixHandoff: true,
@@ -1499,6 +1581,7 @@
       await setSpotifyVolume(savedVolume);
       return true;
     } catch (error) {
+      if (!executionActive(executionSerial)) return false;
       window.targetVolume = savedVolume;
       restoreAutoMixOutput('spotify-direct-handoff-failed');
       markTrackFailure(pending.toSong, 90000);
@@ -1511,6 +1594,11 @@
     if (!pending || state.executing || !state.enabled) return;
     if (pending.token !== Number(window.trackSwitchToken) || pending.fromIndex !== Number(window.currentIdx)) return;
     var executionSerial = ++state.executionSerial;
+    var settleExecution;
+    var executionSettled = new Promise(function (resolve) { settleExecution = resolve; });
+    state.activeExecutionPromise = executionSettled;
+    state.activeExecutionPending = pending;
+    pending.executionSerial = executionSerial;
     state.executionStartedAt = Date.now();
     state.executing = true;
     state.outputDirty = true;
@@ -1530,46 +1618,52 @@
     } catch (error) {
       console.warn('[CuefieldAutoMix] execute:', error && (error.message || error));
     } finally {
-      // A newer user selection or watchdog abort owns the player now. The stale
-      // transaction must not stop media, set volume, change status or schedule a
-      // recovery after it has lost ownership.
-      if (executionSerial !== state.executionSerial) return;
-      state.executing = false;
-      state.executionStartedAt = 0;
-      window.cuefieldAutoMixExecuting = false;
-      if (state.preparedAudio) stopPreparedAudio(state.preparedAudio);
-      state.preparedForToken = -1;
-      state.preparedForKey = '';
-      state.preloadMs = 0;
-      var finalOwner = succeeded
-        ? (pending.toSpotify ? 'spotify' : 'html-audio')
-        : (pending.fromSpotify ? 'spotify' : 'html-audio');
-      await restoreAutoMixOutput(succeeded ? 'transition-complete' : 'transition-failed', { owner: finalOwner });
-      setStatus(succeeded ? 'waiting' : 'error');
-      if (succeeded) {
-        state.bypassToken = -1;
-        schedulePrepare(900);
-      } else {
-        markTrackFailure(pending && pending.toSong, 90000);
-        state.bypassToken = Number(window.trackSwitchToken);
-        setTimeout(function () {
-          if (state.executing || !state.enabled || state.bypassToken !== Number(window.trackSwitchToken)) return;
-          var duration = playbackDuration(currentSong());
-          var remaining = Math.max(0, duration - playbackTime());
-          if (!playbackRunning() || (duration > 0 && remaining < 1.25)) {
-            var fallbackIndex = nextIndex(Number(window.currentIdx));
-            if (fallbackIndex >= 0 && fallbackIndex !== Number(window.currentIdx)) {
-              Promise.resolve(window.playQueueAt(fallbackIndex, {
-                preserveHomeState: true,
-                autoMixRecovery: true,
-                suppressPlayFailureNotice: true
-              })).catch(function () {});
+      try {
+        // A newer user selection or watchdog abort owns the player now. The stale
+        // transaction must not stop media, set volume, change status or schedule a
+        // recovery after it has lost ownership.
+        if (executionSerial !== state.executionSerial) return;
+        state.executing = false;
+        state.executionStartedAt = 0;
+        window.cuefieldAutoMixExecuting = false;
+        if (state.preparedAudio) stopPreparedAudio(state.preparedAudio);
+        state.preparedForToken = -1;
+        state.preparedForKey = '';
+        state.preloadMs = 0;
+        var finalOwner = succeeded
+          ? (pending.toSpotify ? 'spotify' : 'html-audio')
+          : (pending.fromSpotify ? 'spotify' : 'html-audio');
+        await restoreAutoMixOutput(succeeded ? 'transition-complete' : 'transition-failed', { owner: finalOwner });
+        setStatus(succeeded ? 'waiting' : 'error');
+        if (succeeded) {
+          state.bypassToken = -1;
+          schedulePrepare(900);
+        } else {
+          markTrackFailure(pending && pending.toSong, 90000);
+          state.bypassToken = Number(window.trackSwitchToken);
+          setTimeout(function () {
+            if (state.executing || !state.enabled || state.bypassToken !== Number(window.trackSwitchToken)) return;
+            var duration = playbackDuration(currentSong());
+            var remaining = Math.max(0, duration - playbackTime());
+            if (!playbackRunning() || (duration > 0 && remaining < 1.25)) {
+              var fallbackIndex = nextIndex(Number(window.currentIdx));
+              if (fallbackIndex >= 0 && fallbackIndex !== Number(window.currentIdx)) {
+                Promise.resolve(window.playQueueAt(fallbackIndex, {
+                  preserveHomeState: true,
+                  autoMixRecovery: true,
+                  suppressPlayFailureNotice: true
+                })).catch(function () {});
+              }
             }
-          }
-          // When the current track is still healthy, do not immediately retry
-          // AutoMix on the same token. Normal onended/queue logic remains in
-          // control and the bypass clears on the next track.
-        }, 0);
+            // When the current track is still healthy, do not immediately retry
+            // AutoMix on the same token. Normal onended/queue logic remains in
+            // control and the bypass clears on the next track.
+          }, 0);
+        }
+      } finally {
+        if (state.activeExecutionPending === pending) state.activeExecutionPending = null;
+        if (state.activeExecutionPromise === executionSettled) state.activeExecutionPromise = null;
+        settleExecution();
       }
     }
   }
@@ -1661,11 +1755,22 @@
 
   window.abortCuefieldAutoMixForPlaybackSelection = function (reason) {
     if (!state.executing && !state.preparing && !state.pending && !state.preparedAudio) {
-      if (state.outputDirty) restoreAutoMixOutput(reason || 'new-selection', { owner: activeOutputOwner() });
+      if (state.outputDirty) {
+        var restorePromise = Promise.resolve(restoreAutoMixOutput(reason || 'new-selection', { owner: activeOutputOwner() }));
+        state.lastAbortPromise = restorePromise;
+        restorePromise.then(function () {
+          if (state.lastAbortPromise === restorePromise) state.lastAbortPromise = null;
+        }, function () {
+          if (state.lastAbortPromise === restorePromise) state.lastAbortPromise = null;
+        });
+      }
       return false;
     }
     abortExecution(reason || 'new-selection');
     return true;
+  };
+  window.awaitCuefieldAutoMixReleaseForPlaybackSelection = function (reason) {
+    return releaseAutoMixForManualSelection(reason || 'manual-selection');
   };
 
   window.resetCuefieldAutoMix = function (reason, options) {
