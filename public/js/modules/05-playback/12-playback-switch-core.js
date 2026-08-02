@@ -18,6 +18,9 @@ function syncPlaybackStateFromAudioEvent(reason) {
   playing = isPlaying;
   setPlayIcon(isPlaying);
   if (!isPlaying) hideLoading();
+  if (reason === 'pause' || reason === 'manual-pause') {
+    if (typeof holdStageLyricsOnPlaybackPause === 'function') holdStageLyricsOnPlaybackPause(reason);
+  }
   if (reason === 'play' || reason === 'playing') {
     switchPlaybackVisualToEmily();
     if (typeof markStageLyricsPlaybackResume === 'function') markStageLyricsPlaybackResume(reason);

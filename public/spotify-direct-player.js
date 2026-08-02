@@ -2721,12 +2721,19 @@
       if (typeof window.syncNowPlayingBackgroundPlaybackState === 'function') {
         window.syncNowPlayingBackgroundPlaybackState(wasPlaying ? 'pause' : 'play');
       }
-      if (wasPlaying) await pauseSpotifyDirect(false);
-      else await resumeSpotifyDirect();
+      if (wasPlaying) {
+        if (typeof window.holdStageLyricsOnPlaybackPause === 'function') window.holdStageLyricsOnPlaybackPause('spotify-pause-requested');
+        await pauseSpotifyDirect(false);
+      } else {
+        var spotifyResumed = await resumeSpotifyDirect();
+        if (spotifyResumed && typeof window.markStageLyricsPlaybackResume === 'function') window.markStageLyricsPlaybackResume('spotify-resume-confirmed');
+      }
     } catch (error) {
       updateSpotifyState({ isPlaying: wasPlaying }, 'toggle-rollback');
       window.playing = wasPlaying;
       if (typeof window.setPlayIcon === 'function') window.setPlayIcon(wasPlaying);
+      if (wasPlaying && typeof window.markStageLyricsPlaybackResume === 'function') window.markStageLyricsPlaybackResume('spotify-toggle-rollback');
+      else if (!wasPlaying && typeof window.holdStageLyricsOnPlaybackPause === 'function') window.holdStageLyricsOnPlaybackPause('spotify-toggle-rollback');
       throw error;
     } finally {
       window.playToggleBusy = false;

@@ -1,23 +1,22 @@
-# ShinaYuu Music 2.1.2
+# ShinaYuu Music 2.1.3
 
-ShinaYuu Music 2.1.2 được phát triển trực tiếp từ source 2.1.1 của ShinaYuu. Bản 2.1.0 trước đó đã port chọn lọc các cải tiến ổn định từ **Mineradio 2.1.0**; bản 2.1.1 sửa giao diện Discord, loại bỏ độ trễ khi chọn bài và gia cố khởi động Spotify. Bản 2.1.2 tập trung vào timestamp YouTube MV và tính sống còn của transaction AutoMix/provider.
+ShinaYuu Music 2.1.3 được phát triển trực tiếp từ source 2.1.2. Bản này chỉ sửa vòng đời hiển thị lyrics khi tạm dừng và phát tiếp; hệ thống nguồn lyrics, AutoMix, Spotify/YouTube playback và các bản sửa timestamp YouTube MV của 2.1.2 được giữ nguyên.
 
-## Sửa lỗi chính của 2.1.1
+## Sửa lỗi trọng tâm
 
-- Đưa CSS Liquid Glass quan trọng của Discord vào ngay `public/index.html`, đồng thời vẫn giữ stylesheet ngoài. Giao diện không còn phụ thuộc hoàn toàn vào một file CSS có thể bị thiếu hoặc còn cache cũ khi cập nhật riêng thư mục `public`.
-- Khóa kích thước SVG, input, toggle và bốn nút Discord; các nút giữ bố cục lưới 2 × 2 thay vì biến thành biểu tượng HTML quá lớn.
-- Loại bỏ hàng chờ AutoMix tối đa 2,8 giây khỏi thao tác chọn bài thủ công. Lệnh chọn bài cập nhật trạng thái ngay trong cùng thao tác người dùng.
-- Khi AutoMix đang dừng Spotify để bàn giao cho nguồn HTML, lệnh Spotify mới chỉ chờ đúng thao tác dừng provider đang thực sự chạy, không chờ toàn bộ transaction AutoMix.
-- Prewarm Spotify Web Playback SDK sau khi giao diện sẵn sàng và có phiên đăng nhập, giảm thời gian kết nối ở lần phát đầu tiên.
-- Giữ nguyên các port chọn lọc từ Mineradio 2.1.0: persistence nhạc cục bộ, runtime recovery, Wallpaper Engine/fullscreen lifecycle, giới hạn provider fallback, layer lyrics và kệ playlist 3D.
+- Lyrics không còn biến mất khi tạm dừng bài hát.
+- Khi phát tiếp, dòng lyrics hiện tại được khôi phục ngay theo clock thật của nguồn phát.
+- Hỗ trợ đúng cả Spotify Web Playback SDK, YouTube Music, YouTube Video/MV và nhạc cục bộ.
+- Spotify được xử lý riêng vì khi phát trực tiếp bằng SDK, HTMLAudioElement có thể không có `src`; trạng thái pause/resume không còn phụ thuộc vào `audio.src`.
+- Nếu mesh lyrics bị mất trong một frame chuyển trạng thái, app dựng lại đúng dòng hiện tại mà không yêu cầu đổi chế độ Lyrics thủ công.
+- Tôn trọng tùy chọn “Giữ lyrics khi tạm dừng”; khi tùy chọn này bật, dòng hiện tại đứng yên thay vì bị retire khỏi stage.
 
-## Các phần được giữ nguyên
+## Giữ nguyên từ 2.1.2
 
-- Spotify Direct Player và YouTube playback của ShinaYuu.
+- Caption timestamp của đúng YouTube MV và forced alignment.
 - Nguồn lấy lyrics, parser LRC/YRC, Delay lyrics và lệch tiến độ từng bài.
-- Cấu trúc layer lyrics và kệ playlist 3D đã port chọn lọc từ Mineradio 2.1.0.
-- Updater riêng của ShinaYuu với lựa chọn bản vá nhanh hoặc bộ cài đầy đủ.
-- Toàn bộ UI mới sử dụng tiếng Việt và tiếng Anh; không nhập chuỗi tiếng Trung từ upstream.
+- AutoMix/provider ownership và timeout liveness.
+- Spotify Direct Player, YouTube playback, updater patch/bộ cài đầy đủ và UI song ngữ Việt/Anh.
 
 ## Chạy source
 
@@ -35,24 +34,16 @@ npm run build:win
 Installer dự kiến:
 
 ```text
-ShinaYuu-Music-2.1.2-Setup.exe
+ShinaYuu-Music-2.1.3-Setup.exe
 ```
 
 ## Phiên bản
 
 ```text
-Package version : 2.1.2
-Display version : 2.1.2
-Build version   : 2.1.2.0
+Package version : 2.1.3
+Display version : 2.1.3
+Build version   : 2.1.3.0
 ```
-
-## Sửa lỗi trọng tâm 2.1.2
-
-- YouTube MV dùng timestamp caption của chính video khi có; không dùng timeline chia đều trong lúc alignment đang chạy.
-- Giữ nguyên nguồn lyrics, UI lyrics cũ và các nút chỉnh delay/lệch tiến độ.
-- Chặn provider-stop Spotify cũ can thiệp vào bài mới.
-- AutoMix dùng giới hạn thích ứng 11,5–15,5 giây tùy loại handoff; khi quá hạn sẽ rollback về provider đang phát, tránh khóa toàn bộ playback mà không cắt ngang crossfade hai deck hợp lệ.
-
 ## Acknowledgments
 
 Mineradio was originally designed and developed by XxHuberrr, and is now being maintained and localized for global users by x.kihuh. Special thanks to **emily**, who co-created early concepts for the visual foundation and inspired the optimization direction for the `emily` visual preset.

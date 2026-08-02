@@ -6,11 +6,11 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('2.1.2 version and update repository are configured', () => {
+test('2.1.3 version and update repository are configured', () => {
   const pkg = JSON.parse(read('package.json'));
-  assert.equal(pkg.version, '2.1.2');
-  assert.equal(pkg.build.buildVersion, '2.1.2.0');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.2');
+  assert.equal(pkg.version, '2.1.3');
+  assert.equal(pkg.build.buildVersion, '2.1.3.0');
+  assert.equal(pkg.shinayuu.displayVersion, '2.1.3');
   assert.equal(pkg.shinayuu.update.owner, 'xkihuh');
   assert.equal(pkg.shinayuu.update.repo, 'Mineradio-ShinaYuu-Ver');
 });

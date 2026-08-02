@@ -1,3 +1,12 @@
+# ShinaYuu Music 2.1.3
+
+- Giữ dòng lyrics hiện tại trên stage khi tạm dừng, kể cả khi provider không dùng HTMLAudioElement có `src`.
+- Thêm nhận biết pause/ended theo provider cho Spotify SDK, AutoMix handoff và HTML audio.
+- Khôi phục mesh lyrics ngay tại clock hiện tại khi phát tiếp; không cần đổi chế độ Lyrics để ép render lại.
+- Kết nối sự kiện pause/play của HTML audio và toggle pause/resume của Spotify với cùng một lifecycle lyrics.
+- Giữ nguyên nguồn lyrics, parser, Delay lyrics, offset từng bài, YouTube MV timing và AutoMix/provider liveness của 2.1.2.
+- Đồng bộ package/display/build identity lên 2.1.3 / 2.1.3.0.
+
 # ShinaYuu Music 2.1.2
 
 - Ưu tiên caption có timestamp của đúng YouTube MV trước timestamp mượn từ bản album.

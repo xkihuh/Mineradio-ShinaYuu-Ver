@@ -8,7 +8,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('2.1.2 treats Spotify, YouTube Music and YouTube Video as separate fallback platforms', () => {
+test('2.1.3 treats Spotify, YouTube Music and YouTube Video as separate fallback platforms', () => {
   const fallback = read('public/js/modules/05-playback/11-provider-fallback.js');
   assert.match(fallback, /SOURCE_FALLBACK_DIRECT_PROVIDERS = \['youtube-music', 'youtube-video', 'spotify'\]/);
   assert.match(fallback, /function playbackPlatformKey\(song\)/);
