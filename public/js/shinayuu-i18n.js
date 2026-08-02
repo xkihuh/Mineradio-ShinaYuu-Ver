@@ -54,6 +54,8 @@ Object.keys(SHINAYUU_V6_DIRECT_TEXT).forEach(function(key){SOURCE[key]=SHINAYUU_
 var SHINAYUU_UPDATE_UI_TEXT={
 "Đã có phiên bản mới":["Đã có phiên bản mới","A new version is available"],
 "Bộ cài đầy đủ":["Bộ cài đầy đủ","Full installer"],
+"Cập nhật bằng bản vá":["Cập nhật bằng bản vá","Update with patch"],
+"Chọn bản vá nhanh hoặc tải bộ cài đầy đủ để cài đặt.":["Chọn bản vá nhanh hoặc tải bộ cài đầy đủ để cài đặt.","Choose the quick patch or download the full installer."],
 "Đang tải bản cập nhật":["Đang tải bản cập nhật","Downloading update"],
 "Đang áp dụng bản vá":["Đang áp dụng bản vá","Applying patch"],
 "Đã tải xong bộ cài":["Đã tải xong bộ cài","Installer downloaded"],

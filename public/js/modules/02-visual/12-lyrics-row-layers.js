@@ -1263,6 +1263,12 @@ function updateLyricRowLayers(data, opts) {
   var seed = Number(opts.seed) || 0;
   var renderBase = opts.renderBase == null ? 43 : Number(opts.renderBase);
   if (!isFinite(renderBase)) renderBase = 43;
+  // Mineradio 2.1.0 layer-structure port: keep all lyric sub-groups on the
+  // same authoritative render plane so multi-line context cannot fall behind
+  // the 3D playlist shelf. This changes visual ordering only, not lyric data.
+  if (data.rowLayerGroup) data.rowLayerGroup.renderOrder = renderBase;
+  if (data.contextGroup) data.contextGroup.renderOrder = renderBase;
+  if (data.readabilityGroup) data.readabilityGroup.renderOrder = renderBase;
   var translationMode = normalizeLyricTranslationMode(fx && fx.lyricTranslationMode);
   var displayMode = normalizeLyricDisplayMode(data.displayMode || (fx && fx.lyricDisplayMode));
   var singleLineStaticSwap = displayMode === 'single' && !data.usesTrack;

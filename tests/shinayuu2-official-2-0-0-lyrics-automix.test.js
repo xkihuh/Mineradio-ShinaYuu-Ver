@@ -37,14 +37,14 @@ function lyricAdapter(provider, latencyMs, counters) {
   };
 }
 
-test('official identity is ShinaYuu Music 2.0.17', () => {
+test('official identity is ShinaYuu Music 2.1.0', () => {
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
-  assert.equal(pkg.version, '2.0.17');
-  assert.equal(pkg.displayVersion, '2.0.17');
-  assert.equal(pkg.shinayuu.displayVersion, '2.0.17');
-  assert.equal(pkg.build.buildVersion, '2.0.17.0');
-  assert.equal(lock.version, '2.0.17');
+  assert.equal(pkg.version, '2.1.0');
+  assert.equal(pkg.displayVersion, '2.1.0');
+  assert.equal(pkg.shinayuu.displayVersion, '2.1.0');
+  assert.equal(pkg.build.buildVersion, '2.1.0.0');
+  assert.equal(lock.version, '2.1.0');
 });
 
 test('automatic stage mode and lyric line controls are silent', () => {

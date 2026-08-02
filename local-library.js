@@ -12,7 +12,9 @@ const sevenBin = require('7zip-bin');
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.flac', '.wav', '.ogg', '.opus', '.m4a', '.aac', '.wma', '.webm']);
 const ARCHIVE_EXTENSIONS = new Set(['.zip', '.rar', '.7z']);
 const LYRIC_EXTENSIONS = ['.yrc', '.lrc', '.txt'];
-const STATE_VERSION = 1;
+const STATE_VERSION = 2;
+const MAX_STATE_BYTES = 24 * 1024 * 1024;
+const MAX_PERSISTED_TRACKS = 50000;
 
 function sha1(value) {
   return crypto.createHash('sha1').update(String(value || '')).digest('hex');
@@ -88,6 +90,7 @@ class LocalLibrary extends EventEmitter {
     super();
     this.dataDir = path.resolve(options.dataDir || process.env.SHINAYUU_DATA_DIR || path.join(__dirname, '.data'));
     this.stateFile = path.join(this.dataDir, 'local-library.json');
+    this.stateBackupFile = path.join(this.dataDir, 'local-library.json.bak');
     this.cacheRoot = path.join(this.dataDir, 'local-library-cache');
     this.archiveRoot = path.join(this.cacheRoot, 'archives');
     this.coverRoot = path.join(this.cacheRoot, 'covers');
@@ -100,6 +103,8 @@ class LocalLibrary extends EventEmitter {
     this.revision = 0;
     this.lastError = '';
     this.changeTimer = null;
+    this.stateWriteChain = Promise.resolve();
+    this.loadedFromBackup = false;
   }
 
 
@@ -112,20 +117,98 @@ class LocalLibrary extends EventEmitter {
     this.changeTimer.unref?.();
   }
 
+  async readStoredStateFile(filePath) {
+    try {
+      const stat = await fsp.stat(filePath);
+      if (!stat.isFile() || stat.size <= 0 || stat.size > MAX_STATE_BYTES) return null;
+      const parsed = JSON.parse(await fsp.readFile(filePath, 'utf8'));
+      if (!parsed || !Array.isArray(parsed.sources)) return null;
+      if (![1, STATE_VERSION].includes(Number(parsed.version || 1))) return null;
+      return parsed;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async loadStoredState() {
+    const primary = await this.readStoredStateFile(this.stateFile);
+    if (primary) return primary;
+    const backup = await this.readStoredStateFile(this.stateBackupFile);
+    if (backup) {
+      this.loadedFromBackup = true;
+      this.lastError = 'LOCAL_LIBRARY_STATE_RECOVERED_FROM_BACKUP';
+      return backup;
+    }
+    return null;
+  }
+
+  persistedTrack(track) {
+    if (!track || !track.id || !track.sourceId || !track.filePath) return null;
+    return {
+      id: String(track.id),
+      localId: String(track.localId || track.id),
+      sourceId: String(track.sourceId),
+      sourceType: String(track.sourceType || ''),
+      sourceLabel: String(track.sourceLabel || ''),
+      filePath: String(track.filePath),
+      relativePath: String(track.relativePath || ''),
+      coverPath: String(track.coverPath || ''),
+      lyricPath: String(track.lyricPath || ''),
+      name: String(track.name || track.title || ''),
+      title: String(track.title || track.name || ''),
+      artist: String(track.artist || 'Unknown Artist'),
+      album: String(track.album || ''),
+      duration: Math.max(0, Number(track.duration) || 0),
+      durationMs: Math.max(0, Number(track.durationMs) || 0),
+      size: Math.max(0, Number(track.size) || 0),
+      modifiedAt: Math.max(0, Number(track.modifiedAt) || 0),
+      provider: 'local',
+      realProvider: 'local',
+      source: 'local',
+      type: 'local',
+      localKey: String(track.localKey || track.id),
+      localFileId: String(track.localFileId || track.id),
+      playbackTransport: 'local',
+      lyricsMetadataProvider: 'local',
+    };
+  }
+
+  restorePersistedTracks(stored) {
+    const sourceById = new Map(this.sources.map((source) => [source.id, source]));
+    const rows = Array.isArray(stored && stored.tracks) ? stored.tracks.slice(0, MAX_PERSISTED_TRACKS) : [];
+    for (const raw of rows) {
+      if (!raw || !sourceById.has(String(raw.sourceId || ''))) continue;
+      const source = sourceById.get(String(raw.sourceId));
+      const filePath = path.resolve(String(raw.filePath || ''));
+      const expectedRoot = source.type === 'archive' ? source.extractDir : source.path;
+      if (!filePath || !expectedRoot || !isInside(expectedRoot, filePath)) continue;
+      const relativePath = String(raw.relativePath || path.relative(expectedRoot, filePath)).replace(/\\/g, '/');
+      const expectedId = sha1(`${source.id}:${relativePath.toLowerCase()}`);
+      if (String(raw.id || '') !== expectedId) continue;
+      const restored = this.persistedTrack({ ...raw, id: expectedId, relativePath, filePath });
+      if (!restored) continue;
+      restored.localUrl = `/api/local/file?id=${encodeURIComponent(expectedId)}`;
+      restored.audioUrl = restored.localUrl;
+      restored.cover = restored.coverPath ? `/api/local/cover?id=${encodeURIComponent(expectedId)}&v=${Math.round(restored.modifiedAt || 0)}` : '';
+      this.tracks.set(expectedId, restored);
+    }
+  }
+
   async init() {
     if (this.initialized) return this.getState();
     if (this.initializing) return this.initializing;
     this.initializing = (async () => {
       await ensureDir(this.archiveRoot);
       await ensureDir(this.coverRoot);
-      let stored = null;
-      try { stored = JSON.parse(await fsp.readFile(this.stateFile, 'utf8')); } catch (_) {}
+      const stored = await this.loadStoredState();
       this.sources = Array.isArray(stored && stored.sources)
         ? stored.sources.map((source) => this.normalizeSource(source)).filter(Boolean)
         : [];
+      this.restorePersistedTracks(stored);
       await this.refreshAll({ persist: false });
       this.sources.forEach((source) => this.watchSource(source));
       this.initialized = true;
+      if (this.loadedFromBackup) await this.saveState().catch(() => {});
       return this.getState();
     })().finally(() => { this.initializing = null; });
     return this.initializing;
@@ -149,11 +232,12 @@ class LocalLibrary extends EventEmitter {
     };
   }
 
-  async saveState() {
+  async writeStateSnapshot() {
     await ensureDir(path.dirname(this.stateFile));
     const payload = {
       version: STATE_VERSION,
       revision: this.revision,
+      savedAt: Date.now(),
       sources: this.sources.map((source) => ({
         id: source.id,
         type: source.type,
@@ -163,11 +247,32 @@ class LocalLibrary extends EventEmitter {
         updatedAt: source.updatedAt,
         trackCount: source.trackCount,
       })),
+      tracks: [...this.tracks.values()].slice(0, MAX_PERSISTED_TRACKS).map((track) => this.persistedTrack(track)).filter(Boolean),
     };
-    const temp = `${this.stateFile}.${process.pid}.tmp`;
-    await fsp.writeFile(temp, JSON.stringify(payload, null, 2), 'utf8');
-    try { await fsp.rename(temp, this.stateFile); }
-    catch (_) { await fsp.copyFile(temp, this.stateFile); await fsp.unlink(temp).catch(() => {}); }
+    const serialized = JSON.stringify(payload, null, 2);
+    if (Buffer.byteLength(serialized, 'utf8') > MAX_STATE_BYTES) throw new Error('LOCAL_LIBRARY_STATE_TOO_LARGE');
+    const temp = `${this.stateFile}.${process.pid}.${Date.now()}.tmp`;
+    await fsp.writeFile(temp, serialized, 'utf8');
+    try {
+      const handle = await fsp.open(temp, 'r');
+      try { await handle.sync(); } finally { await handle.close(); }
+    } catch (_) {}
+    if (await pathExists(this.stateFile)) {
+      await fsp.copyFile(this.stateFile, this.stateBackupFile).catch(() => {});
+    }
+    try {
+      await fsp.rename(temp, this.stateFile);
+    } catch (_) {
+      await fsp.copyFile(temp, this.stateFile);
+      await fsp.unlink(temp).catch(() => {});
+    }
+    this.loadedFromBackup = false;
+  }
+
+  async saveState() {
+    const write = () => this.writeStateSnapshot();
+    this.stateWriteChain = this.stateWriteChain.then(write, write);
+    return this.stateWriteChain;
   }
 
   async addPaths(paths) {
@@ -396,7 +501,9 @@ class LocalLibrary extends EventEmitter {
     }));
     return {
       ok: true,
+      version: STATE_VERSION,
       revision: this.revision,
+      recoveredFromBackup: this.loadedFromBackup,
       sources: this.sources.map((source) => this.publicSource(source)),
       playlists,
       tracks,
@@ -436,8 +543,11 @@ class LocalLibrary extends EventEmitter {
   async close() {
     if (this.changeTimer) clearTimeout(this.changeTimer);
     this.changeTimer = null;
+    for (const timer of this.refreshTimers.values()) clearTimeout(timer);
+    this.refreshTimers.clear();
     for (const watcher of this.watchers.values()) await watcher.close().catch(() => {});
     this.watchers.clear();
+    await this.stateWriteChain.catch(() => {});
   }
 }
 

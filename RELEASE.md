@@ -1,6 +1,7 @@
-# ShinaYuu Music 2.0.17
+# ShinaYuu Music 2.1.0
 
-- Fixed manual song selection during an active AutoMix crossfade.
-- Manual selection now waits for the cancelled AutoMix/provider transaction to settle before starting the chosen track.
-- Stale AutoMix code can no longer call `playQueueAt`, `nextTrack`, restore old volume, or stop the newly selected provider after losing ownership.
-- Preserved the restored lyrics timing controls and updater-logo fix from 2.0.15–2.0.16.
+- Selectively ports Mineradio 2.1.0 local-library persistence, runtime recovery, Wallpaper Engine/fullscreen lifecycle and visual-layer fixes.
+- Keeps ShinaYuu Spotify/YouTube playback, AutoMix ownership, lyrics providers and bilingual UI intact.
+- Bounds automatic provider fallback so it cannot loop through providers or the queue indefinitely.
+- Adds a dedicated **Download full installer** action beside the quick-patch update action.
+- Keeps all newly introduced UI text in Vietnamese and English.

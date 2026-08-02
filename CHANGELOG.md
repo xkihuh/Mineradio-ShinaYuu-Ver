@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.1.0
+
+- Selectively ported Mineradio 2.1.0 stability improvements without replacing ShinaYuu playback, AutoMix or lyrics providers.
+- Persisted a validated local-track snapshot with atomic primary/backup state files and serialized writes.
+- Added bounded main-renderer recovery with cooldown and retry limits for renderer termination or prolonged unresponsiveness.
+- Added lifecycle serial guards for Wallpaper Engine/fullscreen transitions so stale callbacks cannot restart or resize an obsolete host state.
+- Strengthened provider fallback with a total action budget, no-progress timeout and user-intent cancellation.
+- Ported the lyrics row-group render-order correction and pointer-aware 3D shelf foreground behavior from Mineradio 2.1.0.
+- Added separate quick-patch and full-installer actions to the update dialog.
+- Preserved Vietnamese/English UI and prevented upstream Chinese strings from entering new ShinaYuu controls.
+- Bumped package/display/build identity to 2.1.0 / 2.1.0.0.
+
 ## 2.0.17
 
 - Fixed a race where selecting another song during the audible AutoMix overlap could leave the new song unplayable and lock the playback engine.

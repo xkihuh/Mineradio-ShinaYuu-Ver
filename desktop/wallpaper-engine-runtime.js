@@ -3998,22 +3998,23 @@ class WallpaperEngineRuntime {
   }
 
   async dispose() {
+    const isClean = () => !this.active && !this.pending;
     if (this.disposed) {
       return {
-        ok: !this.active && !this.pending,
-        stopped: !this.active && !this.pending,
+        ok: isClean(),
+        stopped: isClean(),
         active: !!this.active,
         sessionId: this.active ? this.active.sessionId : '',
-        reason: this.active || this.pending ? 'WALLPAPER_ENGINE_WINDOW_CLOSE_FAILED' : '',
+        reason: isClean() ? '' : 'WALLPAPER_ENGINE_WINDOW_CLOSE_FAILED',
       };
     }
     this.disposed = true;
     let result = await this.stop();
-    if (!result || result.stopped !== true) {
+    if (!isClean() && (!result || result.stopped !== true)) {
       await this.nativeSleep(180);
       result = await this.stop();
     }
-    if (!result || result.stopped !== true) {
+    if (!isClean() && (!result || result.stopped !== true)) {
       const leftovers = [];
       if (this.pending) leftovers.push(this.pending);
       if (this.active && (!this.pending || this.active.sessionId !== this.pending.sessionId)) leftovers.push(this.active);
@@ -4029,6 +4030,15 @@ class WallpaperEngineRuntime {
         active: !!this.active,
         sessionId: this.active ? this.active.sessionId : '',
         reason: 'WALLPAPER_ENGINE_WINDOW_CLOSE_FAILED',
+      };
+    } else if (isClean()) {
+      result = {
+        ...(result || {}),
+        ok: true,
+        stopped: true,
+        active: false,
+        sessionId: '',
+        reason: '',
       };
     } else {
       result = { ...result, ok: true };

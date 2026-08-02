@@ -76,6 +76,12 @@ let fullDesktopEscapeExitPending = false;
 let fullDesktopEscapeSuspendedBinding = null;
 let fullDesktopEnableOperation = 0;
 let fullDesktopEnablePending = false;
+let mainRuntimeRecoveryTimer = null;
+let mainUnresponsiveTimer = null;
+let mainRuntimeRecoveryHistory = [];
+let mainRuntimeLastHealthyAt = 0;
+let wallpaperFullscreenLifecycleSerial = 0;
+let wallpaperFullscreenLifecycleTimer = null;
 
 const WINDOWED_ASPECT = 16 / 9;
 const WINDOWED_SCALE = 3 / 4;
@@ -101,6 +107,10 @@ const STARTUP_SERVER_TIMEOUT_MS = 10000;
 const STARTUP_HTTP_TIMEOUT_MS = 8000;
 const STARTUP_NAVIGATION_TIMEOUT_MS = 15000;
 const STARTUP_SHOW_WATCHDOG_MS = 3500;
+const MAIN_RUNTIME_RECOVERY_WINDOW_MS = 10 * 60 * 1000;
+const MAIN_RUNTIME_RECOVERY_COOLDOWN_MS = 45000;
+const MAIN_RUNTIME_RECOVERY_MAX_ATTEMPTS = 2;
+const MAIN_UNRESPONSIVE_GRACE_MS = 7000;
 const CACHE_SETTINGS_FILE = 'cache-settings.json';
 const LYRIC_CACHE_VERSION = 1;
 const LYRIC_CACHE_MAX_BYTES = 96 * 1024 * 1024;
@@ -3816,6 +3826,70 @@ async function ensureLocalServerStarted() {
   return localServerStartPromise;
 }
 
+function pruneMainRuntimeRecoveryHistory(now = Date.now()) {
+  mainRuntimeRecoveryHistory = mainRuntimeRecoveryHistory.filter((at) => now - at < MAIN_RUNTIME_RECOVERY_WINDOW_MS);
+  return mainRuntimeRecoveryHistory.length;
+}
+
+function markMainRuntimeHealthy(reason) {
+  mainRuntimeLastHealthyAt = Date.now();
+  if (mainUnresponsiveTimer) {
+    clearTimeout(mainUnresponsiveTimer);
+    mainUnresponsiveTimer = null;
+  }
+  if (reason) console.log('[RuntimeRecovery] healthy:', reason);
+}
+
+function scheduleMainWindowRuntimeRecovery(win, reason) {
+  if (appQuitting || !win || win.isDestroyed()) return false;
+  const now = Date.now();
+  pruneMainRuntimeRecoveryHistory(now);
+  const lastAttemptAt = mainRuntimeRecoveryHistory.length ? mainRuntimeRecoveryHistory[mainRuntimeRecoveryHistory.length - 1] : 0;
+  if (mainRuntimeRecoveryTimer || (lastAttemptAt && now - lastAttemptAt < MAIN_RUNTIME_RECOVERY_COOLDOWN_MS)) return false;
+  if (mainRuntimeRecoveryHistory.length >= MAIN_RUNTIME_RECOVERY_MAX_ATTEMPTS) {
+    console.warn('[RuntimeRecovery] retry budget exhausted:', reason || 'unknown');
+    return false;
+  }
+  mainRuntimeRecoveryHistory.push(now);
+  const recoverySerial = mainRuntimeRecoveryHistory.length;
+  mainRuntimeRecoveryTimer = setTimeout(async () => {
+    mainRuntimeRecoveryTimer = null;
+    if (appQuitting) return;
+    try {
+      stopWallpaperEngineRuntimeForRenderer(`runtime-recovery:${reason || 'unknown'}`);
+      await closeWallpaperWindow(`runtime-recovery:${reason || 'unknown'}`).catch(() => {});
+      if (!win || win.isDestroyed()) {
+        await createWindow();
+      } else {
+        try { win.webContents.stop(); } catch (_) {}
+        await ensureLocalServerStarted();
+        await loadMainWindowWithRetry(win);
+        showMainWindowSafely(win, `runtime-recovery-${recoverySerial}`);
+      }
+      markMainRuntimeHealthy(`recovered:${reason || 'unknown'}`);
+    } catch (error) {
+      console.error('[RuntimeRecovery] failed:', error && (error.stack || error.message) || error);
+      writeStartupErrorLog('Main window runtime recovery', 'MR-RUNTIME-RECOVERY', error);
+    }
+  }, 350);
+  mainRuntimeRecoveryTimer.unref?.();
+  return true;
+}
+
+function scheduleWallpaperFullscreenReconcile(win, reason, delay, restoreWindowedBounds) {
+  const serial = ++wallpaperFullscreenLifecycleSerial;
+  if (wallpaperFullscreenLifecycleTimer) clearTimeout(wallpaperFullscreenLifecycleTimer);
+  wallpaperFullscreenLifecycleTimer = setTimeout(() => {
+    wallpaperFullscreenLifecycleTimer = null;
+    if (serial !== wallpaperFullscreenLifecycleSerial || !win || win.isDestroyed()) return;
+    if (restoreWindowedBounds) applyWindowedBounds(win);
+    scheduleWallpaperEngineHostBoundsRestart(win, reason);
+    if (win.isVisible() && !win.isMinimized()) resumeWallpaperEngineForVisibleHost(win, reason);
+  }, Math.max(0, Number(delay) || 0));
+  wallpaperFullscreenLifecycleTimer.unref?.();
+  return serial;
+}
+
 function showMainWindowSafely(win, reason) {
   if (!win || win.isDestroyed()) return false;
   if (win.__mineradioStartupShowTimer) {
@@ -3933,9 +4007,11 @@ async function createWindowOnce() {
   });
 
   win.webContents.on('did-finish-load', () => {
+    markMainRuntimeHealthy('did-finish-load');
     showMainWindowSafely(win, 'did-finish-load');
   });
   win.webContents.on('dom-ready', () => {
+    markMainRuntimeHealthy('dom-ready');
     showMainWindowSafely(win, 'dom-ready');
   });
   win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
@@ -3943,15 +4019,24 @@ async function createWindowOnce() {
     console.warn('[StartupWindow] did-fail-load:', errorCode, errorDescription, validatedURL || '');
   });
   win.webContents.on('render-process-gone', (_event, details) => {
-    stopWallpaperEngineRuntimeForRenderer(`render-process-gone:${details && details.reason || 'unknown'}`);
-    closeWallpaperWindow(`main-renderer-gone:${details && details.reason || 'unknown'}`).catch(() => {});
-    const error = new Error(`renderer process gone: ${details && details.reason || 'unknown'} exitCode=${details && details.exitCode}`);
+    const goneReason = details && details.reason || 'unknown';
+    stopWallpaperEngineRuntimeForRenderer(`render-process-gone:${goneReason}`);
+    closeWallpaperWindow(`main-renderer-gone:${goneReason}`).catch(() => {});
+    const error = new Error(`renderer process gone: ${goneReason} exitCode=${details && details.exitCode}`);
     console.error('[StartupWindow]', error.message);
     if (!startupCompleted) writeStartupErrorLog('Renderer process gone', 'MR-BOOT-GPU', error);
+    else scheduleMainWindowRuntimeRecovery(win, `renderer-gone:${goneReason}`);
   });
   win.on('unresponsive', () => {
     console.warn('[StartupWindow] main window became unresponsive', { startupCompleted });
+    if (!startupCompleted || mainUnresponsiveTimer) return;
+    mainUnresponsiveTimer = setTimeout(() => {
+      mainUnresponsiveTimer = null;
+      scheduleMainWindowRuntimeRecovery(win, 'unresponsive');
+    }, MAIN_UNRESPONSIVE_GRACE_MS);
+    mainUnresponsiveTimer.unref?.();
   });
+  win.on('responsive', () => markMainRuntimeHealthy('responsive'));
 
   win.webContents.on('before-input-event', (event, input) => {
     if (isZoomShortcutInput(input)) {
@@ -4064,6 +4149,19 @@ async function createWindowOnce() {
       clearTimeout(win.__mineradioStartupShowTimer);
       win.__mineradioStartupShowTimer = null;
     }
+    if (mainRuntimeRecoveryTimer) {
+      clearTimeout(mainRuntimeRecoveryTimer);
+      mainRuntimeRecoveryTimer = null;
+    }
+    if (mainUnresponsiveTimer) {
+      clearTimeout(mainUnresponsiveTimer);
+      mainUnresponsiveTimer = null;
+    }
+    if (wallpaperFullscreenLifecycleTimer) {
+      clearTimeout(wallpaperFullscreenLifecycleTimer);
+      wallpaperFullscreenLifecycleTimer = null;
+    }
+    wallpaperFullscreenLifecycleSerial += 1;
     if (mainWindowStateTimer) {
       clearTimeout(mainWindowStateTimer);
       mainWindowStateTimer = null;
@@ -4089,29 +4187,23 @@ async function createWindowOnce() {
     sendWindowState(win);
     // Some Windows builds coalesce the final resize event during native
     // fullscreen. Re-arm the settled debounce from the authoritative event.
-    setTimeout(() => scheduleWallpaperEngineHostBoundsRestart(win, 'enter-full-screen'), 40);
+    scheduleWallpaperFullscreenReconcile(win, 'enter-full-screen', 40, false);
   });
   win.on('leave-full-screen', () => {
     windowFullscreenActive = false;
     setMainWindowFullscreenResizeGuard(win, false);
-    setTimeout(() => {
-      applyWindowedBounds(win);
-      scheduleWallpaperEngineHostBoundsRestart(win, 'leave-full-screen');
-    }, 50);
+    scheduleWallpaperFullscreenReconcile(win, 'leave-full-screen', 50, true);
   });
   win.on('enter-html-full-screen', () => {
     htmlFullscreenActive = true;
     setMainWindowFullscreenResizeGuard(win, true);
     sendWindowState(win);
-    setTimeout(() => scheduleWallpaperEngineHostBoundsRestart(win, 'enter-html-full-screen'), 40);
+    scheduleWallpaperFullscreenReconcile(win, 'enter-html-full-screen', 40, false);
   });
   win.on('leave-html-full-screen', () => {
     htmlFullscreenActive = false;
     setMainWindowFullscreenResizeGuard(win, false);
-    setTimeout(() => {
-      applyWindowedBounds(win);
-      scheduleWallpaperEngineHostBoundsRestart(win, 'leave-html-full-screen');
-    }, 50);
+    scheduleWallpaperFullscreenReconcile(win, 'leave-html-full-screen', 50, true);
   });
 
   const startupShell = path.join(__dirname, 'startup.html');

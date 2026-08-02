@@ -120,3 +120,32 @@ body.sy-automix-cover-swap #thumb-cover{
 /* 2.0.16 — keep the native updater app icon at the compact app-logo size. */
 #shinayuu-native-modal[data-kind="update"] .shinayuu-update-logo{position:relative!important;display:grid!important;place-items:center!important;overflow:hidden!important;flex:0 0 52px!important;width:52px!important;min-width:52px!important;max-width:52px!important;height:52px!important;min-height:52px!important;max-height:52px!important}
 #shinayuu-native-modal[data-kind="update"] .shinayuu-update-logo>img{display:block!important;width:42px!important;height:42px!important;min-width:0!important;min-height:0!important;max-width:42px!important;max-height:42px!important;object-fit:contain!important;object-position:center!important;border:0!important;border-radius:12px!important;margin:0!important;padding:0!important;box-shadow:none!important}
+
+/* 2.1.0 — offer the full installer beside the quick patch without crowding the updater. */
+#shinayuu-native-modal[data-kind="update"] .shinayuu-update-actions.has-installer-choice{
+  display:grid!important;
+  grid-template-columns:minmax(92px,.75fr) minmax(145px,1fr) minmax(155px,1.08fr)!important;
+  align-items:stretch!important;
+  gap:8px!important;
+}
+#shinayuu-native-modal[data-kind="update"] .shinayuu-update-actions.has-installer-choice .shinayuu-native-button{
+  width:100%!important;
+  min-width:0!important;
+  min-height:38px!important;
+  padding:0 11px!important;
+  white-space:normal!important;
+  text-align:center!important;
+  line-height:1.2!important;
+}
+#shinayuu-native-modal[data-kind="update"] .shinayuu-update-actions.has-installer-choice .installer{
+  border-color:rgba(123,212,255,.25)!important;
+  background:linear-gradient(135deg,rgba(62,183,255,.12),rgba(137,96,255,.11))!important;
+}
+@media(max-width:560px){
+  #shinayuu-native-modal[data-kind="update"] .shinayuu-update-actions.has-installer-choice{
+    grid-template-columns:1fr 1fr!important;
+  }
+  #shinayuu-native-modal[data-kind="update"] .shinayuu-update-actions.has-installer-choice #shinayuu-update-later{
+    grid-column:1/-1!important;
+  }
+}

@@ -20,7 +20,7 @@
       mvBackground: 'MV của bài đang phát', mvHint: 'Dùng video YouTube đúng của bài hiện tại làm nền, không thay đổi bố cục giao diện hoặc lyrics.', on: 'Bật', off: 'Tắt', full: 'Fill', fit: 'Fit', original: 'Gốc',
       discord: 'Discord Rich Presence', discordId: 'Discord Application ID', configure: 'Lưu cấu hình', reconnect: 'Kết nối lại', portal: 'Mở Discord Developer Portal',
       update: 'Cập nhật ShinaYuu Music', checkUpdate: 'Kiểm tra cập nhật', currentVersion: 'Phiên bản hiện tại', latestVersion: 'Phiên bản mới nhất', upToDate: 'Bạn đang dùng phiên bản mới nhất.',
-      updateAvailable: 'Đã có phiên bản mới', updateNow: 'Cập nhật ngay', later: 'Để sau', quickPatch: 'Bản vá nhanh', fullInstaller: 'Bộ cài đầy đủ', downloadingUpdate: 'Đang tải bản cập nhật', applyingPatch: 'Đang áp dụng bản vá', preparingInstall: 'Đã tải xong bộ cài', restartNow: 'Khởi động lại ngay', installNow: 'Cài đặt ngay', retry: 'Thử lại', fallbackInstaller: 'Dùng bộ cài đầy đủ', updateReady: 'Bản cập nhật đã sẵn sàng', updateFailed: 'Cập nhật không thành công', releaseNotes: 'Nội dung cập nhật', updateSizeUnknown: 'Không rõ dung lượng', updateChecking: 'Đang kiểm tra phiên bản mới…', updateProgress: 'Tiến trình cập nhật', patchPreferred: 'Ứng dụng sẽ ưu tiên tải bản vá nhỏ và tự chuyển sang bộ cài đầy đủ khi cần.', installerWillClose: 'Bộ cài sẽ mở và ShinaYuu Music sẽ đóng để hoàn tất cập nhật.', restartToFinish: 'Khởi động lại ShinaYuu Music để sử dụng phiên bản mới.',
+      updateAvailable: 'Đã có phiên bản mới', updateNow: 'Cập nhật ngay', later: 'Để sau', quickPatch: 'Bản vá nhanh', fullInstaller: 'Bộ cài đầy đủ', updateWithPatch: 'Cập nhật bằng bản vá', downloadFullInstaller: 'Tải bộ cài đầy đủ', chooseUpdateMethod: 'Chọn bản vá nhanh hoặc tải bộ cài đầy đủ để cài đặt.', downloadingUpdate: 'Đang tải bản cập nhật', applyingPatch: 'Đang áp dụng bản vá', preparingInstall: 'Đã tải xong bộ cài', restartNow: 'Khởi động lại ngay', installNow: 'Cài đặt ngay', retry: 'Thử lại', fallbackInstaller: 'Dùng bộ cài đầy đủ', updateReady: 'Bản cập nhật đã sẵn sàng', updateFailed: 'Cập nhật không thành công', releaseNotes: 'Nội dung cập nhật', updateSizeUnknown: 'Không rõ dung lượng', updateChecking: 'Đang kiểm tra phiên bản mới…', updateProgress: 'Tiến trình cập nhật', patchPreferred: 'Ứng dụng sẽ ưu tiên tải bản vá nhỏ và tự chuyển sang bộ cài đầy đủ khi cần.', installerWillClose: 'Bộ cài sẽ mở và ShinaYuu Music sẽ đóng để hoàn tất cập nhật.', restartToFinish: 'Khởi động lại ShinaYuu Music để sử dụng phiên bản mới.',
       close: 'Đóng', search: 'Tìm trong thư viện…', loading: 'Đang tải…', failed: 'Không thể hoàn tất thao tác.', remove: 'Gỡ', play: 'Phát',
       connected: 'Đã kết nối', disconnected: 'Chưa kết nối', notConfigured: 'Chưa cấu hình', saved: 'Đã lưu.', mvUnavailable: 'Bài hiện tại không có video nền phù hợp.',
       runtime: 'ShinaYuu Music 2.0', tools: 'Tính năng ShinaYuu', localCount: '{n} bài cục bộ', mediaCount: '{n} tệp nền', mediaApplied: 'Đã áp dụng nền đa phương tiện.', mediaMissing: 'Không thể mở tệp nền này.', updateUnknown: 'Chưa kiểm tra', updateNotConfigured: 'Chưa cấu hình nguồn cập nhật'
@@ -32,7 +32,7 @@
       mvBackground: 'Now-playing MV background', mvHint: 'Use the exact YouTube video for the current track as the background without changing the UI or lyrics layout.', on: 'On', off: 'Off', full: 'Fill', fit: 'Fit', original: 'Original',
       discord: 'Discord Rich Presence', discordId: 'Discord Application ID', configure: 'Save configuration', reconnect: 'Reconnect', portal: 'Open Discord Developer Portal',
       update: 'ShinaYuu Music updates', checkUpdate: 'Check for updates', currentVersion: 'Current version', latestVersion: 'Latest version', upToDate: 'You are using the latest version.',
-      updateAvailable: 'A new version is available', updateNow: 'Update now', later: 'Later', quickPatch: 'Quick patch', fullInstaller: 'Full installer', downloadingUpdate: 'Downloading update', applyingPatch: 'Applying patch', preparingInstall: 'Installer downloaded', restartNow: 'Restart now', installNow: 'Install now', retry: 'Try again', fallbackInstaller: 'Use full installer', updateReady: 'The update is ready', updateFailed: 'Update failed', releaseNotes: 'What is new', updateSizeUnknown: 'Unknown size', updateChecking: 'Checking for a new version…', updateProgress: 'Update progress', patchPreferred: 'The app will prefer the smaller patch and fall back to the full installer when needed.', installerWillClose: 'The installer will open and ShinaYuu Music will close to finish the update.', restartToFinish: 'Restart ShinaYuu Music to use the new version.',
+      updateAvailable: 'A new version is available', updateNow: 'Update now', later: 'Later', quickPatch: 'Quick patch', fullInstaller: 'Full installer', updateWithPatch: 'Update with patch', downloadFullInstaller: 'Download full installer', chooseUpdateMethod: 'Choose the quick patch or download the full installer.', downloadingUpdate: 'Downloading update', applyingPatch: 'Applying patch', preparingInstall: 'Installer downloaded', restartNow: 'Restart now', installNow: 'Install now', retry: 'Try again', fallbackInstaller: 'Use full installer', updateReady: 'The update is ready', updateFailed: 'Update failed', releaseNotes: 'What is new', updateSizeUnknown: 'Unknown size', updateChecking: 'Checking for a new version…', updateProgress: 'Update progress', patchPreferred: 'The app will prefer the smaller patch and fall back to the full installer when needed.', installerWillClose: 'The installer will open and ShinaYuu Music will close to finish the update.', restartToFinish: 'Restart ShinaYuu Music to use the new version.',
       close: 'Close', search: 'Search the library…', loading: 'Loading…', failed: 'The operation could not be completed.', remove: 'Remove', play: 'Play',
       connected: 'Connected', disconnected: 'Disconnected', notConfigured: 'Not configured', saved: 'Saved.', mvUnavailable: 'The current track has no suitable background video.',
       runtime: 'ShinaYuu Music 2.0', tools: 'ShinaYuu features', localCount: '{n} local tracks', mediaCount: '{n} background files', mediaApplied: 'Background media applied.', mediaMissing: 'This background file cannot be opened.', updateUnknown: 'Not checked', updateNotConfigured: 'Update source is not configured'
@@ -636,9 +636,11 @@
   }
   function bindUpdatePromptActions(latest) {
     var later = byId('shinayuu-update-later');
-    var now = byId('shinayuu-update-now');
+    var patch = byId('shinayuu-update-patch');
+    var installer = byId('shinayuu-update-installer');
     if (later) later.onclick = closeModal;
-    if (now) now.onclick = function () { startUpdateInstall(latest, false); };
+    if (patch) patch.onclick = function () { startUpdateInstall(latest, false); };
+    if (installer) installer.onclick = function () { startUpdateInstall(latest, true); };
   }
   function updateAppLogoMarkup(status) {
     var badge = status ? '<span class="shinayuu-update-logo-badge ' + escapeHtml(status) + '">' + escapeHtml(status === 'success' ? '✓' : status === 'error' ? '!' : '') + '</span>' : '';
@@ -648,13 +650,18 @@
     var info = updateReleaseInfo(latest);
     var mode = info.patchAvailable ? t('quickPatch') : t('fullInstaller');
     var size = info.patchAvailable ? info.patchSize : info.installerSize;
-    var summary = info.release.summary || t('patchPreferred');
+    var summary = info.release.summary || t('chooseUpdateMethod');
+    var actionButtons = '<button class="shinayuu-native-button" id="shinayuu-update-later" type="button">' + escapeHtml(t('later')) + '</button>';
+    if (info.patchAvailable) {
+      actionButtons += '<button class="shinayuu-native-button primary" id="shinayuu-update-patch" type="button">' + escapeHtml(t('updateWithPatch')) + '</button>';
+    }
+    actionButtons += '<button class="shinayuu-native-button' + (info.patchAvailable ? ' installer' : ' primary') + '" id="shinayuu-update-installer" type="button">' + escapeHtml(t('downloadFullInstaller')) + '</button>';
     var body = '<div class="shinayuu-update-shell">' +
       '<div class="shinayuu-update-hero">' + updateAppLogoMarkup('') + '<div class="shinayuu-update-copy"><strong>' + escapeHtml(t('updateAvailable')) + '</strong><span>' + escapeHtml(summary) + '</span></div></div>' +
       '<div class="shinayuu-update-version"><span>' + escapeHtml(info.currentVersion) + '</span><span>→</span><b>' + escapeHtml(info.latestVersion) + '</b></div>' +
       updateNotesHtml(info.notes) +
-      '<div class="shinayuu-update-mode"><strong>' + escapeHtml(mode) + '</strong><span>' + escapeHtml(formatUpdateBytes(size)) + '<br>' + escapeHtml(t('patchPreferred')) + '</span></div>' +
-      '<div class="shinayuu-update-actions"><button class="shinayuu-native-button" id="shinayuu-update-later" type="button">' + escapeHtml(t('later')) + '</button><button class="shinayuu-native-button primary" id="shinayuu-update-now" type="button">' + escapeHtml(t('updateNow')) + '</button></div>' +
+      '<div class="shinayuu-update-mode"><strong>' + escapeHtml(mode) + '</strong><span>' + escapeHtml(formatUpdateBytes(size)) + '<br>' + escapeHtml(info.patchAvailable ? t('chooseUpdateMethod') : t('installerWillClose')) + '</span></div>' +
+      '<div class="shinayuu-update-actions has-installer-choice">' + actionButtons + '</div>' +
       '</div>';
     openModal(t('update'), '', body, 'update');
     bindUpdatePromptActions(latest);

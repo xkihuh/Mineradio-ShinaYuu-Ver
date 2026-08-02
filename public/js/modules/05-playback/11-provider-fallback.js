@@ -314,6 +314,8 @@ var SOURCE_FALLBACK_DIRECT_PROVIDERS = ['youtube-music', 'youtube-video', 'spoti
 var SOURCE_FALLBACK_RECOVERY_TIMEOUT_MS = 20000;
 var SOURCE_FALLBACK_MAX_QUEUE_ADVANCES = 2;
 var SOURCE_FALLBACK_MAX_PROVIDER_ATTEMPTS = 4;
+var SOURCE_FALLBACK_MAX_TOTAL_ACTIONS = 6;
+var SOURCE_FALLBACK_NO_PROGRESS_TIMEOUT_MS = 12000;
 var sourceFallbackRecoverySerial = 0;
 var activeSourceFallbackRecovery = null;
 var sourceFallbackBudgetTimeoutResult = {};
@@ -436,7 +438,28 @@ function sourceFallbackRecoveryRemainingMs(recovery) {
   return Math.max(0, Number(recovery.deadlineAt) - Date.now());
 }
 function sourceFallbackRecoveryCanContinue(recovery) {
-  return sourceFallbackRecoveryRemainingMs(recovery) > 0;
+  if (sourceFallbackRecoveryRemainingMs(recovery) <= 0) return false;
+  if (Number(recovery && recovery.actionCount || 0) >= SOURCE_FALLBACK_MAX_TOTAL_ACTIONS) return false;
+  var lastProgressAt = Number(recovery && recovery.lastProgressAt || recovery && recovery.startedAt || 0);
+  if (lastProgressAt > 0 && Date.now() - lastProgressAt > SOURCE_FALLBACK_NO_PROGRESS_TIMEOUT_MS) return false;
+  return true;
+}
+function touchSourceFallbackProgress(recovery, stage) {
+  if (!recovery || !sourceFallbackRecoveryIdentityActive(recovery)) return false;
+  recovery.lastProgressAt = Date.now();
+  recovery.lastProgressStage = String(stage || 'progress');
+  return true;
+}
+function claimSourceFallbackAction(recovery, actionKey) {
+  if (!sourceFallbackRecoveryCanContinue(recovery)) return false;
+  var key = String(actionKey || 'action');
+  recovery.actionKeys = recovery.actionKeys || Object.create(null);
+  if (recovery.actionKeys[key]) return false;
+  if (Number(recovery.actionCount || 0) >= SOURCE_FALLBACK_MAX_TOTAL_ACTIONS) return false;
+  recovery.actionKeys[key] = true;
+  recovery.actionCount = Number(recovery.actionCount || 0) + 1;
+  touchSourceFallbackProgress(recovery, key);
+  return true;
 }
 function cancelSourceFallbackRecovery(reason) {
   var recovery = activeSourceFallbackRecovery;
@@ -480,6 +503,10 @@ function ensureSourceFallbackRecovery(opts, song, idx, token) {
     rootToken: token,
     queueAdvances: 0,
     providerAttempts: 0,
+    actionCount: 0,
+    actionKeys: Object.create(null),
+    lastProgressAt: Date.now(),
+    lastProgressStage: 'created',
     silent: !!(opts && opts.startupAutoplay),
     visitedSongKeys: Object.create(null),
     attemptedProviderKeys: Object.create(null),
@@ -541,6 +568,7 @@ function beginSourceFallbackProviderAttempt(recovery, song, provider) {
   var key = sourceFallbackProviderAttemptKey(recovery, song, provider);
   if (recovery.attemptedProviderKeys[key]) return false;
   if (recovery.providerAttempts >= SOURCE_FALLBACK_MAX_PROVIDER_ATTEMPTS) return false;
+  if (!claimSourceFallbackAction(recovery, 'provider:' + key)) return false;
   recovery.attemptedProviderKeys[key] = true;
   recovery.providerAttempts++;
   return true;
@@ -792,8 +820,11 @@ async function skipFailedQueueItem(idx, token, message, opts) {
     return settleSourceFallbackTerminal(idx, token, 'Đã bỏ qua các bài bị giới hạn nhưng không còn mục mới có thể phát.', terminalOpts);
   }
   if (!opts.silent) showSourceFallbackNotice('Đã bỏ qua bài bị giới hạn', message || 'Không tìm thấy phiên bản cùng tên và nghệ sĩ ở nguồn còn lại; đang phát bài tiếp theo.');
-  recovery.queueAdvances++;
   var nextRecoveryKey = sourceFallbackRecoveryContentKey(playQueue[nextIdx]);
+  if (!claimSourceFallbackAction(recovery, 'queue:' + (nextRecoveryKey || nextIdx))) {
+    return settleSourceFallbackTerminal(idx, token, 'Đã dừng tự đổi nguồn để tránh lặp provider hoặc quét hàng chờ quá mức.', terminalOpts);
+  }
+  recovery.queueAdvances++;
   if (nextRecoveryKey) recovery.visitedSongKeys[nextRecoveryKey] = true;
   var nextPlaybackOpts = Object.assign(
     {},
@@ -801,7 +832,10 @@ async function skipFailedQueueItem(idx, token, message, opts) {
     { skipShuffleOrder: true }
   );
   var nextStarted = await playQueueAt(nextIdx, nextPlaybackOpts);
-  if (nextStarted === true) completeSourceFallbackRecovery(recovery);
+  if (nextStarted === true) {
+    touchSourceFallbackProgress(recovery, 'queue-playback-started');
+    completeSourceFallbackRecovery(recovery);
+  }
   else if (sourceFallbackRecoveryIdentityActive(recovery) && !sourceFallbackRecoveryCanContinue(recovery)) {
     return settleSourceFallbackTerminal(currentIdx, trackSwitchToken, 'Tự khôi phục đã hết thời gian. Vui lòng thử lại thủ công.', terminalOpts);
   }
@@ -859,6 +893,7 @@ async function tryAutoPlaybackFallback(song, data, idx, token, opts) {
         return settleSourceFallbackTerminal(idx, token, 'Tự khôi phục đã hết thời gian. Vui lòng thử lại thủ công.', skipOpts);
       }
       if (!alternate) continue;
+      touchSourceFallbackProgress(recovery, 'candidate:' + alternateProvider);
       var alternateData = typeof resolveAlbumGaplessPlaybackData === 'function'
         ? await awaitSourceFallbackBudget(resolveAlbumGaplessPlaybackData(alternate), recovery)
         : null;
@@ -894,6 +929,7 @@ async function tryAutoPlaybackFallback(song, data, idx, token, opts) {
       var fallbackToken = trackSwitchToken;
       if (currentIdx !== idx || sourceFallbackSongKey(playQueue[idx]) !== fallbackCandidateKey) return false;
       if (fallbackStarted === true) {
+        touchSourceFallbackProgress(recovery, 'playback-started:' + alternateProvider);
         completeSourceFallbackRecovery(recovery);
         if (!opts.startupAutoplay) showSourceFallbackNotice('Đã tự đổi nguồn', (song.name || 'Bài hiện tại') + ' đã chuyển từ ' + fromLabel + ' sang ' + targetLabel + '.');
         return true;

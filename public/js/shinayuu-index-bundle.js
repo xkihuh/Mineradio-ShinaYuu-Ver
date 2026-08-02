@@ -281,7 +281,7 @@ var updatePreviewState = {
   installerPath: '',
   installerOpened: false,
   cached: false,
-  currentVersion: '2.0.16',
+  currentVersion: '2.1.0',
   version: '2.0.0',
   configured: false,
   preview: true,
@@ -12011,6 +12011,12 @@ function updateLyricRowLayers(data, opts) {
   var seed = Number(opts.seed) || 0;
   var renderBase = opts.renderBase == null ? 43 : Number(opts.renderBase);
   if (!isFinite(renderBase)) renderBase = 43;
+  // Mineradio 2.1.0 layer-structure port: keep all lyric sub-groups on the
+  // same authoritative render plane so multi-line context cannot fall behind
+  // the 3D playlist shelf. This changes visual ordering only, not lyric data.
+  if (data.rowLayerGroup) data.rowLayerGroup.renderOrder = renderBase;
+  if (data.contextGroup) data.contextGroup.renderOrder = renderBase;
+  if (data.readabilityGroup) data.readabilityGroup.renderOrder = renderBase;
   var translationMode = normalizeLyricTranslationMode(fx && fx.lyricTranslationMode);
   var displayMode = normalizeLyricDisplayMode(data.displayMode || (fx && fx.lyricDisplayMode));
   var singleLineStaticSwap = displayMode === 'single' && !data.usesTrack;
@@ -21816,6 +21822,10 @@ function makeShelfManager() {
   var selectedIdx = -1;
   var lastStablePlaylistItems = [];
 
+  function shelfPointerSelectionForegroundActive() {
+    return selectedIdx >= 0 && !document.body.classList.contains('cursor-hidden');
+  }
+
   // v7.2 PSP 风格状态
   var centerIdx = 0;          // 当前居中卡片 index (在 items 数组中的位置)
   var centerTarget = 0;       // 目标 centerIdx (插值)
@@ -22252,7 +22262,7 @@ function makeShelfManager() {
       var nowT = uniforms.uTime.value;
       var hoverBreath = (!shelfPinnedOpen && !detailOpenSide) ? shelfVisibility : 0;
       var passiveAlways = shelfAlwaysVisible() && !shelfPinnedOpen && !detailOpenSide;
-      var liftTarget = card.selected && !detailOpenSide ? 1 : 0;
+      var liftTarget = card.selected && shelfPointerSelectionForegroundActive() && !detailOpenSide ? 1 : 0;
       var liftRate = liftTarget > (card.floatMix || 0) ? 0.20 : 0.13;
       card.floatMix = (card.floatMix || 0) + (liftTarget - (card.floatMix || 0)) * liftRate;
       if (!liftTarget && card.floatMix < 0.004) card.floatMix = 0;
@@ -22588,7 +22598,10 @@ void main(){ vec4 t = texture2D(uDotTex, gl_PointCoord); if (t.a < 0.02) discard
       if (floorMirror) floorMirror.visible = group.visible && mode === 'stage';
       if (mode === 'side') {
         var passiveAlwaysGroup = shelfAlwaysVisible() && !shelfPinnedOpen && !(contentList && contentList.isOpen());
-        var liftedCardActive = passiveAlwaysGroup && cards.some(function(c){ return c.selected || (c.floatMix || 0) > 0.025; });
+        var pointerSelectionForeground = shelfPointerSelectionForegroundActive();
+        var liftedCardActive = passiveAlwaysGroup && cards.some(function(c){
+          return (pointerSelectionForeground && c.selected) || (c.floatMix || 0) > 0.025;
+        });
         group.renderOrder = passiveAlwaysGroup && !liftedCardActive ? 30 : 50;
         group.position.set(0, 0, 0);
         var bindToCover = shelfAlwaysVisible() && particles && particles.rotation && !(contentList && contentList.isOpen());
@@ -32746,6 +32759,8 @@ var SOURCE_FALLBACK_DIRECT_PROVIDERS = ['youtube-music', 'youtube-video', 'spoti
 var SOURCE_FALLBACK_RECOVERY_TIMEOUT_MS = 20000;
 var SOURCE_FALLBACK_MAX_QUEUE_ADVANCES = 2;
 var SOURCE_FALLBACK_MAX_PROVIDER_ATTEMPTS = 4;
+var SOURCE_FALLBACK_MAX_TOTAL_ACTIONS = 6;
+var SOURCE_FALLBACK_NO_PROGRESS_TIMEOUT_MS = 12000;
 var sourceFallbackRecoverySerial = 0;
 var activeSourceFallbackRecovery = null;
 var sourceFallbackBudgetTimeoutResult = {};
@@ -32868,7 +32883,28 @@ function sourceFallbackRecoveryRemainingMs(recovery) {
   return Math.max(0, Number(recovery.deadlineAt) - Date.now());
 }
 function sourceFallbackRecoveryCanContinue(recovery) {
-  return sourceFallbackRecoveryRemainingMs(recovery) > 0;
+  if (sourceFallbackRecoveryRemainingMs(recovery) <= 0) return false;
+  if (Number(recovery && recovery.actionCount || 0) >= SOURCE_FALLBACK_MAX_TOTAL_ACTIONS) return false;
+  var lastProgressAt = Number(recovery && recovery.lastProgressAt || recovery && recovery.startedAt || 0);
+  if (lastProgressAt > 0 && Date.now() - lastProgressAt > SOURCE_FALLBACK_NO_PROGRESS_TIMEOUT_MS) return false;
+  return true;
+}
+function touchSourceFallbackProgress(recovery, stage) {
+  if (!recovery || !sourceFallbackRecoveryIdentityActive(recovery)) return false;
+  recovery.lastProgressAt = Date.now();
+  recovery.lastProgressStage = String(stage || 'progress');
+  return true;
+}
+function claimSourceFallbackAction(recovery, actionKey) {
+  if (!sourceFallbackRecoveryCanContinue(recovery)) return false;
+  var key = String(actionKey || 'action');
+  recovery.actionKeys = recovery.actionKeys || Object.create(null);
+  if (recovery.actionKeys[key]) return false;
+  if (Number(recovery.actionCount || 0) >= SOURCE_FALLBACK_MAX_TOTAL_ACTIONS) return false;
+  recovery.actionKeys[key] = true;
+  recovery.actionCount = Number(recovery.actionCount || 0) + 1;
+  touchSourceFallbackProgress(recovery, key);
+  return true;
 }
 function cancelSourceFallbackRecovery(reason) {
   var recovery = activeSourceFallbackRecovery;
@@ -32912,6 +32948,10 @@ function ensureSourceFallbackRecovery(opts, song, idx, token) {
     rootToken: token,
     queueAdvances: 0,
     providerAttempts: 0,
+    actionCount: 0,
+    actionKeys: Object.create(null),
+    lastProgressAt: Date.now(),
+    lastProgressStage: 'created',
     silent: !!(opts && opts.startupAutoplay),
     visitedSongKeys: Object.create(null),
     attemptedProviderKeys: Object.create(null),
@@ -32973,6 +33013,7 @@ function beginSourceFallbackProviderAttempt(recovery, song, provider) {
   var key = sourceFallbackProviderAttemptKey(recovery, song, provider);
   if (recovery.attemptedProviderKeys[key]) return false;
   if (recovery.providerAttempts >= SOURCE_FALLBACK_MAX_PROVIDER_ATTEMPTS) return false;
+  if (!claimSourceFallbackAction(recovery, 'provider:' + key)) return false;
   recovery.attemptedProviderKeys[key] = true;
   recovery.providerAttempts++;
   return true;
@@ -33224,8 +33265,11 @@ async function skipFailedQueueItem(idx, token, message, opts) {
     return settleSourceFallbackTerminal(idx, token, 'Đã bỏ qua các bài bị giới hạn nhưng không còn mục mới có thể phát.', terminalOpts);
   }
   if (!opts.silent) showSourceFallbackNotice('Đã bỏ qua bài bị giới hạn', message || 'Không tìm thấy phiên bản cùng tên và nghệ sĩ ở nguồn còn lại; đang phát bài tiếp theo.');
-  recovery.queueAdvances++;
   var nextRecoveryKey = sourceFallbackRecoveryContentKey(playQueue[nextIdx]);
+  if (!claimSourceFallbackAction(recovery, 'queue:' + (nextRecoveryKey || nextIdx))) {
+    return settleSourceFallbackTerminal(idx, token, 'Đã dừng tự đổi nguồn để tránh lặp provider hoặc quét hàng chờ quá mức.', terminalOpts);
+  }
+  recovery.queueAdvances++;
   if (nextRecoveryKey) recovery.visitedSongKeys[nextRecoveryKey] = true;
   var nextPlaybackOpts = Object.assign(
     {},
@@ -33233,7 +33277,10 @@ async function skipFailedQueueItem(idx, token, message, opts) {
     { skipShuffleOrder: true }
   );
   var nextStarted = await playQueueAt(nextIdx, nextPlaybackOpts);
-  if (nextStarted === true) completeSourceFallbackRecovery(recovery);
+  if (nextStarted === true) {
+    touchSourceFallbackProgress(recovery, 'queue-playback-started');
+    completeSourceFallbackRecovery(recovery);
+  }
   else if (sourceFallbackRecoveryIdentityActive(recovery) && !sourceFallbackRecoveryCanContinue(recovery)) {
     return settleSourceFallbackTerminal(currentIdx, trackSwitchToken, 'Tự khôi phục đã hết thời gian. Vui lòng thử lại thủ công.', terminalOpts);
   }
@@ -33291,6 +33338,7 @@ async function tryAutoPlaybackFallback(song, data, idx, token, opts) {
         return settleSourceFallbackTerminal(idx, token, 'Tự khôi phục đã hết thời gian. Vui lòng thử lại thủ công.', skipOpts);
       }
       if (!alternate) continue;
+      touchSourceFallbackProgress(recovery, 'candidate:' + alternateProvider);
       var alternateData = typeof resolveAlbumGaplessPlaybackData === 'function'
         ? await awaitSourceFallbackBudget(resolveAlbumGaplessPlaybackData(alternate), recovery)
         : null;
@@ -33326,6 +33374,7 @@ async function tryAutoPlaybackFallback(song, data, idx, token, opts) {
       var fallbackToken = trackSwitchToken;
       if (currentIdx !== idx || sourceFallbackSongKey(playQueue[idx]) !== fallbackCandidateKey) return false;
       if (fallbackStarted === true) {
+        touchSourceFallbackProgress(recovery, 'playback-started:' + alternateProvider);
         completeSourceFallbackRecovery(recovery);
         if (!opts.startupAutoplay) showSourceFallbackNotice('Đã tự đổi nguồn', (song.name || 'Bài hiện tại') + ' đã chuyển từ ' + fromLabel + ' sang ' + targetLabel + '.');
         return true;
