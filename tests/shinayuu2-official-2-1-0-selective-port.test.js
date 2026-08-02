@@ -7,16 +7,16 @@ const { execFileSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('2.1.1 release identity is synchronized', () => {
+test('2.1.2 release identity is synchronized', () => {
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
-  assert.equal(pkg.version, '2.1.1');
-  assert.equal(pkg.displayVersion, '2.1.1');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.1');
-  assert.equal(pkg.build.buildVersion, '2.1.1.0');
-  assert.equal(pkg.shinayuu.buildVersion, '2.1.1.0');
-  assert.equal(lock.version, '2.1.1');
-  assert.equal(lock.packages[''].version, '2.1.1');
+  assert.equal(pkg.version, '2.1.2');
+  assert.equal(pkg.displayVersion, '2.1.2');
+  assert.equal(pkg.shinayuu.displayVersion, '2.1.2');
+  assert.equal(pkg.build.buildVersion, '2.1.2.0');
+  assert.equal(pkg.shinayuu.buildVersion, '2.1.2.0');
+  assert.equal(lock.version, '2.1.2');
+  assert.equal(lock.packages[''].version, '2.1.2');
 });
 
 test('updater exposes independent patch and full-installer actions in Vietnamese and English', () => {

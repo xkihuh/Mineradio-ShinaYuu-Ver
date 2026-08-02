@@ -50,7 +50,8 @@ test('all renderer lyric endpoints exist and pending alignment remains visible a
   for (const route of ['/api/spotify/lyric', '/api/youtube-music/lyric', '/api/youtube-video/lyric']) {
     assert.ok(server.includes(route), `server lyric route missing ${route}`);
   }
-  assert.match(providers, /plainLyric: exactTranscript \|\| baseResult\.plainLyric \|\| ''/);
+  assert.match(providers, /plainLyric: '',/);
+  assert.match(providers, /pendingPlainLyric: exactTranscript \|\| baseResult\.plainLyric \|\| ''/);
   assert.match(providers, /source: 'youtube-video-alignment-pending'/);
   assert.match(lyrics, /function parsePlainLyricText\(/);
   assert.match(lyrics, /function shouldRetryPendingLyricAlignment\(/);

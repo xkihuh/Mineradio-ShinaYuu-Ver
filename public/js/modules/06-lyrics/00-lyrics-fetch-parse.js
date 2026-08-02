@@ -338,9 +338,14 @@ function buildLyricAutomaticSyncProfile(song, response, lines, timingSource) {
   var compatibility = helper && typeof helper.durationCompatibility === 'function'
     ? helper.durationCompatibility(sourceDuration, targetDuration)
     : { compatible: !sourceDuration || !targetDuration || Math.abs(sourceDuration - targetDuration) <= Math.max(8, targetDuration * 0.055), delta: Math.abs(sourceDuration - targetDuration), tolerance: Math.max(8, targetDuration * 0.055) };
-  var rate = helper && typeof helper.automaticTimelineRate === 'function'
-    ? helper.automaticTimelineRate(sourceDuration, targetDuration, Math.max(score, exact ? 100 : 0))
-    : 1;
+  // Exact selected-video captions and completed forced alignment already use
+  // the audible MV clock. Stretching that authored timeline by metadata duration
+  // introduces progressive drift, so exact timing always runs at rate 1.
+  var rate = exact
+    ? 1
+    : (helper && typeof helper.automaticTimelineRate === 'function'
+      ? helper.automaticTimelineRate(sourceDuration, targetDuration, score)
+      : 1);
   var anchorValue = helper && typeof helper.lyricTimelineAnchor === 'function'
     ? helper.lyricTimelineAnchor(lines)
     : 0;
@@ -370,7 +375,8 @@ function parseLyricResponseToOriginalState(song, response) {
   response = response || {};
   var nativeLines = parseYrcText(response.yrc || '');
   var lrcLines = parseLyricText(response.lyric || '');
-  var plainLines = (!nativeLines.length && !lrcLines.length)
+  var alignmentPending = lyricAlignmentIsPending(response);
+  var plainLines = (!nativeLines.length && !lrcLines.length && !alignmentPending)
     ? parsePlainLyricText(response.plainLyric || '', lyricDurationSecondsForPlainText(song, response))
     : [];
   var translationPayload = buildLyricTranslationPayload(response);
@@ -419,12 +425,15 @@ function scheduleStartupLyricFetchRetry(song, token, attempt) {
   }, delay);
 }
 function shouldRetryPendingLyricAlignment(song, token, response, attempt) {
-  if (!song || token !== trackSwitchToken || (attempt || 0) >= 6) return false;
+  if (!song || token !== trackSwitchToken || (attempt || 0) >= 10) return false;
   if (song.type === 'local' || song.source === 'local' || song.localKey || song.type === 'podcast') return false;
   return lyricAlignmentIsPending(response);
 }
 function schedulePendingLyricAlignmentRetry(song, token, attempt) {
-  var delays = [650, 1150, 1900, 3000, 4500, 6500];
+  // Local alignment can legitimately take longer than the former ~18-second
+  // window on a busy machine. Keep polling in the background without inventing
+  // a temporary timeline from plain text.
+  var delays = [500, 850, 1300, 1900, 2800, 4000, 5500, 7000, 9000, 11000];
   var delay = delays[Math.max(0, Math.min(delays.length - 1, attempt || 0))];
   setTimeout(function () {
     if (token === trackSwitchToken) fetchLyric(song, token, (attempt || 0) + 1, { alignmentRetry: true });

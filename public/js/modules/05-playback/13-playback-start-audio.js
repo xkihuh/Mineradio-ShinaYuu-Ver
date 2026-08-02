@@ -1418,7 +1418,9 @@ async function playQueueAt(idx, opts) {
             new Promise(function (resolve) { setTimeout(function () { resolve(false); }, 1800); })
           ]);
         } catch (_) { }
-        if (window.pendingExternalProviderStopPromise === providerStopPromise) window.pendingExternalProviderStopPromise = null;
+        // Do not clear a stop that merely exceeded the HTML start budget. A later
+        // Spotify selection must still see and wait for that concrete operation;
+        // the promise owner clears it only after real settlement.
         if (!playbackInvocationStillCurrent(playbackMedia)) return false;
       }
       var playbackStarted;

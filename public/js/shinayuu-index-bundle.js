@@ -281,7 +281,7 @@ var updatePreviewState = {
   installerPath: '',
   installerOpened: false,
   cached: false,
-  currentVersion: '2.1.1',
+  currentVersion: '2.1.2',
   version: '2.0.0',
   configured: false,
   preview: true,
@@ -34938,7 +34938,9 @@ async function playQueueAt(idx, opts) {
             new Promise(function (resolve) { setTimeout(function () { resolve(false); }, 1800); })
           ]);
         } catch (_) { }
-        if (window.pendingExternalProviderStopPromise === providerStopPromise) window.pendingExternalProviderStopPromise = null;
+        // Do not clear a stop that merely exceeded the HTML start budget. A later
+        // Spotify selection must still see and wait for that concrete operation;
+        // the promise owner clears it only after real settlement.
         if (!playbackInvocationStillCurrent(playbackMedia)) return false;
       }
       var playbackStarted;
@@ -36995,10 +36997,11 @@ function clearPlayerControlFocusState(reason) {
 (function () {
   'use strict';
 
-  var VERSION = '2.1.1';
+  var VERSION = '2.1.2';
   var STORE_KEY = 'shinayuu-cuefield-automix-v2';
   var GAPLESS_STORE_KEY = 'shinayuu-album-gapless-v1';
   var PREPARE_DELAY_MS = 950;
+  var EXECUTION_TIMEOUT_MS = 11500;
   var state = {
     enabled: false,
     albumGapless: true,
@@ -37020,6 +37023,7 @@ function clearPlayerControlFocusState(reason) {
     lastCountdownSec: -1,
     executionSerial: 0,
     executionStartedAt: 0,
+    executionTimeoutMs: EXECUTION_TIMEOUT_MS,
     bypassToken: -1,
     lastAbortReason: '',
     outputDirty: false,
@@ -37471,6 +37475,7 @@ function clearPlayerControlFocusState(reason) {
     var pendingExecution = state.activeExecutionPending;
     state.executionSerial++;
     state.executionStartedAt = 0;
+    state.executionTimeoutMs = EXECUTION_TIMEOUT_MS;
     state.lastAbortReason = String(reason || 'aborted');
     state.executing = false;
     window.cuefieldAutoMixExecuting = false;
@@ -37532,6 +37537,7 @@ function clearPlayerControlFocusState(reason) {
     state.generation++;
     state.executionSerial++;
     state.executionStartedAt = 0;
+    state.executionTimeoutMs = EXECUTION_TIMEOUT_MS;
     clearPrepareTimer();
     state.pending = null;
     state.preparing = false;
@@ -38493,11 +38499,18 @@ function clearPlayerControlFocusState(reason) {
       return true;
     })();
     state.activeProviderStopPromise = stopOperation;
-    try {
-      return await stopOperation;
-    } finally {
+    stopOperation.then(function () {
       if (state.activeProviderStopPromise === stopOperation) state.activeProviderStopPromise = null;
-    }
+    }, function () {
+      if (state.activeProviderStopPromise === stopOperation) state.activeProviderStopPromise = null;
+    });
+    // A remote pause must not hold the complete AutoMix engine indefinitely.
+    // Keep the real promise exposed as a barrier, while this transition gets a
+    // bounded answer and can roll back to the still-audible outgoing provider.
+    return await Promise.race([
+      stopOperation,
+      delay(3000).then(function () { return false; })
+    ]);
   }
 
   async function crossfadeSpotifyToHtml(pending, executionSerial) {
@@ -38586,6 +38599,18 @@ function clearPlayerControlFocusState(reason) {
     }
   }
 
+  function transitionTimeoutMs(pending) {
+    // HTML dual-deck mixes can legitimately spend up to 10 seconds on the
+    // audible curve plus secondary-start and primary-adoption confirmation.
+    // Give that valid path enough room, while keeping provider-only handoffs on
+    // the tighter liveness budget so a broken source cannot lock the engine.
+    if (pending && pending.htmlDualDeck) {
+      var fadeMs = clamp(Number(pending.fadeSec) || 8, 0.65, 10) * 1000;
+      return clamp(fadeMs + 5000, EXECUTION_TIMEOUT_MS, 15500);
+    }
+    return EXECUTION_TIMEOUT_MS;
+  }
+
   async function execute(pending) {
     if (!pending || state.executing || !state.enabled) return;
     if (pending.token !== Number(window.trackSwitchToken) || pending.fromIndex !== Number(window.currentIdx)) return;
@@ -38596,6 +38621,7 @@ function clearPlayerControlFocusState(reason) {
     state.activeExecutionPending = pending;
     pending.executionSerial = executionSerial;
     state.executionStartedAt = Date.now();
+    state.executionTimeoutMs = transitionTimeoutMs(pending);
     state.executing = true;
     state.outputDirty = true;
     state.lastOutputOwner = pending.fromSpotify ? 'spotify' : 'html-audio';
@@ -38604,10 +38630,25 @@ function clearPlayerControlFocusState(reason) {
     setStatus('handoff');
     var succeeded = false;
     try {
-      if (pending.htmlDualDeck) succeeded = await crossfadeDualDeck(pending, executionSerial);
-      else if (pending.spotifyToHtml) succeeded = await crossfadeSpotifyToHtml(pending, executionSerial);
-      else if (pending.htmlToSpotify) succeeded = await crossfadeHtmlToSpotify(pending, executionSerial);
-      else succeeded = await safeProviderHandoff(pending, executionSerial);
+      var transitionTask;
+      if (pending.htmlDualDeck) transitionTask = crossfadeDualDeck(pending, executionSerial);
+      else if (pending.spotifyToHtml) transitionTask = crossfadeSpotifyToHtml(pending, executionSerial);
+      else if (pending.htmlToSpotify) transitionTask = crossfadeHtmlToSpotify(pending, executionSerial);
+      else transitionTask = safeProviderHandoff(pending, executionSerial);
+      var transitionResult = await Promise.race([
+        Promise.resolve(transitionTask).then(function (value) { return { completed: true, value: !!value }; }),
+        delay(state.executionTimeoutMs).then(function () { return { completed: false, value: false }; })
+      ]);
+      if (!transitionResult.completed && executionActive(executionSerial)) {
+        console.warn('[CuefieldAutoMix] transition timeout; preserving the current provider');
+        state.bypassToken = Number(window.trackSwitchToken);
+        abortExecution('transition-timeout', {
+          keepBypass: true,
+          owner: pending.fromSpotify ? 'spotify' : 'html-audio'
+        });
+        return;
+      }
+      succeeded = transitionResult.value;
       if (succeeded && executionActive(executionSerial)) {
         console.info('[CuefieldAutoMix] transition complete', { fromIndex: pending.fromIndex, toIndex: pending.toIndex });
       }
@@ -38621,6 +38662,7 @@ function clearPlayerControlFocusState(reason) {
         if (executionSerial !== state.executionSerial) return;
         state.executing = false;
         state.executionStartedAt = 0;
+        state.executionTimeoutMs = EXECUTION_TIMEOUT_MS;
         window.cuefieldAutoMixExecuting = false;
         if (state.preparedAudio) stopPreparedAudio(state.preparedAudio);
         state.preparedForToken = -1;
@@ -38666,7 +38708,7 @@ function clearPlayerControlFocusState(reason) {
 
   function tick() {
     var token = Number(window.trackSwitchToken);
-    if (state.executing && state.executionStartedAt && Date.now() - state.executionStartedAt > 24000) {
+    if (state.executing && state.executionStartedAt && Date.now() - state.executionStartedAt > state.executionTimeoutMs + 1800) {
       console.warn('[CuefieldAutoMix] stale execution watchdog released the player');
       abortExecution('watchdog-timeout');
       state.bypassToken = token;
@@ -39170,9 +39212,14 @@ function buildLyricAutomaticSyncProfile(song, response, lines, timingSource) {
   var compatibility = helper && typeof helper.durationCompatibility === 'function'
     ? helper.durationCompatibility(sourceDuration, targetDuration)
     : { compatible: !sourceDuration || !targetDuration || Math.abs(sourceDuration - targetDuration) <= Math.max(8, targetDuration * 0.055), delta: Math.abs(sourceDuration - targetDuration), tolerance: Math.max(8, targetDuration * 0.055) };
-  var rate = helper && typeof helper.automaticTimelineRate === 'function'
-    ? helper.automaticTimelineRate(sourceDuration, targetDuration, Math.max(score, exact ? 100 : 0))
-    : 1;
+  // Exact selected-video captions and completed forced alignment already use
+  // the audible MV clock. Stretching that authored timeline by metadata duration
+  // introduces progressive drift, so exact timing always runs at rate 1.
+  var rate = exact
+    ? 1
+    : (helper && typeof helper.automaticTimelineRate === 'function'
+      ? helper.automaticTimelineRate(sourceDuration, targetDuration, score)
+      : 1);
   var anchorValue = helper && typeof helper.lyricTimelineAnchor === 'function'
     ? helper.lyricTimelineAnchor(lines)
     : 0;
@@ -39202,7 +39249,8 @@ function parseLyricResponseToOriginalState(song, response) {
   response = response || {};
   var nativeLines = parseYrcText(response.yrc || '');
   var lrcLines = parseLyricText(response.lyric || '');
-  var plainLines = (!nativeLines.length && !lrcLines.length)
+  var alignmentPending = lyricAlignmentIsPending(response);
+  var plainLines = (!nativeLines.length && !lrcLines.length && !alignmentPending)
     ? parsePlainLyricText(response.plainLyric || '', lyricDurationSecondsForPlainText(song, response))
     : [];
   var translationPayload = buildLyricTranslationPayload(response);
@@ -39251,12 +39299,15 @@ function scheduleStartupLyricFetchRetry(song, token, attempt) {
   }, delay);
 }
 function shouldRetryPendingLyricAlignment(song, token, response, attempt) {
-  if (!song || token !== trackSwitchToken || (attempt || 0) >= 6) return false;
+  if (!song || token !== trackSwitchToken || (attempt || 0) >= 10) return false;
   if (song.type === 'local' || song.source === 'local' || song.localKey || song.type === 'podcast') return false;
   return lyricAlignmentIsPending(response);
 }
 function schedulePendingLyricAlignmentRetry(song, token, attempt) {
-  var delays = [650, 1150, 1900, 3000, 4500, 6500];
+  // Local alignment can legitimately take longer than the former ~18-second
+  // window on a busy machine. Keep polling in the background without inventing
+  // a temporary timeline from plain text.
+  var delays = [500, 850, 1300, 1900, 2800, 4000, 5500, 7000, 9000, 11000];
   var delay = delays[Math.max(0, Math.min(delays.length - 1, attempt || 0))];
   setTimeout(function () {
     if (token === trackSwitchToken) fetchLyric(song, token, (attempt || 0) + 1, { alignmentRetry: true });

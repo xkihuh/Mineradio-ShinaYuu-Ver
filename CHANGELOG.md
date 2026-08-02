@@ -1,3 +1,13 @@
+# ShinaYuu Music 2.1.2
+
+- Ưu tiên caption có timestamp của đúng YouTube MV trước timestamp mượn từ bản album.
+- Không dựng timeline giả chia đều khi forced alignment của MV còn đang xử lý.
+- Timestamp exact/aligned không còn bị kéo giãn theo chênh lệch duration metadata.
+- Mở rộng thời gian polling forced alignment ở nền cho máy xử lý chậm.
+- Sửa race provider-stop cũ có thể pause một yêu cầu Spotify mới ở trạng thái `spotify-pending`.
+- Giữ provider-stop promise đến khi thực sự hoàn tất; không làm mất barrier sau timeout HTML.
+- AutoMix dùng timeout transaction thích ứng: 11,5 giây cho handoff provider và tối đa 15,5 giây cho crossfade hai deck dài; khi vượt giới hạn, app rollback về nguồn đang phát thay vì giữ máy phát ở trạng thái khóa.
+
 # Changelog
 
 ## 2.1.1

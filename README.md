@@ -1,6 +1,6 @@
-# ShinaYuu Music 2.1.1
+# ShinaYuu Music 2.1.2
 
-ShinaYuu Music 2.1.1 được phát triển từ source 2.1.0 của ShinaYuu. Bản 2.1.0 trước đó đã port chọn lọc các cải tiến ổn định từ **Mineradio 2.1.0**; bản 2.1.1 tập trung sửa lỗi giao diện Discord bị rơi về HTML mặc định, loại bỏ độ trễ khi chọn bài và gia cố quá trình khởi động Spotify.
+ShinaYuu Music 2.1.2 được phát triển trực tiếp từ source 2.1.1 của ShinaYuu. Bản 2.1.0 trước đó đã port chọn lọc các cải tiến ổn định từ **Mineradio 2.1.0**; bản 2.1.1 sửa giao diện Discord, loại bỏ độ trễ khi chọn bài và gia cố khởi động Spotify. Bản 2.1.2 tập trung vào timestamp YouTube MV và tính sống còn của transaction AutoMix/provider.
 
 ## Sửa lỗi chính của 2.1.1
 
@@ -35,16 +35,24 @@ npm run build:win
 Installer dự kiến:
 
 ```text
-ShinaYuu-Music-2.1.1-Setup.exe
+ShinaYuu-Music-2.1.2-Setup.exe
 ```
 
 ## Phiên bản
 
 ```text
-Package version : 2.1.1
-Display version : 2.1.1
-Build version   : 2.1.1.0
+Package version : 2.1.2
+Display version : 2.1.2
+Build version   : 2.1.2.0
 ```
+
+## Sửa lỗi trọng tâm 2.1.2
+
+- YouTube MV dùng timestamp caption của chính video khi có; không dùng timeline chia đều trong lúc alignment đang chạy.
+- Giữ nguyên nguồn lyrics, UI lyrics cũ và các nút chỉnh delay/lệch tiến độ.
+- Chặn provider-stop Spotify cũ can thiệp vào bài mới.
+- AutoMix dùng giới hạn thích ứng 11,5–15,5 giây tùy loại handoff; khi quá hạn sẽ rollback về provider đang phát, tránh khóa toàn bộ playback mà không cắt ngang crossfade hai deck hợp lệ.
+
 ## Acknowledgments
 
 Mineradio was originally designed and developed by XxHuberrr, and is now being maintained and localized for global users by x.kihuh. Special thanks to **emily**, who co-created early concepts for the visual foundation and inspired the optimization direction for the `emily` visual preset.
@@ -59,4 +67,3 @@ ShinaYuu Music is licensed under `GPL-3.0-only`. Redistribution of source or bin
 This project is licensed under the GPL-3.0 License. See the [LICENSE](./LICENSE) file for details.
 
 The ShinaYuu Logo, the name "ShinaYuu," the UI visual design, and original visual assets belong entirely to the original author. Third-party dependencies and services follow their respective open-source licenses and terms of service.
-

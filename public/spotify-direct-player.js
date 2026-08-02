@@ -82,7 +82,9 @@
     activationWarmAt: 0,
     deviceRecoveryAt: 0,
     lastGestureAt: 0,
-    startupPrewarmScheduled: false
+    startupPrewarmScheduled: false,
+    externalStopSerial: 0,
+    ownershipSerial: 0
   };
 
   window.spotifyDirectState = spotifyDirectState;
@@ -1864,7 +1866,9 @@
   }
 
   async function deactivateSpotifyForExternalPlayback(reason) {
-    var transportWasSpotify = window.activePlaybackTransport === 'spotify';
+    var stopSerial = ++spotifyDirectState.externalStopSerial;
+    var stopOwnershipSerial = ++spotifyDirectState.ownershipSerial;
+    var transportWasSpotify = window.activePlaybackTransport === 'spotify' || window.activePlaybackTransport === 'spotify-pending';
     var shouldStop = transportWasSpotify || spotifyDirectState.active || spotifyDirectState.isPlaying || spotifyDirectState.switchingTrack;
     spotifyDirectState.seekSerial++;
     spotifyDirectState.switchingTrack = false;
@@ -1895,20 +1899,24 @@
       }
     }
 
-    setSpotifyExpectedPlaying(false, 'provider-stop');
-    spotifyDirectState.active = false;
-    spotifyDirectState.isPlaying = false;
-    spotifyDirectState.seeking = false;
-    spotifyDirectState.seekWasPlaying = false;
-    spotifyDirectState.seekRecoveryUntil = 0;
-    spotifyDirectState.clockUpdatedAt = monotonicNowMs();
-    document.body.classList.remove('spotify-direct-active');
+    var stopStillOwnsState = stopSerial === spotifyDirectState.externalStopSerial
+      && stopOwnershipSerial === spotifyDirectState.ownershipSerial;
+    if (stopStillOwnsState) {
+      setSpotifyExpectedPlaying(false, 'provider-stop');
+      spotifyDirectState.active = false;
+      spotifyDirectState.isPlaying = false;
+      spotifyDirectState.seeking = false;
+      spotifyDirectState.seekWasPlaying = false;
+      spotifyDirectState.seekRecoveryUntil = 0;
+      spotifyDirectState.clockUpdatedAt = monotonicNowMs();
+      document.body.classList.remove('spotify-direct-active');
+    }
     // A YouTube/local source may have claimed output while the remote Spotify
     // pause was still awaiting the SDK. Never let the stale stop completion
     // overwrite the newer transport or flip its play button back to paused.
     var htmlAlreadyOwnsOutput = window.activePlaybackTransport === 'html-audio';
-    if (transportWasSpotify && window.activePlaybackTransport === 'spotify') window.activePlaybackTransport = 'none';
-    if (!htmlAlreadyOwnsOutput) {
+    if (stopStillOwnsState && transportWasSpotify && (window.activePlaybackTransport === 'spotify' || window.activePlaybackTransport === 'spotify-pending')) window.activePlaybackTransport = 'none';
+    if (stopStillOwnsState && !htmlAlreadyOwnsOutput) {
       window.playing = false;
       try { if (typeof window.setPlayIcon === 'function') window.setPlayIcon(false); } catch (_) {}
     }
@@ -1917,7 +1925,12 @@
     // if that stale request starts later, pause it before it can overlap.
     [220, 700].forEach(function(delayMs){
       setTimeout(async function(){
-        if (window.activePlaybackTransport === 'spotify' || !spotifyDirectState.sdkPlayer || typeof spotifyDirectState.sdkPlayer.getCurrentState !== 'function') return;
+        // A later Spotify selection may already be in its `spotify-pending`
+        // phase. Old provider-stop verification must never pause that new SDK
+        // request, even before it reaches the confirmed `spotify` transport.
+        if (stopSerial !== spotifyDirectState.externalStopSerial || stopOwnershipSerial !== spotifyDirectState.ownershipSerial) return;
+        if (window.activePlaybackTransport === 'spotify' || window.activePlaybackTransport === 'spotify-pending' || spotifyDirectState.switchingTrack || spotifyDirectState.requestedUri) return;
+        if (!spotifyDirectState.sdkPlayer || typeof spotifyDirectState.sdkPlayer.getCurrentState !== 'function') return;
         try {
           var state = await spotifyDirectState.sdkPlayer.getCurrentState();
           if (state && state.paused === false) await spotifyDirectState.sdkPlayer.pause();
@@ -2217,14 +2230,24 @@
   window.prepareSpotifyDirectForSong = prepareSpotifyDirectForSong;
 
   async function awaitCuefieldSpotifyStopBarrier(token) {
-    var barrier = null;
+    var barriers = [];
     try {
-      barrier = typeof window.getCuefieldProviderStopBarrier === 'function'
+      var cuefieldBarrier = typeof window.getCuefieldProviderStopBarrier === 'function'
         ? window.getCuefieldProviderStopBarrier()
         : null;
-    } catch (_) { barrier = null; }
-    if (!barrier || typeof barrier.then !== 'function') return true;
-    try { await barrier; } catch (_) { }
+      if (cuefieldBarrier && typeof cuefieldBarrier.then === 'function') barriers.push(cuefieldBarrier);
+    } catch (_) { }
+    try {
+      var providerBarrier = window.pendingExternalProviderStopPromise;
+      if (providerBarrier && typeof providerBarrier.then === 'function' && barriers.indexOf(providerBarrier) < 0) barriers.push(providerBarrier);
+    } catch (_) { }
+    if (!barriers.length) return true;
+    try {
+      await Promise.race([
+        Promise.allSettled(barriers),
+        spotifyDelay(2600)
+      ]);
+    } catch (_) { }
     return token === window.trackSwitchToken;
   }
 
@@ -2243,6 +2266,7 @@
       throw new Error('SPOTIFY_DESCRIPTOR_MISMATCH:' + selectedId + ':' + descriptorId);
     }
 
+    var ownershipSerial = ++spotifyDirectState.ownershipSerial;
     var requestId = 'sy-' + Date.now().toString(36) + '-' + token + '-' + targetId.slice(-6);
     stopSpotifyRealtimeCapture();
     spotifyRealtimeAudio.status = 'disabled';
@@ -2285,6 +2309,7 @@
     // the SDK and issue the new exact-track command. Normal Spotify clicks have
     // no barrier and continue immediately.
     if (!await awaitCuefieldSpotifyStopBarrier(token)) return false;
+    if (ownershipSerial !== spotifyDirectState.ownershipSerial) return false;
     activateSpotifyAudioFromGesture();
     var initialSpotifyVolume = opts.initialSpotifyVolume == null
       ? targetSpotifyVolume()
@@ -2300,7 +2325,7 @@
       requestId,
       song
     );
-    if (token !== window.trackSwitchToken) return false;
+    if (token !== window.trackSwitchToken || ownershipSerial !== spotifyDirectState.ownershipSerial) return false;
 
     var confirmedTrack = spotifySdkCurrentTrack(confirmedState);
     var confirmedMatch = spotifySdkTrackMatch(confirmedTrack, targetUri, song);
@@ -2669,10 +2694,13 @@
       window.activePlaybackTransport = 'html-audio';
       return originalPlayQueueAt.call(window, idx, opts);
     }
-    var stopPromise = deactivateSpotifyForExternalPlayback('provider-switch');
-    window.pendingExternalProviderStopPromise = Promise.resolve(stopPromise).catch(function (error) {
+    var stopPromise = Promise.resolve(deactivateSpotifyForExternalPlayback('provider-switch')).catch(function (error) {
       console.warn('[SpotifyProviderSwitchStop]', error);
       return false;
+    });
+    window.pendingExternalProviderStopPromise = stopPromise;
+    stopPromise.finally(function () {
+      if (window.pendingExternalProviderStopPromise === stopPromise) window.pendingExternalProviderStopPromise = null;
     });
     window.activePlaybackTransport = 'html-audio';
     return originalPlayQueueAt.call(window, idx, opts);

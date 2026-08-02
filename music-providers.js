@@ -5660,6 +5660,19 @@ async function lyricsFor(id, provider, query = {}) {
     ? spotifyFastLrclibLyrics(metadata).catch(() => null)
     : null;
   const primaryCrossPromise = crossProviderLyricsFor(metadata, provider, youtubeSourceType, query, ['qq', 'netease']).catch(() => null);
+  // The selected YouTube MV owns its own timeline. Start exact caption lookup in
+  // parallel with QQ/NetEase text matching, so an MV intro/outro/edit can never
+  // inherit album timestamps merely because the text provider answered first.
+  const exactVideoCaptionPromise = provider === 'youtube' && youtubeSourceType === 'video' && id
+    ? youtubeCaptionService.fetchForVideo(id, {
+      getInfo: youtubeInfoViaYtDlp,
+      userAgent: UA,
+      languages: [query.language, providerConfig().language, 'vi', 'en'].filter(Boolean),
+    }).catch((error) => {
+      console.warn('[YouTubeExactCaptionLyrics]', error && error.message || error);
+      return null;
+    })
+    : null;
   let primaryCrossLyrics = null;
 
   if (provider === 'spotify') {
@@ -5746,10 +5759,28 @@ async function lyricsFor(id, provider, query = {}) {
     }
   }
 
-  // QQ and NetEase remain the primary ShinaYuu lyrics sources. Exact YouTube
-  // captions are used only when those providers have no usable lyric text;
-  // their timestamps already include the selected video's intro and outro.
-  if (provider === 'youtube' && id && !(primaryCrossLyrics && (primaryCrossLyrics.plainLyric || primaryCrossLyrics.lyric || primaryCrossLyrics.yrc))) {
+  // For a normal YouTube MV, exact captions from the selected video outrank
+  // every borrowed timestamp source. The lookup has already been running beside
+  // QQ/NetEase, so this bounded wait normally adds no visible delay.
+  if (provider === 'youtube' && youtubeSourceType === 'video' && exactVideoCaptionPromise) {
+    const exactCaption = await Promise.race([
+      exactVideoCaptionPromise,
+      new Promise((resolve) => setTimeout(() => resolve(null), 950)),
+    ]);
+    if (exactCaption && exactCaption.exactVideoTiming && (exactCaption.yrc || exactCaption.lyric)) {
+      return {
+        ...exactCaption,
+        metadataProvider: 'youtube-video',
+        metadata,
+        match: { score: 100, duration, source: 'exact-selected-video-caption' },
+        exactVideoTiming: true,
+      };
+    }
+  }
+
+  // YouTube Music keeps the previous fallback behaviour: use captions only when
+  // QQ/NetEase and native music lyrics provide no usable text.
+  if (provider === 'youtube' && youtubeSourceType !== 'video' && id && !(primaryCrossLyrics && (primaryCrossLyrics.plainLyric || primaryCrossLyrics.lyric || primaryCrossLyrics.yrc))) {
     try {
       const exactCaption = await youtubeCaptionService.fetchForVideo(id, {
         getInfo: youtubeInfoViaYtDlp,
@@ -5759,9 +5790,9 @@ async function lyricsFor(id, provider, query = {}) {
       if (exactCaption && exactCaption.exactVideoTiming && (exactCaption.yrc || exactCaption.lyric)) {
         return {
           ...exactCaption,
-          metadataProvider: youtubeSourceType === 'music' ? 'youtube-music' : 'youtube-video',
+          metadataProvider: 'youtube-music',
           metadata,
-          match: { score: 100, duration, source: youtubeSourceType === 'music' ? 'exact-youtube-music-caption' : 'exact-selected-video-caption' },
+          match: { score: 100, duration, source: 'exact-youtube-music-caption' },
           exactVideoTiming: true,
         };
       }
@@ -6020,14 +6051,17 @@ async function lyricsFor(id, provider, query = {}) {
       };
     }
     if (youtubeSourceType === 'video' && alignment && alignment.status === 'processing') {
-      // A normal video must not borrow timestamps from an album version, but
-      // the exact QQ/NetEase lyric text should already be visible while the
-      // ShinaYuu forced aligner prepares timing for the selected MV.
+      // Do not turn plain text into an evenly-spaced fake timeline while the
+      // exact-video aligner is still processing. That provisional animation is
+      // the main reason long-intro MVs look several seconds out of sync. Keep the
+      // text only as pending metadata and publish timed lines once captions or
+      // forced alignment are ready.
       return {
         lyric: '',
         tlyric: baseResult.tlyric || '',
         yrc: '',
-        plainLyric: exactTranscript || baseResult.plainLyric || '',
+        plainLyric: '',
+        pendingPlainLyric: exactTranscript || baseResult.plainLyric || '',
         source: 'youtube-video-alignment-pending',
         metadataProvider: 'youtube-video',
         metadata,

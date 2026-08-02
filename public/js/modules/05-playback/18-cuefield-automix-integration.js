@@ -1,10 +1,11 @@
 (function () {
   'use strict';
 
-  var VERSION = '2.1.1';
+  var VERSION = '2.1.2';
   var STORE_KEY = 'shinayuu-cuefield-automix-v2';
   var GAPLESS_STORE_KEY = 'shinayuu-album-gapless-v1';
   var PREPARE_DELAY_MS = 950;
+  var EXECUTION_TIMEOUT_MS = 11500;
   var state = {
     enabled: false,
     albumGapless: true,
@@ -26,6 +27,7 @@
     lastCountdownSec: -1,
     executionSerial: 0,
     executionStartedAt: 0,
+    executionTimeoutMs: EXECUTION_TIMEOUT_MS,
     bypassToken: -1,
     lastAbortReason: '',
     outputDirty: false,
@@ -477,6 +479,7 @@
     var pendingExecution = state.activeExecutionPending;
     state.executionSerial++;
     state.executionStartedAt = 0;
+    state.executionTimeoutMs = EXECUTION_TIMEOUT_MS;
     state.lastAbortReason = String(reason || 'aborted');
     state.executing = false;
     window.cuefieldAutoMixExecuting = false;
@@ -538,6 +541,7 @@
     state.generation++;
     state.executionSerial++;
     state.executionStartedAt = 0;
+    state.executionTimeoutMs = EXECUTION_TIMEOUT_MS;
     clearPrepareTimer();
     state.pending = null;
     state.preparing = false;
@@ -1499,11 +1503,18 @@
       return true;
     })();
     state.activeProviderStopPromise = stopOperation;
-    try {
-      return await stopOperation;
-    } finally {
+    stopOperation.then(function () {
       if (state.activeProviderStopPromise === stopOperation) state.activeProviderStopPromise = null;
-    }
+    }, function () {
+      if (state.activeProviderStopPromise === stopOperation) state.activeProviderStopPromise = null;
+    });
+    // A remote pause must not hold the complete AutoMix engine indefinitely.
+    // Keep the real promise exposed as a barrier, while this transition gets a
+    // bounded answer and can roll back to the still-audible outgoing provider.
+    return await Promise.race([
+      stopOperation,
+      delay(3000).then(function () { return false; })
+    ]);
   }
 
   async function crossfadeSpotifyToHtml(pending, executionSerial) {
@@ -1592,6 +1603,18 @@
     }
   }
 
+  function transitionTimeoutMs(pending) {
+    // HTML dual-deck mixes can legitimately spend up to 10 seconds on the
+    // audible curve plus secondary-start and primary-adoption confirmation.
+    // Give that valid path enough room, while keeping provider-only handoffs on
+    // the tighter liveness budget so a broken source cannot lock the engine.
+    if (pending && pending.htmlDualDeck) {
+      var fadeMs = clamp(Number(pending.fadeSec) || 8, 0.65, 10) * 1000;
+      return clamp(fadeMs + 5000, EXECUTION_TIMEOUT_MS, 15500);
+    }
+    return EXECUTION_TIMEOUT_MS;
+  }
+
   async function execute(pending) {
     if (!pending || state.executing || !state.enabled) return;
     if (pending.token !== Number(window.trackSwitchToken) || pending.fromIndex !== Number(window.currentIdx)) return;
@@ -1602,6 +1625,7 @@
     state.activeExecutionPending = pending;
     pending.executionSerial = executionSerial;
     state.executionStartedAt = Date.now();
+    state.executionTimeoutMs = transitionTimeoutMs(pending);
     state.executing = true;
     state.outputDirty = true;
     state.lastOutputOwner = pending.fromSpotify ? 'spotify' : 'html-audio';
@@ -1610,10 +1634,25 @@
     setStatus('handoff');
     var succeeded = false;
     try {
-      if (pending.htmlDualDeck) succeeded = await crossfadeDualDeck(pending, executionSerial);
-      else if (pending.spotifyToHtml) succeeded = await crossfadeSpotifyToHtml(pending, executionSerial);
-      else if (pending.htmlToSpotify) succeeded = await crossfadeHtmlToSpotify(pending, executionSerial);
-      else succeeded = await safeProviderHandoff(pending, executionSerial);
+      var transitionTask;
+      if (pending.htmlDualDeck) transitionTask = crossfadeDualDeck(pending, executionSerial);
+      else if (pending.spotifyToHtml) transitionTask = crossfadeSpotifyToHtml(pending, executionSerial);
+      else if (pending.htmlToSpotify) transitionTask = crossfadeHtmlToSpotify(pending, executionSerial);
+      else transitionTask = safeProviderHandoff(pending, executionSerial);
+      var transitionResult = await Promise.race([
+        Promise.resolve(transitionTask).then(function (value) { return { completed: true, value: !!value }; }),
+        delay(state.executionTimeoutMs).then(function () { return { completed: false, value: false }; })
+      ]);
+      if (!transitionResult.completed && executionActive(executionSerial)) {
+        console.warn('[CuefieldAutoMix] transition timeout; preserving the current provider');
+        state.bypassToken = Number(window.trackSwitchToken);
+        abortExecution('transition-timeout', {
+          keepBypass: true,
+          owner: pending.fromSpotify ? 'spotify' : 'html-audio'
+        });
+        return;
+      }
+      succeeded = transitionResult.value;
       if (succeeded && executionActive(executionSerial)) {
         console.info('[CuefieldAutoMix] transition complete', { fromIndex: pending.fromIndex, toIndex: pending.toIndex });
       }
@@ -1627,6 +1666,7 @@
         if (executionSerial !== state.executionSerial) return;
         state.executing = false;
         state.executionStartedAt = 0;
+        state.executionTimeoutMs = EXECUTION_TIMEOUT_MS;
         window.cuefieldAutoMixExecuting = false;
         if (state.preparedAudio) stopPreparedAudio(state.preparedAudio);
         state.preparedForToken = -1;
@@ -1672,7 +1712,7 @@
 
   function tick() {
     var token = Number(window.trackSwitchToken);
-    if (state.executing && state.executionStartedAt && Date.now() - state.executionStartedAt > 24000) {
+    if (state.executing && state.executionStartedAt && Date.now() - state.executionStartedAt > state.executionTimeoutMs + 1800) {
       console.warn('[CuefieldAutoMix] stale execution watchdog released the player');
       abortExecution('watchdog-timeout');
       state.bypassToken = token;
