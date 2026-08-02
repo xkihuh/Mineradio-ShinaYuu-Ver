@@ -80,7 +80,9 @@
     clockSyncFailureCount: 0,
     lastPauseStateKey: '',
     activationWarmAt: 0,
-    deviceRecoveryAt: 0
+    deviceRecoveryAt: 0,
+    lastGestureAt: 0,
+    startupPrewarmScheduled: false
   };
 
   window.spotifyDirectState = spotifyDirectState;
@@ -1142,6 +1144,7 @@
 
   function captureSpotifyMediaActivation(event) {
     if (!event || event.type === 'keydown' && event.key !== 'Enter' && event.key !== ' ') return;
+    spotifyDirectState.lastGestureAt = Date.now();
     if (spotifyDirectState.sdkPlayer) activateSpotifyAudioFromGesture();
     else if (!spotifyDirectState.prewarmPromise) prewarmSpotifyDirectPlayer();
   }
@@ -2213,6 +2216,18 @@
   }
   window.prepareSpotifyDirectForSong = prepareSpotifyDirectForSong;
 
+  async function awaitCuefieldSpotifyStopBarrier(token) {
+    var barrier = null;
+    try {
+      barrier = typeof window.getCuefieldProviderStopBarrier === 'function'
+        ? window.getCuefieldProviderStopBarrier()
+        : null;
+    } catch (_) { barrier = null; }
+    if (!barrier || typeof barrier.then !== 'function') return true;
+    try { await barrier; } catch (_) { }
+    return token === window.trackSwitchToken;
+  }
+
   async function startSpotifyTrack(song, descriptor, opts, token) {
     opts = opts || {};
     var prepared = opts.spotifyPrepared || null;
@@ -2263,6 +2278,13 @@
     }
 
     spotifyDirectState.sdkPlaybackError = '';
+    activateSpotifyAudioFromGesture();
+    // When a manual selection interrupts Spotify -> HTML AutoMix, an old
+    // provider pause may already be on the wire. Wait only for that concrete
+    // pause operation, never for the whole AutoMix transaction, then reactivate
+    // the SDK and issue the new exact-track command. Normal Spotify clicks have
+    // no barrier and continue immediately.
+    if (!await awaitCuefieldSpotifyStopBarrier(token)) return false;
     activateSpotifyAudioFromGesture();
     var initialSpotifyVolume = opts.initialSpotifyVolume == null
       ? targetSpotifyVolume()
@@ -2326,6 +2348,17 @@
   async function playSpotifyQueueAt(idx, opts) {
     opts = opts || {};
     if (!spotifyPlaybackIntentActive(opts)) return false;
+    var manualSpotifySelection = !!(
+      (opts.manual || opts.userInitiated)
+      && !opts.autoMixHandoff
+      && !opts.cuefieldAutoMix
+      && !opts.autoMixRecovery
+      && !opts.sourceFallbackRecovery
+    );
+    if (manualSpotifySelection && typeof window.awaitCuefieldAutoMixReleaseForPlaybackSelection === 'function') {
+      await window.awaitCuefieldAutoMixReleaseForPlaybackSelection('manual-spotify-selection');
+      if (!spotifyPlaybackIntentActive(opts)) return false;
+    }
     if (!window.playQueue || idx < 0 || idx >= window.playQueue.length) return false;
     var requestedSong = normalizeSpotifyQueueSong(window.playQueue[idx]);
     window.playQueue[idx] = requestedSong;
@@ -2891,6 +2924,15 @@
 
   window.prewarmSpotifyDirectPlayer = prewarmSpotifyDirectPlayer;
   setTimeout(function () { setSpotifyDirectVolume(targetSpotifyVolume()); }, 450);
+  // Prepare the in-app Spotify device before the first track click whenever a
+  // saved session exists. This runs after the UI is interactive and never blocks
+  // startup; it removes the avoidable SDK-connect delay from normal playback.
+  if (!spotifyDirectState.startupPrewarmScheduled) {
+    spotifyDirectState.startupPrewarmScheduled = true;
+    setTimeout(function () {
+      Promise.resolve(prewarmSpotifyDirectPlayer()).catch(function () {});
+    }, 900);
+  }
 
   window.addEventListener('beforeunload', function () {
     stopSpotifyPolling();

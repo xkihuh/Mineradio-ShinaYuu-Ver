@@ -9,7 +9,7 @@ const vm = require('node:vm');
 const root = path.resolve(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('2.1.0 isolates every root playback selection from stale provider recovery', () => {
+test('2.1.1 isolates every root playback selection from stale provider recovery', () => {
   const fallback = read('public/js/modules/05-playback/11-provider-fallback.js');
   const controls = read('public/js/modules/05-playback/14-player-controls.js');
   const spotify = read('public/spotify-direct-player.js');
@@ -99,10 +99,10 @@ test('lyrics clock combines provider time, global delay and per-track correction
   assert.equal(context.getAdjustedLyricPlaybackTime(10), 0);
 });
 
-test('release identity is consistently bumped to 2.1.0', () => {
+test('release identity is consistently bumped to 2.1.1', () => {
   const pkg = JSON.parse(read('package.json'));
-  assert.equal(pkg.version, '2.1.0');
-  assert.equal(pkg.displayVersion, '2.1.0');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.0');
-  assert.equal(pkg.build.buildVersion, '2.1.0.0');
+  assert.equal(pkg.version, '2.1.1');
+  assert.equal(pkg.displayVersion, '2.1.1');
+  assert.equal(pkg.shinayuu.displayVersion, '2.1.1');
+  assert.equal(pkg.build.buildVersion, '2.1.1.0');
 });

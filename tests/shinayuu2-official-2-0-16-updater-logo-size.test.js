@@ -6,7 +6,7 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('2.1.0 constrains the native updater logo image and prevents overflow', () => {
+test('2.1.1 constrains the native updater logo image and prevents overflow', () => {
   const native = read('public/js/shinayuu-v2-native.js');
   const css = read('public/css/shinayuu-alpha3.0.5-fixes.css');
   assert.match(native, /\.shinayuu-update-logo>img\{[^}]*width:42px!important[^}]*height:42px!important/);

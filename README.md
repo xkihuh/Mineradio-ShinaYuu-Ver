@@ -1,24 +1,23 @@
-# ShinaYuu Music 2.1.0
+# ShinaYuu Music 2.1.1
 
-ShinaYuu Music 2.1.0 được phát triển trực tiếp từ source 2.0.17 và chỉ port chọn lọc các cải tiến ổn định của Mineradio 2.1.0. Bản này không thay thế nguồn phát Spotify/YouTube, không đổi nguồn lấy lyrics, không ghi đè AutoMix và không đưa chuỗi tiếng Trung từ repo gốc vào giao diện ShinaYuu.
+ShinaYuu Music 2.1.1 được phát triển từ source 2.1.0 của ShinaYuu. Bản 2.1.0 trước đó đã port chọn lọc các cải tiến ổn định từ **Mineradio 2.1.0**; bản 2.1.1 tập trung sửa lỗi giao diện Discord bị rơi về HTML mặc định, loại bỏ độ trễ khi chọn bài và gia cố quá trình khởi động Spotify.
 
-## Nội dung chính
+## Sửa lỗi chính của 2.1.1
 
-- Gia cố thư viện nhạc cục bộ: lưu snapshot bài hát, khôi phục từ bản sao dự phòng và ghi state tuần tự/atomic để hạn chế mất dữ liệu khi app tắt bất ngờ.
-- Thêm recovery có giới hạn cho cửa sổ chính khi renderer bị treo hoặc kết thúc ngoài ý muốn; không tạo vòng lặp reload vô hạn.
-- Làm chắc vòng đời Wallpaper Engine và fullscreen bằng lifecycle serial, loại bỏ callback cũ chạy muộn sau khi trạng thái cửa sổ đã thay đổi.
-- Giới hạn transaction đổi nguồn tự động theo thời gian, số provider và số bước chuyển hàng chờ; thao tác người dùng luôn hủy recovery cũ.
-- Port cấu trúc layer lyrics và 3D playlist shelf của Mineradio 2.1.0 mà không thay đổi provider hoặc dữ liệu lyrics.
-- Hệ thống cập nhật có hai lựa chọn khi có patch: **Cập nhật bằng bản vá** hoặc **Tải bộ cài đầy đủ**. Nếu không có patch, app tải bộ cài đầy đủ như trước.
-- Toàn bộ chuỗi UI mới có tiếng Việt và tiếng Anh theo hệ thống ngôn ngữ của ShinaYuu Music.
+- Đưa CSS Liquid Glass quan trọng của Discord vào ngay `public/index.html`, đồng thời vẫn giữ stylesheet ngoài. Giao diện không còn phụ thuộc hoàn toàn vào một file CSS có thể bị thiếu hoặc còn cache cũ khi cập nhật riêng thư mục `public`.
+- Khóa kích thước SVG, input, toggle và bốn nút Discord; các nút giữ bố cục lưới 2 × 2 thay vì biến thành biểu tượng HTML quá lớn.
+- Loại bỏ hàng chờ AutoMix tối đa 2,8 giây khỏi thao tác chọn bài thủ công. Lệnh chọn bài cập nhật trạng thái ngay trong cùng thao tác người dùng.
+- Khi AutoMix đang dừng Spotify để bàn giao cho nguồn HTML, lệnh Spotify mới chỉ chờ đúng thao tác dừng provider đang thực sự chạy, không chờ toàn bộ transaction AutoMix.
+- Prewarm Spotify Web Playback SDK sau khi giao diện sẵn sàng và có phiên đăng nhập, giảm thời gian kết nối ở lần phát đầu tiên.
+- Giữ nguyên các port chọn lọc từ Mineradio 2.1.0: persistence nhạc cục bộ, runtime recovery, Wallpaper Engine/fullscreen lifecycle, giới hạn provider fallback, layer lyrics và kệ playlist 3D.
 
 ## Các phần được giữ nguyên
 
 - Spotify Direct Player và YouTube playback của ShinaYuu.
-- AutoMix/Cuefield và bản sửa quyền sở hữu transaction của 2.0.17.
-- Các nguồn lyrics ShinaYuu, QQ, NetEase, Kugou và Qishui.
-- Delay lyrics, lệch tiến độ từng bài và Lyrics Sync cũ.
-- Discord Rich Presence, Home Dashboard và updater/patch pipeline riêng.
+- Nguồn lấy lyrics, parser LRC/YRC, Delay lyrics và lệch tiến độ từng bài.
+- Cấu trúc layer lyrics và kệ playlist 3D đã port chọn lọc từ Mineradio 2.1.0.
+- Updater riêng của ShinaYuu với lựa chọn bản vá nhanh hoặc bộ cài đầy đủ.
+- Toàn bộ UI mới sử dụng tiếng Việt và tiếng Anh; không nhập chuỗi tiếng Trung từ upstream.
 
 ## Chạy source
 
@@ -36,13 +35,13 @@ npm run build:win
 Installer dự kiến:
 
 ```text
-ShinaYuu-Music-2.1.0-Setup.exe
+ShinaYuu-Music-2.1.1-Setup.exe
 ```
 
 ## Phiên bản
 
 ```text
-Package version : 2.1.0
-Display version : 2.1.0
-Build version   : 2.1.0.0
+Package version : 2.1.1
+Display version : 2.1.1
+Build version   : 2.1.1.0
 ```

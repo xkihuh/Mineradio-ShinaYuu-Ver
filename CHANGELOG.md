@@ -1,16 +1,15 @@
 # Changelog
 
-## 2.1.0
+## 2.1.1
 
-- Selectively ported Mineradio 2.1.0 stability improvements without replacing ShinaYuu playback, AutoMix or lyrics providers.
-- Persisted a validated local-track snapshot with atomic primary/backup state files and serialized writes.
-- Added bounded main-renderer recovery with cooldown and retry limits for renderer termination or prolonged unresponsiveness.
-- Added lifecycle serial guards for Wallpaper Engine/fullscreen transitions so stale callbacks cannot restart or resize an obsolete host state.
-- Strengthened provider fallback with a total action budget, no-progress timeout and user-intent cancellation.
-- Ported the lyrics row-group render-order correction and pointer-aware 3D shelf foreground behavior from Mineradio 2.1.0.
-- Added separate quick-patch and full-installer actions to the update dialog.
-- Preserved Vietnamese/English UI and prevented upstream Chinese strings from entering new ShinaYuu controls.
-- Bumped package/display/build identity to 2.1.0 / 2.1.0.0.
+- Fixed the Discord Connect panel falling back to native white inputs and oversized SVG/button rendering when the external fixes stylesheet was missing, stale or incompletely uploaded.
+- Added a critical inline Liquid Glass style layer and intrinsic SVG dimensions while retaining the normal external stylesheet and 2 × 2 action grid.
+- Removed the former 2.8-second AutoMix release wait from manual track selection; stale AutoMix work is invalidated immediately and can no longer delay the selected row.
+- Added a concrete Spotify provider-stop barrier so a new Spotify request waits only for an actual in-flight old pause, rather than the complete AutoMix execution.
+- Added non-blocking Spotify SDK prewarm after the UI becomes interactive when a saved login session exists.
+- Retained the selective Mineradio 2.1.0 ports introduced by ShinaYuu 2.1.0: local-library persistence, bounded runtime recovery, Wallpaper Engine/fullscreen lifecycle guards, bounded provider fallback, lyrics layer ordering and pointer-aware 3D shelf ownership.
+- Preserved ShinaYuu Spotify/YouTube engines, lyrics providers, bilingual UI and patch/full-installer updater flow.
+- Bumped package/display/build identity to 2.1.1 / 2.1.1.0.
 
 ## 2.0.17
 

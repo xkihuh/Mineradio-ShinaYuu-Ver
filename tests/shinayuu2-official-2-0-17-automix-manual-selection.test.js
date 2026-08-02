@@ -6,15 +6,18 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('manual track selection awaits complete AutoMix release before touching playback state', () => {
+test('manual track selection invalidates AutoMix immediately without a multi-second wait', () => {
   const playback = read('public/js/modules/05-playback/13-playback-start-audio.js');
   const mix = read('public/js/modules/05-playback/18-cuefield-automix-integration.js');
   assert.match(playback, /var manualSelectionRoot = !!\(/);
   assert.match(playback, /await window\.awaitCuefieldAutoMixReleaseForPlaybackSelection\('manual-track-selection'\)/);
   assert.match(playback, /if \(!playbackIntentStillCurrent\(\)\) return false;/);
   assert.match(mix, /async function releaseAutoMixForManualSelection\(reason\)/);
-  assert.match(mix, /Promise\.allSettled\(waits\)/);
-  assert.match(mix, /state\.activeExecutionPromise/);
+  assert.match(mix, /await Promise\.resolve\(\)/);
+  assert.match(mix, /state\.activeProviderStopPromise/);
+  assert.match(mix, /window\.getCuefieldProviderStopBarrier/);
+  assert.doesNotMatch(mix, /delay\(2800\)/);
+  assert.doesNotMatch(mix, /Promise\.allSettled\(waits\)/);
 });
 
 test('cancelled AutoMix cannot commit an old queue handoff or skip after manual selection', () => {
@@ -35,13 +38,13 @@ test('stale provider error paths are inert and manual cancellation clears AutoMi
   assert.match(mix, /window\.awaitCuefieldAutoMixReleaseForPlaybackSelection/);
 });
 
-test('release identity is synchronized to 2.1.0', () => {
+test('release identity is synchronized to 2.1.1', () => {
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
-  assert.equal(pkg.version, '2.1.0');
-  assert.equal(pkg.displayVersion, '2.1.0');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.0');
-  assert.equal(pkg.build.buildVersion, '2.1.0.0');
-  assert.equal(lock.version, '2.1.0');
-  assert.equal(lock.packages[''].version, '2.1.0');
+  assert.equal(pkg.version, '2.1.1');
+  assert.equal(pkg.displayVersion, '2.1.1');
+  assert.equal(pkg.shinayuu.displayVersion, '2.1.1');
+  assert.equal(pkg.build.buildVersion, '2.1.1.0');
+  assert.equal(lock.version, '2.1.1');
+  assert.equal(lock.packages[''].version, '2.1.1');
 });

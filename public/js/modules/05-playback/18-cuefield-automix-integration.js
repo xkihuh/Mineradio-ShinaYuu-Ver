@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '2.0.17';
+  var VERSION = '2.1.1';
   var STORE_KEY = 'shinayuu-cuefield-automix-v2';
   var GAPLESS_STORE_KEY = 'shinayuu-album-gapless-v1';
   var PREPARE_DELAY_MS = 950;
@@ -33,7 +33,8 @@
     activeExecutionPromise: null,
     activeExecutionPending: null,
     lastAbortPromise: null,
-    manualReleaseSerial: 0
+    manualReleaseSerial: 0,
+    activeProviderStopPromise: null
   };
 
   function vi(viText, enText) {
@@ -501,23 +502,15 @@
 
   async function releaseAutoMixForManualSelection(reason) {
     var releaseSerial = ++state.manualReleaseSerial;
-    var executionSettled = state.activeExecutionPromise;
-    var releasePromise = state.lastAbortPromise;
-    if (state.executing || state.preparing || state.pending || state.preparedAudio || state.outputDirty) {
-      releasePromise = abortExecution(reason || 'manual-selection');
-      executionSettled = executionSettled || state.activeExecutionPromise;
-    }
-    var waits = [];
-    if (releasePromise && typeof releasePromise.then === 'function') waits.push(releasePromise);
-    if (executionSettled && typeof executionSettled.then === 'function') waits.push(executionSettled);
-    if (!waits.length) return true;
-    if (waits.length) {
-      await Promise.race([
-        Promise.allSettled(waits),
-        delay(2800)
-      ]);
-    }
-    if (releaseSerial !== state.manualReleaseSerial) return false;
+    var mustAbort = !!(state.executing || state.preparing || state.pending || state.preparedAudio || state.outputDirty);
+    if (mustAbort) abortExecution(reason || 'manual-selection');
+
+    // A manual click must update the player on the same interaction frame. The
+    // old implementation waited up to 2.8 seconds for the whole AutoMix task,
+    // including harmless preparation work. Invalidating executionSerial already
+    // prevents that task from committing, so only synchronous output cleanup is
+    // required here. A genuinely in-flight Spotify stop is exposed separately
+    // as a provider barrier and is awaited only at the final Spotify play edge.
     try {
       if (typeof window.clearAudioFadeTimers === 'function') window.clearAudioFadeTimers();
       if (typeof window.audioFadeSerial === 'number') window.audioFadeSerial++;
@@ -534,10 +527,11 @@
       }
     } catch (_) { }
     if (window.spotifyDirectState && window.spotifyDirectState.active) {
-      await Promise.race([setSpotifyVolume(savedVolume), delay(900)]);
+      Promise.resolve(setSpotifyVolume(savedVolume)).catch(function () {});
     }
     state.outputDirty = false;
-    return true;
+    await Promise.resolve();
+    return releaseSerial === state.manualReleaseSerial;
   }
 
   function reset(reason, preservePrepared) {
@@ -1489,19 +1483,27 @@
 
   async function stopSpotifyForHtmlOwnership(reason, executionSerial) {
     if (executionSerial != null && !executionActive(executionSerial)) return false;
-    try {
-      if (typeof window.stopSpotifyPlaybackForProviderSwitch === 'function') {
-        await window.stopSpotifyPlaybackForProviderSwitch(reason || 'automix-html-takeover');
+    var stopOperation = (async function () {
+      try {
+        if (typeof window.stopSpotifyPlaybackForProviderSwitch === 'function') {
+          await window.stopSpotifyPlaybackForProviderSwitch(reason || 'automix-html-takeover');
+        }
+        var pendingStop = window.pendingExternalProviderStopPromise;
+        if (pendingStop && typeof pendingStop.then === 'function') await pendingStop;
+      } catch (error) {
+        console.warn('[CuefieldAutoMix] Spotify provider stop:', error && (error.message || error));
+        return false;
       }
-      var pendingStop = window.pendingExternalProviderStopPromise;
-      if (pendingStop && typeof pendingStop.then === 'function') await pendingStop;
-    } catch (error) {
-      console.warn('[CuefieldAutoMix] Spotify provider stop:', error && (error.message || error));
-      return false;
+      if (executionSerial != null && !executionActive(executionSerial)) return false;
+      window.activePlaybackTransport = 'html-audio';
+      return true;
+    })();
+    state.activeProviderStopPromise = stopOperation;
+    try {
+      return await stopOperation;
+    } finally {
+      if (state.activeProviderStopPromise === stopOperation) state.activeProviderStopPromise = null;
     }
-    if (executionSerial != null && !executionActive(executionSerial)) return false;
-    window.activePlaybackTransport = 'html-audio';
-    return true;
   }
 
   async function crossfadeSpotifyToHtml(pending, executionSerial) {
@@ -1771,6 +1773,9 @@
   };
   window.awaitCuefieldAutoMixReleaseForPlaybackSelection = function (reason) {
     return releaseAutoMixForManualSelection(reason || 'manual-selection');
+  };
+  window.getCuefieldProviderStopBarrier = function () {
+    return state.activeProviderStopPromise;
   };
 
   window.resetCuefieldAutoMix = function (reason, options) {
