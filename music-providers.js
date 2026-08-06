@@ -3110,6 +3110,17 @@ function spotifyPlaybackScopesReady(token) {
   return ['streaming', 'user-read-playback-state', 'user-modify-playback-state'].every((scope) => granted.has(scope));
 }
 
+function spotifyPlaybackEntitlement(status = {}) {
+  const product = String(status.product || '').trim().toLowerCase();
+  const vipLevel = String(status.vipLevel || '').trim().toLowerCase();
+  if (status.isVip === true || product === 'premium' || vipLevel === 'premium') return 'premium';
+  // OAuth can finish before /me returns (or while /me is rate-limited). That is
+  // not proof that the account is Free. Let the Web Playback SDK perform the
+  // authoritative Premium check instead of blocking every track locally.
+  if (status.profilePending === true || (!product && !vipLevel)) return 'unknown';
+  return 'non-premium';
+}
+
 function spotifyStatusFromProfile(config, token, profile, baseUrl = '') {
   const premium = profile.product === 'premium';
   return {
@@ -4786,7 +4797,8 @@ async function resolveSpotifyPlayback(trackId, quality) {
       restriction: { provider: 'spotify', category: 'login_required', action: 'reauthorize' },
     };
   }
-  if (status.vipLevel !== 'premium') {
+  const entitlement = spotifyPlaybackEntitlement(status);
+  if (entitlement === 'non-premium') {
     return {
       url: null,
       proxyUrl: null,
@@ -4831,6 +4843,7 @@ async function resolveSpotifyPlayback(trackId, quality) {
     quality: 'spotify',
     sourceLabel: 'Spotify',
     lyricsMetadataProvider: 'spotify',
+    premiumEntitlement: entitlement,
   };
 }
 
@@ -6330,6 +6343,7 @@ module.exports = {
     youtubeThumbnail,
     youtubeBackgroundVideoLimits,
     youtubeBackgroundVideoFormat,
+    spotifyPlaybackEntitlement,
     youtubeCachedVideoDescriptor,
     mapYouTubeMusicItem,
     youtubeSearchItems,

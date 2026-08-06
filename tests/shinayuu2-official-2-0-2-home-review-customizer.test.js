@@ -10,13 +10,13 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 const pkg = require(path.join(root, 'package.json'));
 const lock = require(path.join(root, 'package-lock.json'));
 
-test('2.1.3 identity and installer metadata are synchronized', () => {
-  assert.equal(pkg.version, '2.1.3');
-  assert.equal(pkg.displayVersion, '2.1.3');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.3');
-  assert.equal(pkg.build.buildVersion, '2.1.3.0');
-  assert.equal(lock.version, '2.1.3');
-  assert.equal(lock.packages[''].version, '2.1.3');
+test('2.1.4 identity and installer metadata are synchronized', () => {
+  assert.equal(pkg.version, '2.1.4');
+  assert.equal(pkg.displayVersion, '2.1.4');
+  assert.equal(pkg.shinayuu.displayVersion, '2.1.4');
+  assert.equal(pkg.build.buildVersion, '2.1.4.0');
+  assert.equal(lock.version, '2.1.4');
+  assert.equal(lock.packages[''].version, '2.1.4');
 });
 
 test('Home wallpaper exposes a Liquid content customization entry', () => {

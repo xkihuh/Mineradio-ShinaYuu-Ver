@@ -8,7 +8,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('2.1.3 adopts an already-audible AutoMix deck without restarting or rerouting it', () => {
+test('2.1.4 adopts an already-audible AutoMix deck without restarting or rerouting it', () => {
   const playback = read('public/js/modules/05-playback/13-playback-start-audio.js');
   assert.match(playback, /var seamlessAutoMixAdoption = !!\(/);
   assert.match(playback, /if \(!seamlessAutoMixAdoption\) \{\s*await applyAudioOutputDevice\(playbackMedia\);\s*\}/);
@@ -32,13 +32,13 @@ test('AutoMix moves renderer and provider work away from the audible boundary', 
   assert.match(spotify, /delay: \(opts\.autoMixHandoff \|\| opts\.cuefieldAutoMix\) \? 720 : 120/);
 });
 
-test('release identity is consistently bumped to 2.1.3', () => {
+test('release identity is consistently bumped to 2.1.4', () => {
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
-  assert.equal(pkg.version, '2.1.3');
-  assert.equal(pkg.displayVersion, '2.1.3');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.3');
-  assert.equal(pkg.build.buildVersion, '2.1.3.0');
-  assert.equal(lock.version, '2.1.3');
-  assert.equal(lock.packages[''].version, '2.1.3');
+  assert.equal(pkg.version, '2.1.4');
+  assert.equal(pkg.displayVersion, '2.1.4');
+  assert.equal(pkg.shinayuu.displayVersion, '2.1.4');
+  assert.equal(pkg.build.buildVersion, '2.1.4.0');
+  assert.equal(lock.version, '2.1.4');
+  assert.equal(lock.packages[''].version, '2.1.4');
 });

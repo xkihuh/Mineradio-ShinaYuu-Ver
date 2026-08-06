@@ -1,3 +1,14 @@
+# ShinaYuu Music 2.1.4
+
+- Sửa trường hợp OAuth đã hoàn tất nhưng profile Spotify còn pending/rate-limit bị hiểu nhầm thành tài khoản Free và chặn toàn bộ playback.
+- Chỉ chặn Premium khi product đã được Spotify xác nhận rõ; trạng thái chưa biết được chuyển cho Web Playback SDK kiểm tra chính thức.
+- Chờ Castlabs/Widevine sẵn sàng theo polling có giới hạn trước khi tạo Spotify SDK device.
+- Kích hoạt device `ShinaYuu Music` trước bài đầu tiên, kích hoạt lại khi device directory của Spotify cập nhật chậm.
+- Dùng Web API playback state làm kênh xác nhận dự phòng khi SDK `getCurrentState()` tạm thời trả về null.
+- Làm lỗi token/reauthorization kết thúc rõ ràng, không để `player.connect()` treo đến timeout.
+- Giữ nguyên lyrics pause/resume, exact Track ID/URI, seek, volume, AutoMix, YouTube, Discord và UI/UX từ 2.1.3.
+- Đồng bộ package/display/build identity lên 2.1.4 / 2.1.4.0.
+
 # ShinaYuu Music 2.1.3
 
 - Giữ dòng lyrics hiện tại trên stage khi tạm dừng, kể cả khi provider không dùng HTMLAudioElement có `src`.

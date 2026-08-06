@@ -1,48 +1,45 @@
-# ShinaYuu Music 2.1.3
+# ShinaYuu Music 2.1.4
 
-ShinaYuu Music 2.1.3 được phát triển trực tiếp từ source 2.1.2. Bản này chỉ sửa vòng đời hiển thị lyrics khi tạm dừng và phát tiếp; hệ thống nguồn lyrics, AutoMix, Spotify/YouTube playback và các bản sửa timestamp YouTube MV của 2.1.2 được giữ nguyên.
+ShinaYuu Music 2.1.4 được phát triển trực tiếp từ source 2.1.3 mà người dùng cung cấp. Bản này ưu tiên sửa lỗi Spotify đăng nhập được nhưng không bắt đầu phát, đồng thời giữ nguyên UI/UX, YouTube, AutoMix, lyrics và các bản sửa pause/resume của 2.1.3.
 
-## Sửa lỗi trọng tâm
+## Sửa Spotify
 
-- Lyrics không còn biến mất khi tạm dừng bài hát.
-- Khi phát tiếp, dòng lyrics hiện tại được khôi phục ngay theo clock thật của nguồn phát.
-- Hỗ trợ đúng cả Spotify Web Playback SDK, YouTube Music, YouTube Video/MV và nhạc cục bộ.
-- Spotify được xử lý riêng vì khi phát trực tiếp bằng SDK, HTMLAudioElement có thể không có `src`; trạng thái pause/resume không còn phụ thuộc vào `audio.src`.
-- Nếu mesh lyrics bị mất trong một frame chuyển trạng thái, app dựng lại đúng dòng hiện tại mà không yêu cầu đổi chế độ Lyrics thủ công.
-- Tôn trọng tùy chọn “Giữ lyrics khi tạm dừng”; khi tùy chọn này bật, dòng hiện tại đứng yên thay vì bị retire khỏi stage.
-
-## Giữ nguyên từ 2.1.2
-
-- Caption timestamp của đúng YouTube MV và forced alignment.
-- Nguồn lấy lyrics, parser LRC/YRC, Delay lyrics và lệch tiến độ từng bài.
-- AutoMix/provider ownership và timeout liveness.
-- Spotify Direct Player, YouTube playback, updater patch/bộ cài đầy đủ và UI song ngữ Việt/Anh.
+- Không còn coi trạng thái hồ sơ Spotify đang tải hoặc đang bị rate-limit là tài khoản Free.
+- Chỉ chặn phát khi Spotify đã xác nhận rõ tài khoản không phải Premium; trường hợp chưa có profile sẽ để Spotify Web Playback SDK xác minh.
+- Chờ Castlabs Electron/Widevine sẵn sàng thay vì kiểm tra một lần rồi thất bại ngay khi app vừa khởi động.
+- Kết thúc nhanh lỗi token/reauthorization thay vì để `Spotify.Player.connect()` treo đến timeout.
+- Kích hoạt thiết bị phát `ShinaYuu Music` trước lệnh phát bài đầu tiên và kích hoạt lại khi Spotify chưa kịp công bố device.
+- Xác nhận playback bằng cả `getCurrentState()` và Web API state để tránh rollback nhầm khi SDK phản hồi chậm.
+- Giữ exact Spotify Track ID/URI, seek, volume, lyrics, Discord Rich Presence và AutoMix ownership hiện có.
 
 ## Chạy source
 
-```powershell
+```bat
 npm ci
 npm start
 ```
 
+Spotify trực tiếp yêu cầu tài khoản Premium, Spotify Client ID đã cấu hình và đăng nhập lại nếu token cũ thiếu quyền playback.
+
 ## Build Windows
 
-```powershell
-npm run build:win
+```bat
+npm ci
+npm run release:win
 ```
 
 Installer dự kiến:
 
 ```text
-ShinaYuu-Music-2.1.3-Setup.exe
+ShinaYuu-Music-2.1.4-Setup.exe
 ```
 
 ## Phiên bản
 
 ```text
-Package version : 2.1.3
-Display version : 2.1.3
-Build version   : 2.1.3.0
+Package version : 2.1.4
+Display version : 2.1.4
+Build version   : 2.1.4.0
 ```
 ## Acknowledgments
 

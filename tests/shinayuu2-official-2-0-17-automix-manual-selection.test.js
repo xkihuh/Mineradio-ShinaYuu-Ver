@@ -38,13 +38,13 @@ test('stale provider error paths are inert and manual cancellation clears AutoMi
   assert.match(mix, /window\.awaitCuefieldAutoMixReleaseForPlaybackSelection/);
 });
 
-test('release identity is synchronized to 2.1.3', () => {
+test('release identity is synchronized to 2.1.4', () => {
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
-  assert.equal(pkg.version, '2.1.3');
-  assert.equal(pkg.displayVersion, '2.1.3');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.3');
-  assert.equal(pkg.build.buildVersion, '2.1.3.0');
-  assert.equal(lock.version, '2.1.3');
-  assert.equal(lock.packages[''].version, '2.1.3');
+  assert.equal(pkg.version, '2.1.4');
+  assert.equal(pkg.displayVersion, '2.1.4');
+  assert.equal(pkg.shinayuu.displayVersion, '2.1.4');
+  assert.equal(pkg.build.buildVersion, '2.1.4.0');
+  assert.equal(lock.version, '2.1.4');
+  assert.equal(lock.packages[''].version, '2.1.4');
 });

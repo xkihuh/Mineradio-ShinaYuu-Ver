@@ -81,6 +81,9 @@
     lastPauseStateKey: '',
     activationWarmAt: 0,
     deviceRecoveryAt: 0,
+    deviceActivatedAt: 0,
+    activatedDeviceId: '',
+    lastApiStateProbeAt: 0,
     lastGestureAt: 0,
     startupPrewarmScheduled: false,
     externalStopSerial: 0,
@@ -1165,7 +1168,7 @@
 
   function spotifyRecoverableSdkError(error) {
     var raw = String(error && (error.message || error) || '');
-    return !spotifyAuthorizationError(error) && /SDK|DEVICE|NOT_READY|CONNECT|PLAYBACK_NOT_CONFIRMED|PLAYBACK_ERROR|TIMEOUT|NOT FOUND|404/i.test(raw) && !/AUDIO_NOT_ACTIVATED|AUTOPLAY/i.test(raw);
+    return !spotifyAuthorizationError(error) && /SDK|DEVICE|NOT_READY|CONNECT|PLAYBACK_NOT_CONFIRMED|PLAYBACK_ERROR|TIMEOUT|NOT FOUND|404|CASTLABS|WIDEVINE|COMPONENTS/i.test(raw) && !/AUDIO_NOT_ACTIVATED|AUTOPLAY/i.test(raw);
   }
 
   async function resetSpotifySdkPlayer(reason) {
@@ -1176,6 +1179,8 @@
     spotifyDirectState.sdkReady = false;
     spotifyDirectState.sdkCreatingPromise = null;
     spotifyDirectState.deviceId = '';
+    spotifyDirectState.deviceActivatedAt = 0;
+    spotifyDirectState.activatedDeviceId = '';
     spotifyDirectState.deviceName = '';
     spotifyDirectState.sdkError = '';
     spotifyDirectState.sdkPlaybackError = '';
@@ -1231,13 +1236,23 @@
     var track = api.track || {};
     var id = String(track.spotifyId || track.id || '');
     var uri = String(track.spotifyUri || (id ? 'spotify:track:' + id : ''));
+    var artists = [];
+    if (Array.isArray(track.artists)) artists = track.artists;
+    else if (track.artist) artists = [{ name: String(track.artist || '') }];
     return {
       currentUri: uri,
       position: Number(api.progressMs || 0),
       duration: Number(api.durationMs || track.duration || 0),
       paused: api.isPlaying !== true,
-      track_window: { current_track: { uri: uri, id: id, name: String(track.name || track.title || ''), artists: [] } }
+      track_window: { current_track: { uri: uri, id: id, name: String(track.name || track.title || ''), artists: artists } }
     };
+  }
+
+  async function readSpotifyApiPlaybackState() {
+    var now = Date.now();
+    if (now - Number(spotifyDirectState.lastApiStateProbeAt || 0) < 600) return null;
+    spotifyDirectState.lastApiStateProbeAt = now;
+    return window.apiJson('/api/spotify/player/state?t=' + now).catch(function () { return null; });
   }
 
   async function waitForRemoteHostReady(timeoutMs) {
@@ -1330,10 +1345,62 @@
           throw wrongTrackError;
         }
       }
+
+      // Some Castlabs/Widevine sessions begin audibly before getCurrentState()
+      // stops returning null. Confirm against the Web API as a bounded backup
+      // so a successful start is not rolled back as a false failure.
+      var apiState = await readSpotifyApiPlaybackState();
+      if (apiState && apiState.track) {
+        var apiSdkState = spotifyApiStateToSdkState(apiState);
+        var apiTrack = spotifySdkCurrentTrack(apiSdkState);
+        var apiMatch = spotifySdkTrackMatch(apiTrack, uri, expectedSong);
+        var apiDeviceId = String(apiState.device && apiState.device.id || '');
+        var correctDevice = !apiDeviceId || !spotifyDirectState.deviceId || apiDeviceId === spotifyDirectState.deviceId;
+        if (apiMatch.matched && correctDevice && apiState.isPlaying === true) {
+          spotifyDirectState.sdkPlaybackError = '';
+          syncSpotifySdkSongMetadata(apiTrack, apiSdkState, 'web-api-playback-confirm');
+          return apiSdkState;
+        }
+        if (apiMatch.matched && correctDevice && apiState.isPlaying !== true && !resumeAttempted) {
+          resumeAttempted = true;
+          try {
+            activateSpotifyAudioFromGesture();
+            if (typeof player.resume === 'function') await player.resume();
+            else await postJson('/api/spotify/player/resume', { deviceId: spotifyDirectState.deviceId });
+          } catch (apiResumeError) {
+            lastPlaybackError = String(apiResumeError && (apiResumeError.message || apiResumeError) || lastPlaybackError);
+          }
+        }
+      }
       await spotifyDelay(180);
     }
     if (lastPlaybackError) throw new Error(lastPlaybackError);
     throw new Error(spotifyDirectState.audioActivated ? 'SPOTIFY_SDK_PLAYBACK_NOT_CONFIRMED' : 'SPOTIFY_AUDIO_NOT_ACTIVATED');
+  }
+
+  async function ensureSpotifyDeviceActivated(device, requestId, force) {
+    if (!device || !device.id || usesRemoteSpotifyHost()) return true;
+    var alreadyActivated = spotifyDirectState.activatedDeviceId === device.id
+      && Date.now() - Number(spotifyDirectState.deviceActivatedAt || 0) < 30 * 60 * 1000;
+    if (alreadyActivated && !force) return true;
+    try {
+      await postJson('/api/spotify/player/transfer', {
+        deviceId: device.id,
+        play: false,
+        requestId: requestId || ''
+      });
+      spotifyDirectState.activatedDeviceId = device.id;
+      spotifyDirectState.deviceActivatedAt = Date.now();
+      spotifyDirectState.deviceRecoveryAt = Date.now();
+      await spotifyDelay(force ? 260 : 180);
+      return true;
+    } catch (error) {
+      // The ready event can beat Spotify's device directory by a few hundred
+      // milliseconds. The exact play request below is still allowed to try;
+      // later attempts force this activation again after propagation.
+      console.warn('[SpotifyPlayback] device pre-activation pending', error && (error.message || error));
+      return false;
+    }
   }
 
   async function playSpotifyUriExactly(device, uri, positionMs, requestId, expectedSong) {
@@ -1341,6 +1408,7 @@
     if (!spotifyTrackIdFromUri(uri)) throw new Error('SPOTIFY_TRACK_URI_REQUIRED');
 
     var lastError = null;
+    await ensureSpotifyDeviceActivated(device, requestId, false);
     for (var attempt = 1; attempt <= 3; attempt++) {
       spotifyDirectState.playRequestId = requestId;
       console.info('[SpotifyPlayback] request=' + requestId + ' attempt=' + attempt + ' target=' + uri + ' device=' + device.id);
@@ -1350,15 +1418,8 @@
       // appear dead. Retry by serially activating the same in-app device.
       if (attempt >= 2) {
         activateSpotifyAudioFromGesture();
-        await postJson('/api/spotify/player/transfer', {
-          deviceId: device.id,
-          play: false,
-          requestId: requestId
-        }).catch(function (error) {
-          console.warn('[SpotifyPlayback] device activation failed', error && (error.message || error));
-        });
-        spotifyDirectState.deviceRecoveryAt = Date.now();
-        await spotifyDelay(attempt === 2 ? 260 : 420);
+        await ensureSpotifyDeviceActivated(device, requestId, true);
+        await spotifyDelay(attempt === 2 ? 180 : 320);
       }
 
       try {
@@ -1496,7 +1557,7 @@
         if (window.Spotify && window.Spotify.Player) {
           clearInterval(timer);
           finishOk();
-        } else if (Date.now() - started > 9000) {
+        } else if (Date.now() - started > 18000) {
           clearInterval(timer);
           if (!settled) {
             settled = true;
@@ -1516,21 +1577,38 @@
       .then(function (data) {
         if (!data || !data.accessToken) throw new Error('SPOTIFY_TOKEN_MISSING');
         if (data.playbackScopesReady === false) throw new Error('SPOTIFY_REAUTHORIZATION_REQUIRED');
+        spotifyDirectState.sdkError = '';
         callback(data.accessToken);
       })
       .catch(function (error) {
-        spotifyDirectState.sdkError = playerErrorMessage(error);
+        var tokenError = error instanceof Error ? error : new Error(String(error && (error.message || error) || 'SPOTIFY_TOKEN_MISSING'));
+        spotifyDirectState.sdkError = playerErrorMessage(tokenError);
+        // Never leave Spotify.Player.connect() waiting forever when the local
+        // token endpoint fails. Supplying an empty token makes the SDK emit its
+        // authentication_error immediately, while rejecting the local ready
+        // promise lets the click flow recover/reconnect deterministically.
+        try { callback(''); } catch (_) {}
+        try { if (spotifyDirectState.sdkReject) spotifyDirectState.sdkReject(tokenError); } catch (_) {}
       });
+  }
+
+  async function waitForCastlabsSpotifyRuntime(timeoutMs) {
+    if (runtimeName() !== 'castlabs-electron' || !window.desktopWindow || typeof window.desktopWindow.getRuntimeStatus !== 'function') return true;
+    var started = Date.now();
+    var lastStatus = null;
+    timeoutMs = Math.max(2500, Number(timeoutMs) || 12000);
+    while (Date.now() - started < timeoutMs) {
+      lastStatus = await window.desktopWindow.getRuntimeStatus().catch(function () { return null; });
+      if (lastStatus && lastStatus.widevineReady === true) return lastStatus;
+      await spotifyDelay(250);
+    }
+    var runtimeError = lastStatus && lastStatus.error || 'CASTLABS_COMPONENTS_NOT_READY';
+    throw new Error(runtimeError);
   }
 
   async function ensureSdkDevice(timeoutMs) {
     timeoutMs = Math.max(1200, Number(timeoutMs) || 4500);
-    if (runtimeName() === 'castlabs-electron' && window.desktopWindow && typeof window.desktopWindow.getRuntimeStatus === 'function') {
-      var runtimeStatus = await window.desktopWindow.getRuntimeStatus().catch(function () { return null; });
-      if (!runtimeStatus || runtimeStatus.widevineReady !== true) {
-        throw new Error((runtimeStatus && runtimeStatus.error) || 'CASTLABS_COMPONENTS_NOT_READY');
-      }
-    }
+    await waitForCastlabsSpotifyRuntime(Math.max(timeoutMs, 12000));
     if (usesRemoteSpotifyHost()) {
       return waitForRemoteHostReady(Math.max(timeoutMs, 12000));
     }
@@ -1560,6 +1638,8 @@
             spotifyDirectState.sdkPlaybackError = '';
             spotifyDirectState.deviceId = payload && payload.device_id || '';
             spotifyDirectState.deviceName = 'ShinaYuu Music';
+            spotifyDirectState.deviceActivatedAt = 0;
+            spotifyDirectState.activatedDeviceId = '';
             applySpotifySdkVolume(player).catch(function (error) { console.warn('[SpotifyVolume ready]', error); });
             if (spotifyDirectState.sdkResolve) spotifyDirectState.sdkResolve({ id: spotifyDirectState.deviceId, name: spotifyDirectState.deviceName, mode: 'sdk' });
           });
@@ -1567,6 +1647,8 @@
             if (!payload || !spotifyDirectState.deviceId || payload.device_id === spotifyDirectState.deviceId) {
               spotifyDirectState.sdkReady = false;
               spotifyDirectState.deviceId = '';
+              spotifyDirectState.deviceActivatedAt = 0;
+              spotifyDirectState.activatedDeviceId = '';
               clearSpotifySdkReadyPromise();
               if (spotifyDirectState.active && spotifyDirectState.expectedPlaying) {
                 triggerSpotifyRuntimeFailureRecovery('sdk-not-ready', new Error('SPOTIFY_SDK_NOT_READY'), 700);

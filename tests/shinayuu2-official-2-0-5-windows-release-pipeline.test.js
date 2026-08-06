@@ -10,8 +10,8 @@ const pkg = require(path.join(root, 'package.json'));
 const releaseScript = fs.readFileSync(path.join(root, 'tools', 'build-windows-release.js'), 'utf8');
 const guide = fs.readFileSync(path.join(root, 'docs', 'WINDOWS_BUILD_A_TO_Z.md'), 'utf8');
 
-test('2.1.3 exposes the official Windows release commands', () => {
-  assert.equal(pkg.version, '2.1.3');
+test('2.1.4 exposes the official Windows release commands', () => {
+  assert.equal(pkg.version, '2.1.4');
   assert.equal(pkg.scripts['build:win'], 'npm run release:win');
   assert.equal(pkg.scripts['release:win'], 'node tools/build-windows-release.js');
   assert.equal(pkg.scripts['package:win:dir'], 'node tools/package-windows-dir.js');
