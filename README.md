@@ -1,6 +1,6 @@
 # ShinaYuu Music 2.1.4
 
-ShinaYuu Music 2.1.4 được phát triển trực tiếp từ source 2.1.3 mà người dùng cung cấp. Bản này ưu tiên sửa lỗi Spotify đăng nhập được nhưng không bắt đầu phát, đồng thời giữ nguyên UI/UX, YouTube, AutoMix, lyrics và các bản sửa pause/resume của 2.1.3.
+ShinaYuu Music 2.1.4 được phát triển trực tiếp từ source 2.1.3 . Bản này ưu tiên sửa lỗi Spotify đăng nhập được nhưng không bắt đầu phát, đồng thời giữ nguyên UI/UX, YouTube, AutoMix, lyrics và các bản sửa pause/resume của 2.1.3.
 
 ## Sửa Spotify
 
