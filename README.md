@@ -1,6 +1,6 @@
-# ShinaYuu Music 2.1.6
+# ShinaYuu Music 2.1.8
 
-Bản sửa Spotify/Widevine được phát triển trực tiếp từ ShinaYuu Music 2.1.5.
+Bản sửa Spotify/Widevine được phát triển trực tiếp từ ShinaYuu Music 2.1.7
 
 ## Sửa chính
 
