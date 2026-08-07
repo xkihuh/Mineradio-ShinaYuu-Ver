@@ -10,7 +10,7 @@ test('2.1.5 keeps the stable provider playback core and applies the 2.1.5 AutoMi
   const automix = read('public/js/modules/05-playback/18-cuefield-automix-integration.js');
   const player = read('public/js/modules/05-playback/14-player-controls.js');
   const spotify = read('public/spotify-direct-player.js');
-  assert.match(automix, /var VERSION = '2\.1\.7'/);
+  assert.match(automix, /var VERSION = '2\.1\.8'/);
   assert.match(automix, /ensureAutoMixAudioContextRunning/);
   assert.match(automix, /function setSpotifyVolume\(value, executionSerial\)/);
   assert.match(player, /async function togglePlay\(\)/);

@@ -281,7 +281,7 @@ var updatePreviewState = {
   installerPath: '',
   installerOpened: false,
   cached: false,
-  currentVersion: '2.1.7',
+  currentVersion: '2.1.8',
   version: '2.0.0',
   configured: false,
   preview: true,
@@ -32182,14 +32182,31 @@ function readLastPlaybackSnapshot() {
     return null;
   }
 }
+function currentSpotifySnapshotState() {
+  var state = window.spotifyDirectState || null;
+  var transport = String(window.activePlaybackTransport || '');
+  var active = !!(
+    state
+    && (state.active || transport === 'spotify' || transport === 'spotify-pending')
+    && (transport === 'spotify' || transport === 'spotify-pending')
+  );
+  return {
+    active: active,
+    playing: !!(active && state && state.isPlaying),
+    positionSec: active && state && typeof window.getPlaybackCurrentSeconds === 'function'
+      ? Math.max(0, Number(window.getPlaybackCurrentSeconds()) || 0)
+      : 0
+  };
+}
 function saveLastPlaybackSnapshot(force, reason) {
   var now = Date.now();
   if (!force && now - lastPlaybackSnapshotSavedAt < 2500) return;
   var song = currentCoverSong();
   if (!song) return;
-  if (!audio && restoredLastPlaybackSnapshot && restoredLastPlaybackSnapshot.current && queueItemKey(song) === queueItemKey(restoredLastPlaybackSnapshot.current)) return;
+  var spotifySnapshot = currentSpotifySnapshotState();
+  if (!audio && !spotifySnapshot.active && restoredLastPlaybackSnapshot && restoredLastPlaybackSnapshot.current && queueItemKey(song) === queueItemKey(restoredLastPlaybackSnapshot.current)) return;
   var durationSec = getPlaybackDurationSeconds();
-  var currentSec = getPlaybackCurrentSeconds();
+  var currentSec = spotifySnapshot.active ? spotifySnapshot.positionSec : getPlaybackCurrentSeconds();
   if (durationSec > 0 && currentSec > durationSec) currentSec = durationSec;
   var queue = Array.isArray(playQueue) ? playQueue.slice(0, 120).map(playbackRestoreSongSnapshot).filter(function (item) { return item && (item.id || item.mid || item.localKey || item.name); }) : [];
   var payload = {
@@ -32199,7 +32216,7 @@ function saveLastPlaybackSnapshot(force, reason) {
     currentIdx: currentIdx,
     currentTime: Math.max(0, Number(currentSec) || 0),
     duration: Math.max(0, Number(durationSec) || playbackDurationFromSong(song) || 0),
-    playing: !!(audio && !audio.paused && !audio.ended),
+    playing: spotifySnapshot.active ? spotifySnapshot.playing : !!(audio && !audio.paused && !audio.ended),
     current: playbackRestoreSongSnapshot(song),
     queue: queue
   };
@@ -37128,7 +37145,7 @@ function clearPlayerControlFocusState(reason) {
 (function () {
   'use strict';
 
-  var VERSION = '2.1.7';
+  var VERSION = '2.1.8';
   var STORE_KEY = 'shinayuu-cuefield-automix-v2';
   var GAPLESS_STORE_KEY = 'shinayuu-album-gapless-v1';
   var PREPARE_DELAY_MS = 950;
@@ -42279,9 +42296,18 @@ progressBar.addEventListener('pointercancel', function (e) { endProgressDrag(e, 
 progressBar.addEventListener('lostpointercapture', function (e) { endProgressDrag(e, true); });
 setInterval(function () {
   if (!audio) {
-    if (restoredLastPlaybackSnapshot && pendingPlaybackResumeAt > 0) applyRestoredPlaybackProgressUi(restoredLastPlaybackSnapshot);
+    var spotifyOwnsProgress = !!(
+      (typeof window.isSpotifyPlaybackActive === 'function' && window.isSpotifyPlaybackActive())
+      || window.activePlaybackTransport === 'spotify'
+      || window.activePlaybackTransport === 'spotify-pending'
+    );
+    // The restore snapshot is only a placeholder before a real transport owns
+    // the clock. Reapplying it every 200 ms while Spotify renders its own clock
+    // made the progress fill oscillate between the previous and current track.
+    if (!spotifyOwnsProgress && restoredLastPlaybackSnapshot && pendingPlaybackResumeAt > 0) applyRestoredPlaybackProgressUi(restoredLastPlaybackSnapshot);
     else updatePlaybackProgressUi({ forceText: true });
     if (playbackProgressTickerShouldRun()) startPlaybackProgressTicker();
+    if (spotifyOwnsProgress) saveLastPlaybackSnapshot(false, 'spotify-tick');
     return;
   }
   if (progressDragState.active) {

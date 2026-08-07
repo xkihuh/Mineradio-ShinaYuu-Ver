@@ -706,9 +706,18 @@ progressBar.addEventListener('pointercancel', function (e) { endProgressDrag(e, 
 progressBar.addEventListener('lostpointercapture', function (e) { endProgressDrag(e, true); });
 setInterval(function () {
   if (!audio) {
-    if (restoredLastPlaybackSnapshot && pendingPlaybackResumeAt > 0) applyRestoredPlaybackProgressUi(restoredLastPlaybackSnapshot);
+    var spotifyOwnsProgress = !!(
+      (typeof window.isSpotifyPlaybackActive === 'function' && window.isSpotifyPlaybackActive())
+      || window.activePlaybackTransport === 'spotify'
+      || window.activePlaybackTransport === 'spotify-pending'
+    );
+    // The restore snapshot is only a placeholder before a real transport owns
+    // the clock. Reapplying it every 200 ms while Spotify renders its own clock
+    // made the progress fill oscillate between the previous and current track.
+    if (!spotifyOwnsProgress && restoredLastPlaybackSnapshot && pendingPlaybackResumeAt > 0) applyRestoredPlaybackProgressUi(restoredLastPlaybackSnapshot);
     else updatePlaybackProgressUi({ forceText: true });
     if (playbackProgressTickerShouldRun()) startPlaybackProgressTicker();
+    if (spotifyOwnsProgress) saveLastPlaybackSnapshot(false, 'spotify-tick');
     return;
   }
   if (progressDragState.active) {

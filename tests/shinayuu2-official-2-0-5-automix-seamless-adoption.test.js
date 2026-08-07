@@ -35,10 +35,10 @@ test('AutoMix moves renderer and provider work away from the audible boundary', 
 test('release identity is consistently bumped to 2.1.5', () => {
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
-  assert.equal(pkg.version, '2.1.7');
-  assert.equal(pkg.displayVersion, '2.1.7');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.7');
-  assert.equal(pkg.build.buildVersion, '2.1.7.0');
-  assert.equal(lock.version, '2.1.7');
-  assert.equal(lock.packages[''].version, '2.1.7');
+  assert.equal(pkg.version, '2.1.8');
+  assert.equal(pkg.displayVersion, '2.1.8');
+  assert.equal(pkg.shinayuu.displayVersion, '2.1.8');
+  assert.equal(pkg.build.buildVersion, '2.1.8.0');
+  assert.equal(lock.version, '2.1.8');
+  assert.equal(lock.packages[''].version, '2.1.8');
 });

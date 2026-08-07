@@ -43,14 +43,31 @@ function readLastPlaybackSnapshot() {
     return null;
   }
 }
+function currentSpotifySnapshotState() {
+  var state = window.spotifyDirectState || null;
+  var transport = String(window.activePlaybackTransport || '');
+  var active = !!(
+    state
+    && (state.active || transport === 'spotify' || transport === 'spotify-pending')
+    && (transport === 'spotify' || transport === 'spotify-pending')
+  );
+  return {
+    active: active,
+    playing: !!(active && state && state.isPlaying),
+    positionSec: active && state && typeof window.getPlaybackCurrentSeconds === 'function'
+      ? Math.max(0, Number(window.getPlaybackCurrentSeconds()) || 0)
+      : 0
+  };
+}
 function saveLastPlaybackSnapshot(force, reason) {
   var now = Date.now();
   if (!force && now - lastPlaybackSnapshotSavedAt < 2500) return;
   var song = currentCoverSong();
   if (!song) return;
-  if (!audio && restoredLastPlaybackSnapshot && restoredLastPlaybackSnapshot.current && queueItemKey(song) === queueItemKey(restoredLastPlaybackSnapshot.current)) return;
+  var spotifySnapshot = currentSpotifySnapshotState();
+  if (!audio && !spotifySnapshot.active && restoredLastPlaybackSnapshot && restoredLastPlaybackSnapshot.current && queueItemKey(song) === queueItemKey(restoredLastPlaybackSnapshot.current)) return;
   var durationSec = getPlaybackDurationSeconds();
-  var currentSec = getPlaybackCurrentSeconds();
+  var currentSec = spotifySnapshot.active ? spotifySnapshot.positionSec : getPlaybackCurrentSeconds();
   if (durationSec > 0 && currentSec > durationSec) currentSec = durationSec;
   var queue = Array.isArray(playQueue) ? playQueue.slice(0, 120).map(playbackRestoreSongSnapshot).filter(function (item) { return item && (item.id || item.mid || item.localKey || item.name); }) : [];
   var payload = {
@@ -60,7 +77,7 @@ function saveLastPlaybackSnapshot(force, reason) {
     currentIdx: currentIdx,
     currentTime: Math.max(0, Number(currentSec) || 0),
     duration: Math.max(0, Number(durationSec) || playbackDurationFromSong(song) || 0),
-    playing: !!(audio && !audio.paused && !audio.ended),
+    playing: spotifySnapshot.active ? spotifySnapshot.playing : !!(audio && !audio.paused && !audio.ended),
     current: playbackRestoreSongSnapshot(song),
     queue: queue
   };

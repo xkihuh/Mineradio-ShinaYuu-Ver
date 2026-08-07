@@ -1,3 +1,12 @@
+# 2.1.8 - Spotify Restore Clock and Loop Fix
+
+- Fixed Spotify progress oscillating between the previous restored session and the newly selected track.
+- Spotify snapshots now save the real SDK position and playing state.
+- Selecting the restored Spotify track resumes at its saved position; selecting another Spotify track clears only the restore placeholder and starts at zero.
+- Reworked exact-track startup so an accepted `/play` command is not repeated merely because SDK confirmation is late.
+- Added movement-based SDK confirmation and local-resume recovery without restarting the URI.
+- Suppressed same-track replay for temporary SDK clock loss and tightened end detection to the same URI.
+
 # ShinaYuu Music 2.1.6
 
 - Sửa quyền DRM Electron: cho phép `mediaKeySystem` chỉ khi ShinaYuu local hoặc frame Spotify tin cậy yêu cầu.

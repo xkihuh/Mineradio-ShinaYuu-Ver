@@ -92,7 +92,12 @@
     lastGestureAt: 0,
     startupPrewarmScheduled: false,
     externalStopSerial: 0,
-    ownershipSerial: 0
+    ownershipSerial: 0,
+    startObservedUri: '',
+    startObservedAt: 0,
+    startObservedPositionMs: 0,
+    exactPlayCommandCount: 0,
+    restoreResumeConsumedAt: 0
   };
 
   window.spotifyDirectState = spotifyDirectState;
@@ -715,6 +720,48 @@
     return /^[A-Za-z0-9]{16,32}$/.test(id) ? 'spotify:track:' + id : '';
   }
 
+  function spotifyRestoreSelectionKey(song) {
+    try {
+      if (typeof window.queueItemKey === 'function') return String(window.queueItemKey(song) || '');
+    } catch (_) {}
+    return String(song && (song.spotifyUri || song.uri || song.spotifyId || song.id || '') || '');
+  }
+
+  function consumeSpotifyRestoreStateForSelection(song, opts) {
+    opts = opts || {};
+    var snapshot = window.restoredLastPlaybackSnapshot || null;
+    var pending = Math.max(0, Number(window.pendingPlaybackResumeAt) || 0);
+    var selectedKey = spotifyRestoreSelectionKey(song);
+    var restoredKey = snapshot && snapshot.current ? spotifyRestoreSelectionKey(snapshot.current) : '';
+    var sameRestoredTrack = !!(pending > 0 && selectedKey && restoredKey && selectedKey === restoredKey);
+    var resumeAt = opts.resumeAt != null
+      ? Math.max(0, Number(opts.resumeAt) || 0)
+      : (sameRestoredTrack && !opts.autoRepeat && !opts.qualitySwitch ? pending : 0);
+
+    // A restore snapshot may keep drawing until a concrete transport claims the
+    // UI. Consume that placeholder on every Spotify selection. The same restored
+    // track receives its saved position; a different track starts at zero.
+    if (snapshot || pending > 0) {
+      window.pendingPlaybackResumeAt = 0;
+      window.restoredLastPlaybackSnapshot = null;
+      window.startupRestoreHomePending = false;
+      spotifyDirectState.restoreResumeConsumedAt = Date.now();
+    }
+    if (opts.resumeAt == null && resumeAt > 0) opts.resumeAt = resumeAt;
+
+    try {
+      if (typeof window.clearSmoothProgressHandoffVisual === 'function') window.clearSmoothProgressHandoffVisual();
+    } catch (_) {}
+    try {
+      var durationSec = Number(song && (song.duration || song.durationMs || song.dt) || 0);
+      if (durationSec > 10000) durationSec /= 1000;
+      var ratio = durationSec > 0 ? Math.max(0, Math.min(1, resumeAt / durationSec)) : 0;
+      if (window.playbackProgressFrameState) window.playbackProgressFrameState.displayedRatio = ratio;
+      if (typeof window.setProgressVisual === 'function') window.setProgressVisual(ratio * 100);
+    } catch (_) {}
+    return resumeAt;
+  }
+
   function snapshotPlaybackBeforeSpotifySwitch() {
     var media = window.audio || null;
     return {
@@ -838,6 +885,13 @@
   function triggerSpotifyRuntimeFailureRecovery(reason, error, delayMs) {
     reason = String(reason || 'runtime-failure');
     if (!isSpotifyActive() || !spotifyDirectState.expectedPlaying || spotifyDirectState.switchingTrack) return false;
+    // Losing SDK clock observations is not proof that protected audio stopped.
+    // Replaying the URI here restarts an otherwise audible track. Keep the local
+    // monotonic clock alive and wait for SDK state to return instead.
+    if (/^(sdk-state-missing|clock-sync-failed)$/.test(reason)) {
+      console.warn('[SpotifyPlaybackGuard] clock recovery suppressed reason=' + reason + ' uri=' + String(spotifyDirectState.currentUri || '-'));
+      return false;
+    }
     // A paused snapshot around DRM/device activation is not proof that the
     // stream URL failed. Replaying the exact URI here caused 0-1 second loops
     // and eventually made the global recovery skip to the next queue item.
@@ -1172,7 +1226,9 @@
       } catch (_) {}
     }
 
-    var ended = !spotifyDirectState.seeking
+    var sameUriForEnd = !next.currentUri || !previousUri || String(next.currentUri || '') === previousUri;
+    var ended = sameUriForEnd
+      && !spotifyDirectState.seeking
       && previousPlaying
       && previousDuration > 0
       && previousPosition >= previousDuration - 1600
@@ -1390,7 +1446,6 @@
   async function waitForSdkPlayback(uri, timeoutMs, expectedSong) {
     if (usesRemoteSpotifyHost()) {
       var remoteStarted = Date.now();
-      var remoteLastPosition = -1;
       var remoteWrongUri = '';
       var remoteWrongSince = 0;
       timeoutMs = Math.max(2500, Number(timeoutMs) || 10000);
@@ -1416,36 +1471,50 @@
     var player = spotifyDirectState.sdkPlayer;
     if (!player || typeof player.getCurrentState !== 'function') throw new Error('SPOTIFY_SDK_NOT_READY');
     var started = Date.now();
-    var lastPosition = -1;
     var wrongUri = '';
     var wrongSince = 0;
     var lastPlaybackError = '';
     var resumeAttempted = false;
+    var matchedFirstPosition = -1;
+    var matchedLastPosition = -1;
+    var matchedFirstAt = 0;
+    var lastMatchedState = null;
     timeoutMs = Math.max(2500, Number(timeoutMs) || 10000);
     while (Date.now() - started < timeoutMs) {
-      // Castlabs/Spotify can emit a short-lived generic playback_error while
-      // the matching track is already starting. Treat the SDK state as the
-      // source of truth and only surface the error if playback never confirms.
-      if (spotifyDirectState.sdkPlaybackError) {
-        lastPlaybackError = String(spotifyDirectState.sdkPlaybackError || '');
-      }
+      if (spotifyDirectState.sdkPlaybackError) lastPlaybackError = String(spotifyDirectState.sdkPlaybackError || '');
       var state = await player.getCurrentState().catch(function () { return null; });
       var currentTrack = spotifySdkCurrentTrack(state);
       var match = spotifySdkTrackMatch(currentTrack, uri, expectedSong);
       var actualUri = match.actualUri || sdkTrackUri(state);
-      if (state && match.matched && state.paused === false) {
-        spotifyDirectState.sdkPlaybackError = '';
-        lastPlaybackError = '';
-        syncSpotifySdkSongMetadata(currentTrack, state, 'playback-confirm');
-        return state;
-      } else if (state && match.matched && state.paused === true && !resumeAttempted) {
-        resumeAttempted = true;
-        try {
-          activateSpotifyAudioFromGesture();
-          if (typeof player.resume === 'function') await player.resume();
-          else await postJson('/api/spotify/player/resume', { deviceId: spotifyDirectState.deviceId });
-        } catch (resumeError) {
-          lastPlaybackError = String(resumeError && (resumeError.message || resumeError) || lastPlaybackError);
+      var actualPosition = Math.max(0, Number(state && state.position || 0));
+      if (state && match.matched) {
+        lastMatchedState = state;
+        spotifyDirectState.startObservedUri = uri;
+        spotifyDirectState.startObservedAt = Date.now();
+        spotifyDirectState.startObservedPositionMs = actualPosition;
+        if (matchedFirstPosition < 0) {
+          matchedFirstPosition = actualPosition;
+          matchedLastPosition = actualPosition;
+          matchedFirstAt = Date.now();
+        }
+        var movedForward = actualPosition >= matchedLastPosition + 90
+          || (Date.now() - matchedFirstAt > 420 && actualPosition >= matchedFirstPosition + 120);
+        matchedLastPosition = Math.max(matchedLastPosition, actualPosition);
+        if (state.paused === false || movedForward) {
+          spotifyDirectState.sdkPlaybackError = '';
+          syncSpotifySdkSongMetadata(currentTrack, state, 'playback-confirm');
+          if (state.paused === true && movedForward) state = Object.assign({}, state, { paused: false });
+          return state;
+        }
+        if (state.paused === true && !resumeAttempted) {
+          resumeAttempted = true;
+          try {
+            activateSpotifyAudioFromGesture();
+            if (typeof player.resume === 'function') await player.resume();
+            else await postJson('/api/spotify/player/resume', { deviceId: spotifyDirectState.deviceId });
+          } catch (resumeError) {
+            lastPlaybackError = String(resumeError && (resumeError.message || resumeError) || lastPlaybackError);
+          }
         }
       } else if (state && actualUri && !match.matched && state.paused === false) {
         if (wrongUri !== actualUri) {
@@ -1458,8 +1527,10 @@
           throw wrongTrackError;
         }
       }
-
       await spotifyDelay(180);
+    }
+    if (lastMatchedState && matchedLastPosition >= matchedFirstPosition + 120) {
+      return Object.assign({}, lastMatchedState, { paused: false, position: matchedLastPosition });
     }
     if (lastPlaybackError) throw new Error(lastPlaybackError);
     throw new Error(spotifyDirectState.audioActivated ? 'SPOTIFY_SDK_PLAYBACK_NOT_CONFIRMED' : 'SPOTIFY_AUDIO_NOT_ACTIVATED');
@@ -1469,52 +1540,63 @@
     if (!device || !device.id) throw new Error('SPOTIFY_SDK_NOT_READY');
     if (!spotifyTrackIdFromUri(uri)) throw new Error('SPOTIFY_TRACK_URI_REQUIRED');
 
-    var lastError = null;
-    for (var attempt = 1; attempt <= 3; attempt++) {
-      spotifyDirectState.playRequestId = requestId;
-      console.info('[SpotifyPlayback] request=' + requestId + ' attempt=' + attempt + ' target=' + uri + ' device=' + device.id);
+    spotifyDirectState.playRequestId = requestId;
+    spotifyDirectState.exactPlayCommandCount = 0;
+    var sendExactPlay = async function (reason) {
+      spotifyDirectState.exactPlayCommandCount += 1;
+      console.info('[SpotifyPlayback] request=' + requestId + ' command=' + spotifyDirectState.exactPlayCommandCount + ' target=' + uri + ' device=' + device.id + ' reason=' + reason);
+      await postJson('/api/spotify/player/play', {
+        deviceId: device.id,
+        uri: uri,
+        positionMs: positionMs,
+        requestId: requestId,
+        forceTrack: true,
+        reason: reason
+      });
+    };
 
-      // Never disconnect the SDK inside a user-initiated play attempt. Doing so
-      // destroys Chromium's media activation and made every later Spotify row
-      // appear dead. Retry by serially activating the same in-app device.
-      if (attempt >= 2) {
-        activateSpotifyAudioFromGesture();
-        // Only transfer after a real start failure. Transferring with play=false
-        // before the first /play request can arrive late and pause the same
-        // track a fraction of a second after it started.
-        await postJson('/api/spotify/player/transfer', {
-          deviceId: device.id,
-          play: false,
-          requestId: requestId
-        }).catch(function (error) {
-          console.warn('[SpotifyPlayback] retry device activation failed', error && (error.message || error));
-        });
-        spotifyDirectState.deviceRecoveryAt = Date.now();
-        await spotifyDelay(attempt === 2 ? 320 : 520);
-      }
-
-      try {
-        await postJson('/api/spotify/player/play', {
-          deviceId: device.id,
-          uri: uri,
-          positionMs: positionMs,
-          requestId: requestId,
-          forceTrack: true,
-          reason: attempt === 1 ? 'exact-start' : 'exact-retry-' + attempt
-        });
-        if (attempt === 3 && spotifyDirectState.sdkPlayer && typeof spotifyDirectState.sdkPlayer.resume === 'function') {
-          setTimeout(function () {
-            spotifyDirectState.sdkPlayer.resume().catch(function () {});
-          }, 180);
-        }
-        return await waitForSdkPlayback(uri, attempt === 1 ? 4200 : 6500, expectedSong);
-      } catch (error) {
-        lastError = error;
-        console.warn('[SpotifyPlayback] exact-track attempt failed', requestId, attempt, error && (error.message || error));
-        if (attempt < 3) await spotifyDelay(360 + attempt * 220);
-      }
+    try {
+      await sendExactPlay('exact-start');
+    } catch (firstCommandError) {
+      // A rejected command may mean the in-app SDK device is not active yet.
+      // This is the only case where a second exact-track command is allowed.
+      activateSpotifyAudioFromGesture();
+      await postJson('/api/spotify/player/transfer', {
+        deviceId: device.id,
+        play: false,
+        requestId: requestId
+      }).catch(function (error) {
+        console.warn('[SpotifyPlayback] device activation failed', error && (error.message || error));
+      });
+      await spotifyDelay(420);
+      await sendExactPlay('exact-command-retry');
     }
-    throw lastError || new Error('SPOTIFY_SDK_PLAYBACK_NOT_CONFIRMED');
+
+    try {
+      return await waitForSdkPlayback(uri, 9000, expectedSong);
+    } catch (confirmError) {
+      // Once the target URI has appeared in SDK state, never send /play again.
+      // A second exact command restarts the audible track from positionMs and is
+      // the source of the repeated 0-1 second playback loop. Resume locally and
+      // keep observing the same playback session instead.
+      var observedTarget = spotifyDirectState.startObservedUri === uri
+        && Date.now() - Number(spotifyDirectState.startObservedAt || 0) < 15000;
+      var state = spotifyDirectState.sdkPlayer && typeof spotifyDirectState.sdkPlayer.getCurrentState === 'function'
+        ? await spotifyDirectState.sdkPlayer.getCurrentState().catch(function () { return null; })
+        : null;
+      var currentTrack = spotifySdkCurrentTrack(state);
+      var match = spotifySdkTrackMatch(currentTrack, uri, expectedSong);
+      if (observedTarget || (state && match.matched)) {
+        activateSpotifyAudioFromGesture();
+        try {
+          if (spotifyDirectState.sdkPlayer && typeof spotifyDirectState.sdkPlayer.resume === 'function') await spotifyDirectState.sdkPlayer.resume();
+          else await postJson('/api/spotify/player/resume', { deviceId: device.id });
+        } catch (_) {}
+        console.warn('[SpotifyPlaybackGuard] exact replay suppressed request=' + requestId + ' uri=' + uri);
+        return await waitForSdkPlayback(uri, 6500, expectedSong);
+      }
+      throw confirmError;
+    }
   }
 
   function spotifyFallbackNormalize(value) {
@@ -1823,6 +1905,9 @@
             }
             spotifyDirectState.switchingTrack = false;
             spotifyDirectState.wrongTrackSince = 0;
+            spotifyDirectState.startObservedUri = uri || spotifyDirectState.currentUri;
+            spotifyDirectState.startObservedAt = Date.now();
+            spotifyDirectState.startObservedPositionMs = Math.max(0, Number(state.position || 0));
             syncSpotifySdkSongMetadata(current, state, 'player-state');
 
             var sdkPosition = Number(state.position || 0);
@@ -2497,6 +2582,10 @@
     spotifyDirectState.deviceName = device.name || 'Spotify';
     spotifyDirectState.currentUri = targetUri;
     spotifyDirectState.currentTrackId = targetId;
+    spotifyDirectState.startObservedUri = '';
+    spotifyDirectState.startObservedAt = 0;
+    spotifyDirectState.startObservedPositionMs = 0;
+    spotifyDirectState.exactPlayCommandCount = 0;
     spotifyDirectState.positionMs = Math.max(0, Math.round(Number(opts && opts.resumeAt || 0) * 1000));
     spotifyDirectState.durationMs = Number(song.duration || descriptor.metadata && descriptor.metadata.duration || 0);
     spotifyDirectState.updatedAt = Date.now();
@@ -2577,6 +2666,7 @@
     resetSpotifyRealtimeDetector();
     console.info('[SpotifyPlaybackGuard] protected loopback capture disabled; Mineradio structural beat map enabled');
     if (typeof window.updatePlaybackQualityUi === 'function') window.updatePlaybackQualityUi();
+    try { if (typeof window.saveLastPlaybackSnapshot === 'function') window.saveLastPlaybackSnapshot(true, 'spotify-start'); } catch (_) {}
     return true;
   }
 
@@ -2597,6 +2687,7 @@
     if (!window.playQueue || idx < 0 || idx >= window.playQueue.length) return false;
     var requestedSong = normalizeSpotifyQueueSong(window.playQueue[idx]);
     window.playQueue[idx] = requestedSong;
+    consumeSpotifyRestoreStateForSelection(requestedSong, opts);
     try {
       if (!opts.autoMixHandoff && !opts.cuefieldAutoMix && typeof window.showLoading === 'function') window.showLoading();
       if (typeof window.forcePlaybackControlsInteractive === 'function') window.forcePlaybackControlsInteractive();

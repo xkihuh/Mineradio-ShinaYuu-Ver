@@ -23,6 +23,10 @@ Bản sửa Spotify/Widevine được phát triển trực tiếp từ ShinaYuu 
 
 Nếu terminal hiện `account_error`, hãy kiểm tra tài khoản Spotify Premium, Client ID và Users Management trong Spotify Developer Dashboard.
 
+## 2.1.8 Spotify Restore Clock and Loop Fix
+
+This build isolates startup restore state from active Spotify playback and prevents exact-track replay loops.
+
 ## Chạy source
 
 ```bat
@@ -52,15 +56,15 @@ npm run release:win
 Installer dự kiến:
 
 ```text
-ShinaYuu-Music-2.1.7-Setup.exe
+ShinaYuu-Music-2.1.8-Setup.exe
 ```
 
 ## Phiên bản
 
 ```text
-Package version : 2.1.7
-Display version : 2.1.7
-Build version   : 2.1.7.0
+Package version : 2.1.8
+Display version : 2.1.8
+Build version   : 2.1.8.0
 ```
 ## Acknowledgments
 

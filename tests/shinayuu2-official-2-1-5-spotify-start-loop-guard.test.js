@@ -28,15 +28,15 @@ test('2.1.5 does not pause-transfer the SDK device before the first exact play c
   const player = read('public/spotify-direct-player.js');
   assert.doesNotMatch(player, /async function ensureSpotifyDeviceActivated/);
   assert.doesNotMatch(player, /await ensureSpotifyDeviceActivated\(device, requestId, false\)/);
-  assert.match(player, /if \(attempt >= 2\)[\s\S]*?\/api\/spotify\/player\/transfer/);
-  assert.match(player, /Transferring with play=false[\s\S]*?pause the same[\s\S]*?track/);
+  assert.match(player, /This is the only case where a second exact-track command is allowed[\s\S]*?\/api\/spotify\/player\/transfer/);
+  assert.match(player, /This is the only case where a second exact-track command is allowed/);
 });
 
 test('2.1.5 confirms an audible start from the local SDK rather than Web API polling', () => {
   const player = read('public/spotify-direct-player.js');
   assert.doesNotMatch(player, /async function readSpotifyApiPlaybackState/);
   assert.doesNotMatch(player, /web-api-playback-confirm/);
-  assert.match(player, /state && match\.matched && state\.paused === false/);
+  assert.match(player, /state\.paused === false \|\| movedForward/);
   assert.match(player, /syncSpotifySdkSongMetadata\(currentTrack, state, 'playback-confirm'\)/);
 });
 
@@ -68,18 +68,19 @@ test('2.1.5 logs the exact-play reason for field diagnostics', () => {
   const server = read('server.js');
   const player = read('public/spotify-direct-player.js');
   assert.match(server, /position=\$\{positionMs\} reason=\$\{reason \|\| '-'\}/);
-  assert.match(player, /reason: attempt === 1 \? 'exact-start' : 'exact-retry-' \+ attempt/);
+  assert.match(player, /await sendExactPlay\('exact-start'\)/);
+  assert.match(player, /exact replay suppressed request=/);
 });
 
 test('2.1.5 release identity and Spotify cache-busting are synchronized', () => {
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
   const html = read('public/index.html');
-  assert.equal(pkg.version, '2.1.7');
-  assert.equal(pkg.displayVersion, '2.1.7');
-  assert.equal(pkg.build.buildVersion, '2.1.7.0');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.7');
-  assert.equal(lock.version, '2.1.7');
-  assert.equal(lock.packages[''].version, '2.1.7');
-  assert.match(html, /spotify-direct-player\.js\?v=2\.1\.7/);
+  assert.equal(pkg.version, '2.1.8');
+  assert.equal(pkg.displayVersion, '2.1.8');
+  assert.equal(pkg.build.buildVersion, '2.1.8.0');
+  assert.equal(pkg.shinayuu.displayVersion, '2.1.8');
+  assert.equal(lock.version, '2.1.8');
+  assert.equal(lock.packages[''].version, '2.1.8');
+  assert.match(html, /spotify-direct-player\.js\?v=2\.1\.8/);
 });
