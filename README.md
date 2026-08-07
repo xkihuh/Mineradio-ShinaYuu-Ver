@@ -1,7 +1,5 @@
 # ShinaYuu Music 2.1.5
 
-ShinaYuu Music 2.1.5 được phát triển từ source 2.1.3 người dùng cung cấp và bản sửa 2.1.4. Mục tiêu của bản này là xử lý đúng lỗi Spotify phát khoảng một giây, lặp lại từ đầu nhiều lần rồi tự chuyển sang bài khác.
-
 ## Sửa Spotify
 
 - Bỏ thao tác `transfer(play:false)` trước lệnh phát đầu tiên. Lệnh transfer đến muộn có thể pause chính bài vừa bắt đầu.
