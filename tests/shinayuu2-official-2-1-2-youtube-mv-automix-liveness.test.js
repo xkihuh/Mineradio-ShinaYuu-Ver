@@ -48,7 +48,7 @@ test('2.1.5 retains unresolved provider-stop barriers and protects a newer Spoti
 
 test('2.1.5 AutoMix has a bounded transition transaction and preserves the outgoing provider on timeout', () => {
   const mix = read('public/js/modules/05-playback/18-cuefield-automix-integration.js');
-  assert.match(mix, /var VERSION = '2\.1\.6'/);
+  assert.match(mix, /var VERSION = '2\.1\.7'/);
   assert.match(mix, /var EXECUTION_TIMEOUT_MS = 11500/);
   assert.match(mix, /Promise\.race\(\[\s*Promise\.resolve\(transitionTask\)/);
   assert.match(mix, /abortExecution\('transition-timeout'/);
@@ -59,11 +59,11 @@ test('2.1.5 AutoMix has a bounded transition transaction and preserves the outgo
 test('2.1.5 release identity is synchronized', () => {
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
-  assert.equal(pkg.version, '2.1.6');
-  assert.equal(pkg.displayVersion, '2.1.6');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.6');
-  assert.equal(pkg.build.buildVersion, '2.1.6.0');
-  assert.equal(pkg.shinayuu.buildVersion, '2.1.6.0');
-  assert.equal(lock.version, '2.1.6');
-  assert.equal(lock.packages[''].version, '2.1.6');
+  assert.equal(pkg.version, '2.1.7');
+  assert.equal(pkg.displayVersion, '2.1.7');
+  assert.equal(pkg.shinayuu.displayVersion, '2.1.7');
+  assert.equal(pkg.build.buildVersion, '2.1.7.0');
+  assert.equal(pkg.shinayuu.buildVersion, '2.1.7.0');
+  assert.equal(lock.version, '2.1.7');
+  assert.equal(lock.packages[''].version, '2.1.7');
 });

@@ -238,6 +238,16 @@ window.addEventListener('focus', wakeMainLoopFromBackground);
 function mainLoopInteractionActive(now) {
   return (typeof isRenderInteractionActive === 'function') && isRenderInteractionActive(now);
 }
+function mainLoopPlaybackIsRunning() {
+  var spotifyState = typeof window !== 'undefined' ? window.spotifyDirectState : null;
+  var spotifyTransport = typeof window !== 'undefined'
+    && (window.activePlaybackTransport === 'spotify' || window.activePlaybackTransport === 'spotify-pending');
+  if (spotifyState && (spotifyState.active || spotifyTransport) && spotifyState.isPlaying) return true;
+  var handoff = typeof window !== 'undefined' ? window.shinayuuAutoMixHandoffClock : null;
+  if (handoff && handoff.active && handoff.media && !handoff.media.paused && !handoff.media.ended) return true;
+  return !!(playing && audio && !audio.paused && !audio.ended);
+}
+window.mainLoopPlaybackIsRunning = mainLoopPlaybackIsRunning;
 function visibleMotionFollowVsync(now) {
   if (isDeepBackgroundMode()) return false;
   var mode = (typeof normalizeForegroundFpsMode === 'function')
@@ -246,7 +256,7 @@ function visibleMotionFollowVsync(now) {
   if (mode !== 'vsync') return false;
   if (typeof isProgressDragPreviewActive === 'function' && isProgressDragPreviewActive()) return true;
   if (mainLoopInteractionActive(now)) return true;
-  return !!(playing && audio && !audio.paused);
+  return mainLoopPlaybackIsRunning();
 }
 function capMainLoopFpsToDisplay(fps) {
   var hz = (typeof estimatedDisplayRefreshHz === 'function') ? estimatedDisplayRefreshHz() : 60;
@@ -260,7 +270,7 @@ function capMainLoopFpsForBudget(fps, minFps) {
 function targetMainAudioFps(now) {
   if (isDeepBackgroundMode()) return 1;
   var scale = (typeof runtimeAudioAnalysisScale === 'function') ? runtimeAudioAnalysisScale() : 1;
-  if (playing && audio && !audio.paused) {
+  if (mainLoopPlaybackIsRunning()) {
     var base = mainLoopInteractionActive(now) ? 72 : 54;
     return capMainLoopFpsToDisplay(Math.max(30, Math.round(base * scale)));
   }
@@ -282,21 +292,21 @@ function targetMainLyricsParticleFps(now) {
   if (!fx || fx.particleLyrics === false) return 12;
   if (visibleMotionFollowVsync(now)) return 0;
   if (mainLoopInteractionActive(now)) return capMainLoopFpsForBudget(120, 72);
-  return (playing && audio && !audio.paused) ? capMainLoopFpsForBudget(60, 48) : 24;
+  return mainLoopPlaybackIsRunning() ? capMainLoopFpsForBudget(60, 48) : 24;
 }
 function targetMainStageLyricsFps(now) {
   if (isDeepBackgroundMode()) return 1;
   if (!fx || fx.particleLyrics === false) return 12;
   if (visibleMotionFollowVsync(now)) return 0;
   if (mainLoopInteractionActive(now)) return capMainLoopFpsForBudget(120, 72);
-  return (playing && audio && !audio.paused) ? capMainLoopFpsForBudget(60, 48) : 24;
+  return mainLoopPlaybackIsRunning() ? capMainLoopFpsForBudget(60, 48) : 24;
 }
 function targetMainSkullParticleFps(now) {
   if (isDeepBackgroundMode()) return 1;
   if (!fx || fx.preset !== SKULL_PRESET_INDEX) return 10;
   if (visibleMotionFollowVsync(now)) return 0;
   if (mainLoopInteractionActive(now)) return capMainLoopFpsForBudget(120, 72);
-  return (playing && audio && !audio.paused) ? capMainLoopFpsForBudget(60, 45) : 24;
+  return mainLoopPlaybackIsRunning() ? capMainLoopFpsForBudget(60, 45) : 24;
 }
 function targetMainHomeAudioFps(now) {
   if (isDeepBackgroundMode()) return 1;

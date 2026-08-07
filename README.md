@@ -21,7 +21,7 @@ Bản sửa Spotify/Widevine được phát triển trực tiếp từ ShinaYuu 
 [SpotifyHost] ready device=...
 ```
 
-Nếu terminal hiện `account_error`, hãy kiểm tra tài khoản Spotify Premium, Client ID và Users Management trong Spotify Developer Dashboard. 
+Nếu terminal hiện `account_error`, hãy kiểm tra tài khoản Spotify Premium, Client ID và Users Management trong Spotify Developer Dashboard.
 
 ## Chạy source
 
@@ -52,15 +52,15 @@ npm run release:win
 Installer dự kiến:
 
 ```text
-ShinaYuu-Music-2.1.6-Setup.exe
+ShinaYuu-Music-2.1.7-Setup.exe
 ```
 
 ## Phiên bản
 
 ```text
-Package version : 2.1.6
-Display version : 2.1.6
-Build version   : 2.1.6.0
+Package version : 2.1.7
+Display version : 2.1.7
+Build version   : 2.1.7.0
 ```
 ## Acknowledgments
 

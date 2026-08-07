@@ -66,7 +66,7 @@ var updatePreviewState = {
   installerPath: '',
   installerOpened: false,
   cached: false,
-  currentVersion: '2.1.6',
+  currentVersion: '2.1.7',
   version: '2.0.0',
   configured: false,
   preview: true,

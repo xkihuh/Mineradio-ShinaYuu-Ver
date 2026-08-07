@@ -59,6 +59,9 @@
     seekRecoveryUntil: 0,
     lastSdkSamplePositionMs: 0,
     lastSdkSampleAt: 0,
+    lastClockAnchorPositionMs: 0,
+    lastClockAnchorAt: 0,
+    lastClockDriftMs: 0,
     uiClockTimer: null,
     lastUiTrackId: '',
     lastLyricsTrackId: '',
@@ -689,7 +692,9 @@
       else applyFullSpotifyMetadataUi();
     }
 
-    if (identity.id && !spotifyDirectState.switchingTrack && (previousTrackId !== identity.id || spotifyLyricsNeedRefresh())) {
+    var clockOnlyMetadataPass = reason === 'clock-sync';
+    if (identity.id && !spotifyDirectState.switchingTrack && !clockOnlyMetadataPass
+        && (previousTrackId !== identity.id || spotifyLyricsNeedRefresh())) {
       scheduleSpotifyLyricsRefresh(song, identity.id, previousTrackId !== identity.id);
     }
     return { song: song, identity: identity, reason: reason || '' };
@@ -1041,6 +1046,36 @@
     return duration > 0 ? Math.min(position, duration) : position;
   }
 
+  function reconcileSpotifySdkClockPosition(actualMs, sdkIsPlaying, options) {
+    options = options || {};
+    actualMs = Math.max(0, Number(actualMs) || 0);
+    var estimatedMs = nowPositionMs();
+    var driftMs = actualMs - estimatedMs;
+    spotifyDirectState.lastClockDriftMs = driftMs;
+
+    // Paused/seek/track-start snapshots are true clock boundaries. During
+    // steady playback, Spotify getCurrentState() can be tens or hundreds of
+    // milliseconds old by the time its Promise resolves. Hard-anchoring every
+    // 500 ms made the compositor clock oscillate left and right.
+    if (options.force || !sdkIsPlaying || spotifyDirectState.seeking || !spotifyDirectState.clockUpdatedAt) {
+      return actualMs;
+    }
+
+    // The local monotonic clock is the smooth source of truth between SDK
+    // samples. Ignore ordinary negative drift because it is normally a stale
+    // snapshot; never pull the visible progress bar backwards during playback.
+    if (driftMs <= 650 && driftMs >= -2200) return null;
+
+    // Catch up gently when Spotify is ahead. A bounded nudge avoids a visible
+    // jump while converging within a few samples.
+    if (driftMs > 650 && driftMs < 3500) {
+      return estimatedMs + Math.min(180, Math.max(55, driftMs * 0.22));
+    }
+
+    // Very large differences indicate a real external seek or clock boundary.
+    return actualMs;
+  }
+
   function updateSpotifyState(next, source) {
     next = next || {};
     var previousPlaying = spotifyDirectState.isPlaying;
@@ -1074,11 +1109,22 @@
     if (next.deviceName != null) spotifyDirectState.deviceName = String(next.deviceName || '');
     if (next.currentUri != null) spotifyDirectState.currentUri = String(next.currentUri || '');
     if (next.currentTrackId != null) spotifyDirectState.currentTrackId = String(next.currentTrackId || '');
-    if (next.positionMs != null) spotifyDirectState.positionMs = Math.max(0, Number(next.positionMs) || 0);
+    var hasPositionAnchor = next.positionMs != null;
+    var nextPlayingProvided = next.isPlaying != null;
+    if (hasPositionAnchor) spotifyDirectState.positionMs = Math.max(0, Number(next.positionMs) || 0);
     if (next.durationMs != null) spotifyDirectState.durationMs = Math.max(0, Number(next.durationMs) || 0);
-    if (next.isPlaying != null) spotifyDirectState.isPlaying = !!next.isPlaying;
+    if (nextPlayingProvided) spotifyDirectState.isPlaying = !!next.isPlaying;
     spotifyDirectState.updatedAt = Date.now();
-    spotifyDirectState.clockUpdatedAt = monotonicNowMs();
+    if (hasPositionAnchor) {
+      spotifyDirectState.clockUpdatedAt = monotonicNowMs();
+      spotifyDirectState.lastClockAnchorPositionMs = spotifyDirectState.positionMs;
+      spotifyDirectState.lastClockAnchorAt = spotifyDirectState.clockUpdatedAt;
+    } else if (nextPlayingProvided && previousPlaying !== spotifyDirectState.isPlaying) {
+      // Freeze the already-interpolated clock at the exact play/pause boundary
+      // without resetting it to an older SDK base position.
+      spotifyDirectState.positionMs = previousPosition;
+      spotifyDirectState.clockUpdatedAt = monotonicNowMs();
+    }
 
     if (!isSpotifyActive()) return;
     var currentPosition = nowPositionMs();
@@ -1090,17 +1136,26 @@
       if (typeof window.refreshLyricTimelineForPlaybackDuration === 'function') window.refreshLyricTimelineForPlaybackDuration(Number(spotifyDirectState.durationMs || 0) / 1000);
     }
     window.playing = spotifyDirectState.isPlaying;
-    if (typeof window.setPlayIcon === 'function') window.setPlayIcon(window.playing);
-    if (typeof window.updatePlaybackProgressUi === 'function') window.updatePlaybackProgressUi();
-    if (typeof window.forcePlaybackControlsInteractive === 'function') window.forcePlaybackControlsInteractive();
-    if (window.playing && typeof window.switchPlaybackVisualToEmily === 'function') window.switchPlaybackVisualToEmily();
-    if (!window.playing && typeof window.hideLoading === 'function') window.hideLoading();
-
     var uriChanged = next.currentUri != null && String(spotifyDirectState.currentUri || '') !== previousUri;
+    var playStateChanged = previousPlaying !== spotifyDirectState.isPlaying;
+    var durationChanged = next.durationMs != null && Math.abs(Number(spotifyDirectState.durationMs || 0) - previousDuration) > 250;
+    // The requestAnimationFrame progress ticker owns steady-state rendering.
+    // Clock reconciliation must not repeat icon/layout/visual work every 500 ms,
+    // otherwise Spotify competes with the 3D lyrics animation for the main thread.
+    if (playStateChanged || uriChanged) {
+      if (typeof window.setPlayIcon === 'function') window.setPlayIcon(window.playing);
+      if (typeof window.forcePlaybackControlsInteractive === 'function') window.forcePlaybackControlsInteractive();
+      if (window.playing && typeof window.switchPlaybackVisualToEmily === 'function') window.switchPlaybackVisualToEmily();
+      if (!window.playing && typeof window.hideLoading === 'function') window.hideLoading();
+    }
+    if ((!window.playing || playStateChanged || uriChanged || durationChanged) && typeof window.updatePlaybackProgressUi === 'function') {
+      window.updatePlaybackProgressUi({ forceText: true });
+    }
+
     var playbackChanged = previousPlaying !== spotifyDirectState.isPlaying
       || uriChanged
       || positionJump > 1450
-      || (next.durationMs != null && Math.abs(Number(spotifyDirectState.durationMs || 0) - previousDuration) > 250);
+      || durationChanged;
     if (playbackChanged) {
       try {
         document.dispatchEvent(new CustomEvent('shinayuu-playback-state', {
@@ -1771,14 +1826,19 @@
             syncSpotifySdkSongMetadata(current, state, 'player-state');
 
             var sdkPosition = Number(state.position || 0);
-            updateSpotifyState({
+            var sdkMoving = spotifySdkPlaybackMoving(state, sdkPosition);
+            var playerStatePosition = reconcileSpotifySdkClockPosition(sdkPosition, sdkMoving, {
+              force: uri !== spotifyDirectState.currentUri || state.paused === true || spotifyDirectState.switchingTrack
+            });
+            var playerStateUpdate = {
               mode: 'sdk',
               currentUri: uri || spotifyDirectState.currentUri,
               currentTrackId: actualId || spotifyDirectState.currentTrackId,
-              positionMs: sdkPosition,
               durationMs: Number(state.duration || current && current.duration_ms || 0),
-              isPlaying: spotifySdkPlaybackMoving(state, sdkPosition)
-            }, 'sdk');
+              isPlaying: sdkMoving
+            };
+            if (playerStatePosition != null) playerStateUpdate.positionMs = playerStatePosition;
+            updateSpotifyState(playerStateUpdate, 'sdk');
             if (state.paused === true) scheduleUnexpectedSpotifyPauseRecovery(state, 'player-state');
             else clearUnexpectedSpotifyPauseRecovery();
           });
@@ -1891,18 +1951,21 @@
         spotifyDirectState.recoveryLoopReason = '';
       }
       var playingChanged = spotifyDirectState.isPlaying !== sdkIsPlaying;
-      // player_state_changed is documented to arrive at random intervals.
-      // Re-anchor to the SDK clock when drift reaches roughly two frames so
-      // lyric transitions use the same playback position as Spotify.
-      if (playingChanged || Math.abs(driftMs) >= 34) {
-        updateSpotifyState({
+      var reconciledPosition = reconcileSpotifySdkClockPosition(actualMs, sdkIsPlaying, {
+        force: playingChanged || state.paused === true
+      });
+      var sdkDurationMs = Number(state.duration || current && current.duration_ms || spotifyDirectState.durationMs || 0);
+      var durationChanged = Math.abs(sdkDurationMs - Number(spotifyDirectState.durationMs || 0)) > 250;
+      if (playingChanged || reconciledPosition != null || durationChanged) {
+        var clockUpdate = {
           mode: 'sdk',
           currentUri: uri || spotifyDirectState.currentUri,
           currentTrackId: match.actualId || (uri ? uri.split(':').pop() : spotifyDirectState.currentTrackId),
-          positionMs: actualMs,
-          durationMs: Number(state.duration || current && current.duration_ms || spotifyDirectState.durationMs || 0),
+          durationMs: sdkDurationMs,
           isPlaying: sdkIsPlaying
-        }, 'sdk-clock-sync');
+        };
+        if (reconciledPosition != null) clockUpdate.positionMs = reconciledPosition;
+        updateSpotifyState(clockUpdate, 'sdk-clock-sync');
       }
       if (state.paused === true) scheduleUnexpectedSpotifyPauseRecovery(state, 'clock-sync');
       else clearUnexpectedSpotifyPauseRecovery();
@@ -1920,7 +1983,7 @@
   function startSpotifyClockSync() {
     stopSpotifyClockSync();
     if (spotifyDirectState.mode !== 'sdk' || !spotifyDirectState.sdkPlayer) return;
-    spotifyDirectState.clockSyncTimer = setInterval(syncSpotifySdkClock, 500);
+    spotifyDirectState.clockSyncTimer = setInterval(syncSpotifySdkClock, 850);
     setTimeout(syncSpotifySdkClock, 120);
   }
 
