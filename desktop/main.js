@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, screen, session, globalShortcut, dialog, Tray, Menu, protocol, desktopCapturer, powerSaveBlocker } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, screen, session, globalShortcut, dialog, Tray, Menu, protocol, desktopCapturer, powerSaveBlocker, components } = require('electron');
 const net = require('net');
 const http = require('http');
 const path = require('path');
@@ -18,6 +18,74 @@ registerWallpaperEngineScheme(protocol);
 registerShinaYuuMediaScheme(protocol);
 
 let mainWindow = null;
+const castlabsRuntimeState = {
+  supported: !!(components && typeof components.whenReady === 'function'),
+  requestedAt: 0,
+  readyAt: 0,
+  ready: false,
+  error: '',
+  status: null,
+};
+let castlabsComponentsReadyPromise = null;
+
+function readCastlabsComponentsStatus() {
+  try {
+    return components && typeof components.status === 'function' ? components.status() : null;
+  } catch (error) {
+    return { error: String(error && error.message || error || 'CASTLABS_STATUS_FAILED') };
+  }
+}
+
+function publicCastlabsRuntimeStatus() {
+  const packageVersion = (() => {
+    try { return String(require('../vendor/castlabs-electron/package.json').version || ''); }
+    catch (_) { return ''; }
+  })();
+  return {
+    runtime: 'castlabs-electron',
+    castlabsVersion: packageVersion,
+    castlabsComponentsSupported: castlabsRuntimeState.supported,
+    castlabsComponentsReady: castlabsRuntimeState.ready,
+    widevineReady: castlabsRuntimeState.ready,
+    requestedAt: castlabsRuntimeState.requestedAt,
+    readyAt: castlabsRuntimeState.readyAt,
+    componentStatus: castlabsRuntimeState.status || readCastlabsComponentsStatus(),
+    error: castlabsRuntimeState.error || '',
+  };
+}
+
+async function ensureCastlabsComponentsReady() {
+  if (castlabsRuntimeState.ready) return publicCastlabsRuntimeStatus();
+  if (!castlabsRuntimeState.supported) {
+    castlabsRuntimeState.error = 'CASTLABS_COMPONENTS_API_UNAVAILABLE';
+    console.warn('[SpotifyDRM] Castlabs components API unavailable; Widevine cannot be confirmed.');
+    return publicCastlabsRuntimeStatus();
+  }
+  if (castlabsComponentsReadyPromise) return castlabsComponentsReadyPromise;
+  castlabsRuntimeState.requestedAt = Date.now();
+  castlabsRuntimeState.error = '';
+  castlabsComponentsReadyPromise = Promise.resolve()
+    .then(() => components.whenReady())
+    .then(() => {
+      castlabsRuntimeState.ready = true;
+      castlabsRuntimeState.readyAt = Date.now();
+      castlabsRuntimeState.status = readCastlabsComponentsStatus();
+      console.log('[SpotifyDRM] Castlabs components ready:', JSON.stringify(castlabsRuntimeState.status || {}));
+      return publicCastlabsRuntimeStatus();
+    })
+    .catch((error) => {
+      castlabsRuntimeState.ready = false;
+      castlabsRuntimeState.error = String(error && error.message || error || 'CASTLABS_COMPONENTS_NOT_READY');
+      castlabsRuntimeState.status = readCastlabsComponentsStatus();
+      console.error('[SpotifyDRM] Castlabs components failed:', castlabsRuntimeState.error);
+      return publicCastlabsRuntimeStatus();
+    })
+    .finally(() => {
+      castlabsComponentsReadyPromise = null;
+    });
+  return castlabsComponentsReadyPromise;
+}
+
 const shinayuuNativeServices = createShinaYuuNativeServices({
   app,
   ipcMain,
@@ -25,6 +93,8 @@ const shinayuuNativeServices = createShinaYuuNativeServices({
   dialog,
   protocol,
   getMainWindow: () => mainWindow,
+  getRuntimeStatus: () => publicCastlabsRuntimeStatus(),
+  ensureRuntimeReady: () => ensureCastlabsComponentsReady(),
 });
 let localServer = null;
 let mainServerPort = 0;
@@ -671,6 +741,49 @@ function flushMainWindowFxAutosave(reason) {
 }
 
 const LOCAL_APP_PERMISSION_ALLOWLIST = new Set(['speaker-selection', 'pointerLock', 'pointer-lock']);
+const SPOTIFY_PERMISSION_HOST_SUFFIXES = Object.freeze([
+  'spotify.com',
+  'scdn.co',
+  'spotifycdn.com',
+  'spotifycdn.net',
+]);
+const spotifyPermissionLogKeys = new Set();
+
+function parsedPermissionUrl(value) {
+  try { return new URL(String(value || '')); } catch (_) { return null; }
+}
+
+function isTrustedSpotifyPermissionUrl(value) {
+  const u = parsedPermissionUrl(value);
+  if (!u || u.protocol !== 'https:') return false;
+  const host = String(u.hostname || '').toLowerCase();
+  return SPOTIFY_PERMISSION_HOST_SUFFIXES.some((suffix) => host === suffix || host.endsWith('.' + suffix));
+}
+
+function permissionEmbeddingOrigin(details) {
+  return String(details && (details.embeddingOrigin || details.securityOrigin || details.requestingUrl) || '');
+}
+
+function isTrustedSpotifyDrmPermission(permission, requestingOrigin, details, webContents) {
+  if (permission !== 'mediaKeySystem') return false;
+  const requester = String(requestingOrigin || details && (details.requestingOrigin || details.requestingUrl || details.securityOrigin) || '');
+  const embedder = permissionEmbeddingOrigin(details);
+  const ownerUrl = String(webContents && webContents.getURL && webContents.getURL() || '');
+  // Spotify's Web Playback SDK may attribute EME to the local top-level page
+  // or to a Spotify-owned cross-origin child frame. Only permit it when the
+  // ShinaYuu local app is the owner/embedder; never grant arbitrary web pages.
+  return isLocalAppUrl(requester)
+    || ((isLocalAppUrl(embedder) || isLocalAppUrl(ownerUrl)) && isTrustedSpotifyPermissionUrl(requester));
+}
+
+function logSpotifyDrmPermissionDecision(allowed, requestingOrigin, details) {
+  const requester = String(requestingOrigin || details && (details.requestingOrigin || details.requestingUrl || details.securityOrigin) || '-');
+  const embedder = permissionEmbeddingOrigin(details) || '-';
+  const key = String(allowed) + '|' + requester + '|' + embedder;
+  if (spotifyPermissionLogKeys.has(key)) return;
+  spotifyPermissionLogKeys.add(key);
+  console.log(`[SpotifyDRM] mediaKeySystem ${allowed ? 'allowed' : 'denied'} requester=${requester} embedder=${embedder}`);
+}
 
 function isLocalAppUrl(value) {
   try {
@@ -1546,19 +1659,30 @@ function configureLocalAppPermissions() {
   if (!ses || ses._mineradioPermissionsConfigured) return;
   ses._mineradioPermissionsConfigured = true;
   ses.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
-    const origin = requestingOrigin || (details && details.requestingUrl) || (webContents && webContents.getURL && webContents.getURL()) || '';
+    const origin = requestingOrigin || (details && (details.requestingOrigin || details.requestingUrl || details.securityOrigin)) || (webContents && webContents.getURL && webContents.getURL()) || '';
     if (permission === 'display-capture') return isTrustedWallpaperEngineDisplayCapturePermission(webContents, origin, details);
     if (permission === 'media') return isTrustedWallpaperEnginePreparationMediaPermission(webContents, origin, details);
+    if (permission === 'mediaKeySystem') {
+      const allowed = isTrustedSpotifyDrmPermission(permission, origin, details, webContents);
+      logSpotifyDrmPermissionDecision(allowed, origin, details);
+      return allowed;
+    }
     return LOCAL_APP_PERMISSION_ALLOWLIST.has(permission) && isLocalAppUrl(origin);
   });
   ses.setPermissionRequestHandler((webContents, permission, callback, details) => {
-    const origin = (details && (details.requestingUrl || details.securityOrigin)) || (webContents && webContents.getURL && webContents.getURL()) || '';
+    const origin = (details && (details.requestingOrigin || details.requestingUrl || details.securityOrigin)) || (webContents && webContents.getURL && webContents.getURL()) || '';
     if (permission === 'display-capture') {
       callback(isTrustedWallpaperEngineDisplayCapturePermission(webContents, origin, details));
       return;
     }
     if (permission === 'media') {
       callback(isTrustedWallpaperEnginePreparationMediaPermission(webContents, origin, details));
+      return;
+    }
+    if (permission === 'mediaKeySystem') {
+      const allowed = isTrustedSpotifyDrmPermission(permission, origin, details, webContents);
+      logSpotifyDrmPermissionDecision(allowed, origin, details);
+      callback(allowed);
       return;
     }
     callback(LOCAL_APP_PERMISSION_ALLOWLIST.has(permission) && isLocalAppUrl(origin));
@@ -3943,6 +4067,9 @@ async function loadMainWindowWithRetry(win) {
 }
 
 async function createWindowOnce() {
+  // ECS installs/updates Widevine asynchronously. Castlabs requires this to
+  // resolve before the first BrowserWindow is created.
+  await ensureCastlabsComponentsReady();
   htmlFullscreenActive = false;
   windowFullscreenActive = false;
   startupCompleted = false;

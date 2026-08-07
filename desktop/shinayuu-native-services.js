@@ -45,6 +45,8 @@ function registerShinaYuuMediaScheme(protocol) {
 function createShinaYuuNativeServices(options = {}) {
   const { app, ipcMain, shell, dialog, protocol } = options;
   const getMainWindow = typeof options.getMainWindow === 'function' ? options.getMainWindow : () => null;
+  const getRuntimeStatus = typeof options.getRuntimeStatus === 'function' ? options.getRuntimeStatus : () => ({});
+  const ensureRuntimeReady = typeof options.ensureRuntimeReady === 'function' ? options.ensureRuntimeReady : null;
   const getSenderWindow = typeof options.getSenderWindow === 'function'
     ? options.getSenderWindow
     : (event) => {
@@ -406,14 +408,24 @@ function createShinaYuuNativeServices(options = {}) {
     registerHandle('shinayuu-cache-write-lyric', async (_event, key, payload, sourceVersion) => ensureLyricCache().write(key, payload, sourceVersion));
     registerHandle('shinayuu-cache-prune-lyrics', async () => ensureLyricCache().prune());
     registerHandle('shinayuu-cache-clear-lyrics', async () => ensureLyricCache().clear());
-    registerHandle('shinayuu-runtime-get-status', async () => ({
-      ok: true,
-      product: 'ShinaYuu Music',
-      version: require('../package.json').version,
-      localLibrary: !!localLibrary,
-      discord: discord ? discord.publicState() : null,
-      mediaProtocol: protocolReady,
-    }));
+    registerHandle('shinayuu-runtime-get-status', async () => {
+      let runtime = {};
+      try {
+        if (ensureRuntimeReady) await ensureRuntimeReady();
+        runtime = await Promise.resolve(getRuntimeStatus()) || {};
+      } catch (error) {
+        runtime = { widevineReady: false, error: String(error && error.message || error || 'RUNTIME_STATUS_FAILED') };
+      }
+      return {
+        ok: true,
+        product: 'ShinaYuu Music',
+        version: require('../package.json').version,
+        localLibrary: !!localLibrary,
+        discord: discord ? discord.publicState() : null,
+        mediaProtocol: protocolReady,
+        ...runtime,
+      };
+    });
   }
 
   async function initialize() {

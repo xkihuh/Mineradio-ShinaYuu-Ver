@@ -11,12 +11,12 @@ const pkg = require(path.join(root, 'package.json'));
 const lock = require(path.join(root, 'package-lock.json'));
 
 test('2.1.5 identity and installer metadata are synchronized', () => {
-  assert.equal(pkg.version, '2.1.5');
-  assert.equal(pkg.displayVersion, '2.1.5');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.5');
-  assert.equal(pkg.build.buildVersion, '2.1.5.0');
-  assert.equal(lock.version, '2.1.5');
-  assert.equal(lock.packages[''].version, '2.1.5');
+  assert.equal(pkg.version, '2.1.6');
+  assert.equal(pkg.displayVersion, '2.1.6');
+  assert.equal(pkg.shinayuu.displayVersion, '2.1.6');
+  assert.equal(pkg.build.buildVersion, '2.1.6.0');
+  assert.equal(lock.version, '2.1.6');
+  assert.equal(lock.packages[''].version, '2.1.6');
 });
 
 test('Home wallpaper exposes a Liquid content customization entry', () => {

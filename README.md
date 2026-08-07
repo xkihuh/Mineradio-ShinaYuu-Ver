@@ -1,17 +1,27 @@
-# ShinaYuu Music 2.1.5
+# ShinaYuu Music 2.1.6
 
-ShinaYuu Music 2.1.5 được phát triển từ source 2.1.3 người dùng cung cấp và bản sửa 2.1.4. Mục tiêu của bản này là xử lý đúng lỗi Spotify phát khoảng một giây, lặp lại từ đầu nhiều lần rồi tự chuyển sang bài khác.
+Bản sửa Spotify/Widevine được phát triển trực tiếp từ ShinaYuu Music 2.1.5.
 
-## Sửa Spotify
+## Sửa chính
 
-- Bỏ thao tác `transfer(play:false)` trước lệnh phát đầu tiên. Lệnh transfer đến muộn có thể pause chính bài vừa bắt đầu.
-- Chỉ transfer/kích hoạt lại thiết bị `ShinaYuu Music` ở lần retry thứ hai trở đi, sau khi lệnh phát thật sự không được SDK xác nhận.
-- Chỉ dùng trạng thái của Spotify Web Playback SDK trong cửa sổ ShinaYuu để xác nhận âm thanh cục bộ; Web API không còn được dùng làm tín hiệu xác nhận thay thế.
-- Pause ngắn trong lúc Widevine/DRM khởi động chỉ gọi resume tại chỗ tối đa ba lần, không tạo một phiên phát mới từ vị trí 0.
-- Chặn vòng lặp recovery cùng Track URI: tối đa một lần recovery toàn cục trong 15 giây và không tự bỏ qua bài chỉ vì pause tạm thời.
-- Recovery trì hoãn phải kiểm tra lại SDK; nếu bài đang phát đúng thì recovery cũ bị hủy.
-- Log phát Spotify có thêm `reason=exact-start`, `exact-retry-2` hoặc `exact-retry-3`.
-- Giữ sửa lỗi profile đang pending, chờ Castlabs/Widevine, token/reauthorization, exact Track ID/URI, seek, volume, lyrics, Discord Rich Presence và AutoMix ownership.
+- Cho phép quyền Electron `mediaKeySystem` chỉ với tài liệu ShinaYuu local và frame Spotify tin cậy.
+- Chờ `components.whenReady()` của Castlabs trước khi tạo BrowserWindow đầu tiên.
+- Sửa renderer gọi đúng `getShinaYuuRuntimeStatus()` và trả trạng thái `widevineReady` thật qua IPC.
+- Cập nhật Castlabs Electron ECS từ `42.5.2+wvcus` lên `42.8.0+wvcus`.
+- Thêm Permissions-Policy cho autoplay/encrypted-media trên trang loopback của app.
+- Đưa lỗi SDK Spotify ra terminal dưới dạng `[SpotifyHost] <error_type>: <message>`.
+- Giữ nguyên loop guard của 2.1.5, YouTube, AutoMix, lyrics, Discord và UI/UX.
+
+## Log cần thấy
+
+```text
+[SpotifyDRM] Castlabs components ready: ...
+[SpotifyDRM] mediaKeySystem allowed requester=... embedder=...
+[SpotifyDRM] runtime ready castlabs=42.8.0+wvcus components=true
+[SpotifyHost] ready device=...
+```
+
+Nếu terminal hiện `account_error`, hãy kiểm tra tài khoản Spotify Premium, Client ID và Users Management trong Spotify Developer Dashboard. 
 
 ## Chạy source
 
@@ -42,15 +52,15 @@ npm run release:win
 Installer dự kiến:
 
 ```text
-ShinaYuu-Music-2.1.5-Setup.exe
+ShinaYuu-Music-2.1.6-Setup.exe
 ```
 
 ## Phiên bản
 
 ```text
-Package version : 2.1.5
-Display version : 2.1.5
-Build version   : 2.1.5.0
+Package version : 2.1.6
+Display version : 2.1.6
+Build version   : 2.1.6.0
 ```
 ## Acknowledgments
 

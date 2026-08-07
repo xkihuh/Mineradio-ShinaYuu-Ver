@@ -366,7 +366,13 @@ function serveStatic(res, filePath) {
   const ext = path.extname(filePath);
   fs.readFile(filePath, (err, data) => {
     if (err) { res.writeHead(404); res.end('Not Found'); return; }
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'text/plain' });
+    const headers = { 'Content-Type': MIME[ext] || 'text/plain' };
+    if (ext === '.html') {
+      // The top-level document is served only from ShinaYuu's loopback server.
+      // Spotify's SDK may use cross-origin frames for autoplay and EME.
+      headers['Permissions-Policy'] = 'autoplay=*, encrypted-media=*';
+    }
+    res.writeHead(200, headers);
     res.end(data);
   });
 }

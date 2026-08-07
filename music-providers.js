@@ -2674,9 +2674,22 @@ async function spotifyApi(endpoint, options = {}) {
   if (response.status === 204) return {};
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error = new Error(data.error && data.error.message || `Spotify HTTP ${response.status}`);
+    const spotifyError = data && data.error || {};
+    const reason = String(spotifyError.reason || data.reason || '').trim();
+    const message = String(spotifyError.message || data.message || `Spotify HTTP ${response.status}`);
+    const error = new Error(message);
     error.status = response.status;
     error.payload = data;
+    error.diagnostics = {
+      endpoint: String(endpoint || ''),
+      method: String(options.method || 'GET').toUpperCase(),
+      status: response.status,
+      reason,
+      developerModeAccessHint: response.status === 403
+        ? 'Check Spotify Developer Dashboard Users Management, app-owner Premium status, and the authorized-user limit.'
+        : '',
+    };
+    console.warn(`[SpotifyAPI] ${error.diagnostics.method} ${endpoint} -> ${response.status} reason=${reason || '-'} message=${message}`);
     if (response.status === 429) {
       error.retryAfterMs = spotifyRetryAfterMs(response);
       error.retryAt = Date.now() + error.retryAfterMs;

@@ -75,11 +75,11 @@ test('2.1.5 release identity and Spotify cache-busting are synchronized', () => 
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
   const html = read('public/index.html');
-  assert.equal(pkg.version, '2.1.5');
-  assert.equal(pkg.displayVersion, '2.1.5');
-  assert.equal(pkg.build.buildVersion, '2.1.5.0');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.5');
-  assert.equal(lock.version, '2.1.5');
-  assert.equal(lock.packages[''].version, '2.1.5');
-  assert.match(html, /spotify-direct-player\.js\?v=2\.1\.5/);
+  assert.equal(pkg.version, '2.1.6');
+  assert.equal(pkg.displayVersion, '2.1.6');
+  assert.equal(pkg.build.buildVersion, '2.1.6.0');
+  assert.equal(pkg.shinayuu.displayVersion, '2.1.6');
+  assert.equal(lock.version, '2.1.6');
+  assert.equal(lock.packages[''].version, '2.1.6');
+  assert.match(html, /spotify-direct-player\.js\?v=2\.1\.6/);
 });

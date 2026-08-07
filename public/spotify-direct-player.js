@@ -1610,17 +1610,42 @@
   }
 
   async function waitForCastlabsSpotifyRuntime(timeoutMs) {
-    if (runtimeName() !== 'castlabs-electron' || !window.desktopWindow || typeof window.desktopWindow.getRuntimeStatus !== 'function') return true;
+    if (runtimeName() !== 'castlabs-electron') return true;
+    var bridge = window.desktopWindow;
+    var getStatus = bridge && typeof bridge.getShinaYuuRuntimeStatus === 'function'
+      ? bridge.getShinaYuuRuntimeStatus.bind(bridge)
+      : null;
+    if (!getStatus) throw new Error('CASTLABS_RUNTIME_BRIDGE_UNAVAILABLE');
     var started = Date.now();
     var lastStatus = null;
-    timeoutMs = Math.max(2500, Number(timeoutMs) || 12000);
+    timeoutMs = Math.max(2500, Number(timeoutMs) || 15000);
     while (Date.now() - started < timeoutMs) {
-      lastStatus = await window.desktopWindow.getRuntimeStatus().catch(function () { return null; });
-      if (lastStatus && lastStatus.widevineReady === true) return lastStatus;
+      lastStatus = await getStatus().catch(function () { return null; });
+      if (lastStatus && lastStatus.widevineReady === true) {
+        if (!spotifyDirectState.runtimeReadyLogged) {
+          spotifyDirectState.runtimeReadyLogged = true;
+          console.info('[SpotifyDRM] runtime ready castlabs=' + String(lastStatus.castlabsVersion || '-') + ' components=' + String(lastStatus.castlabsComponentsReady === true));
+        }
+        return lastStatus;
+      }
       await spotifyDelay(250);
     }
     var runtimeError = lastStatus && lastStatus.error || 'CASTLABS_COMPONENTS_NOT_READY';
     throw new Error(runtimeError);
+  }
+
+  function reportSpotifySdkEvent(type, message, extra) {
+    var payload = Object.assign({
+      type: type === 'ready' ? 'ready' : 'error',
+      errorType: String(type || 'error'),
+      error: String(message || ''),
+      at: Date.now()
+    }, extra || {});
+    window.apiJson('/api/spotify/host/event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).catch(function () {});
   }
 
   async function ensureSdkDevice(timeoutMs) {
@@ -1655,6 +1680,7 @@
             spotifyDirectState.sdkPlaybackError = '';
             spotifyDirectState.deviceId = payload && payload.device_id || '';
             spotifyDirectState.deviceName = 'ShinaYuu Music';
+            reportSpotifySdkEvent('ready', '', { deviceId: spotifyDirectState.deviceId, deviceName: spotifyDirectState.deviceName });
             applySpotifySdkVolume(player).catch(function (error) { console.warn('[SpotifyVolume ready]', error); });
             if (spotifyDirectState.sdkResolve) spotifyDirectState.sdkResolve({ id: spotifyDirectState.deviceId, name: spotifyDirectState.deviceName, mode: 'sdk' });
           });
@@ -1681,7 +1707,20 @@
                 spotifyDirectState.sdkReady = false;
                 spotifyDirectState.deviceId = '';
               }
-              if (spotifyDirectState.active && spotifyDirectState.expectedPlaying) {
+              reportSpotifySdkEvent(eventName, msg, {
+                deviceId: spotifyDirectState.deviceId || '',
+                widevineHint: /widevine|license|key system|eme|drm/i.test(msg)
+              });
+              var authorizationFailure = eventName === 'authentication_error' || eventName === 'account_error';
+              if (authorizationFailure && typeof window.showToast === 'function') {
+                window.showToast(eventName === 'account_error'
+                  ? localized('Spotify từ chối quyền phát. Hãy kiểm tra Premium và Users Management trong Spotify Developer Dashboard.', 'Spotify denied playback access. Check Premium and Users Management in the Spotify Developer Dashboard.')
+                  : localized('Phiên Spotify không còn hợp lệ. Hãy đăng nhập Spotify lại.', 'The Spotify session is no longer valid. Sign in to Spotify again.'));
+              }
+              // Authentication/account failures are deterministic and must not
+              // enter the playback retry loop. Only runtime/playback failures
+              // can be recovered by reconstructing the local SDK pipeline.
+              if (!authorizationFailure && spotifyDirectState.active && spotifyDirectState.expectedPlaying) {
                 triggerSpotifyRuntimeFailureRecovery(eventName, new Error(msg), eventName === 'playback_error' ? 360 : 700);
               }
               console.warn('[SpotifySDK]', eventName, msg);

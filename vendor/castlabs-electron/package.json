@@ -1,6 +1,6 @@
 {
   "name": "electron",
-  "version": "42.5.2+wvcus",
+  "version": "42.8.0+wvcus",
   "description": "Castlabs Electron for Content Security runtime package for ShinaYuu Music",
   "main": "index.js",
   "bin": {

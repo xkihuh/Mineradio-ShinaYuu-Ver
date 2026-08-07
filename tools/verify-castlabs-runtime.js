@@ -6,6 +6,10 @@ const { runtimePaths } = require('./castlabs-runtime-paths');
 
 const root = path.resolve(__dirname, '..');
 const paths = runtimePaths(root);
+const expectedPackageFile = path.join(root, 'vendor', 'castlabs-electron', 'package.json');
+let expectedVersion = '';
+try { expectedVersion = String(JSON.parse(fs.readFileSync(expectedPackageFile, 'utf8')).version || ''); }
+catch (_) { expectedVersion = ''; }
 
 function fail(message) {
   console.error('[Castlabs verify] ' + message);
@@ -26,6 +30,10 @@ try {
 }
 
 const version = String(pkg.version || '');
+if (expectedVersion && version !== expectedVersion) {
+  fail('Castlabs package is stale. Expected ' + expectedVersion + ', installed ' + (version || 'unknown') + '. Delete node_modules and run npm install again.');
+  return;
+}
 if (!/wvcus/i.test(version)) {
   fail('Installed Electron is not a Castlabs wvcus build: ' + (version || 'unknown'));
   return;

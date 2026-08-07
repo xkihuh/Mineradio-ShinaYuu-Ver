@@ -22,7 +22,7 @@ test('package identity is the unified ShinaYuu Music 2.1.5 release', () => {
   const pkg = JSON.parse(read('package.json'));
   assert.equal(pkg.name, 'shinayuu-music');
   assert.equal(pkg.productName, 'ShinaYuu Music');
-  assert.equal(pkg.version, '2.1.5');
+  assert.equal(pkg.version, '2.1.6');
   assert.equal(pkg.main, 'desktop/main.js');
   assert.equal(pkg.shinayuu.lineage.productCore, 'ShinaYuu Music 1.1.8.7');
   assert.equal(pkg.shinayuu.lineage.desktopWallpaper, 'Mineradio 2.1.0 lifecycle hardening selectively ported to ShinaYuu runtime');

@@ -39,11 +39,11 @@ test('2.1.5 wires HTML and Spotify pause-resume events into the same lyric lifec
 test('2.1.5 release identity is synchronized', () => {
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
-  assert.equal(pkg.version, '2.1.5');
-  assert.equal(pkg.displayVersion, '2.1.5');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.5');
-  assert.equal(pkg.build.buildVersion, '2.1.5.0');
-  assert.equal(pkg.shinayuu.buildVersion, '2.1.5.0');
-  assert.equal(lock.version, '2.1.5');
-  assert.equal(lock.packages[''].version, '2.1.5');
+  assert.equal(pkg.version, '2.1.6');
+  assert.equal(pkg.displayVersion, '2.1.6');
+  assert.equal(pkg.shinayuu.displayVersion, '2.1.6');
+  assert.equal(pkg.build.buildVersion, '2.1.6.0');
+  assert.equal(pkg.shinayuu.buildVersion, '2.1.6.0');
+  assert.equal(lock.version, '2.1.6');
+  assert.equal(lock.packages[''].version, '2.1.6');
 });
