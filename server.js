@@ -3781,7 +3781,8 @@ async function handleModernMusicRoute(req, res, url, pn) {
       const contextUri = String(body.contextUri || '');
       const offsetUri = String(body.offsetUri || '');
       const positionMs = Number(body.positionMs || 0);
-      console.log(`[SpotifyPlayback] request=${requestId || '-'} target=${uri || contextUri || '-'} device=${deviceId || '-'} position=${positionMs}`);
+      const reason = String(body.reason || '');
+      console.log(`[SpotifyPlayback] request=${requestId || '-'} target=${uri || contextUri || '-'} device=${deviceId || '-'} position=${positionMs} reason=${reason || '-'}`);
       const started = await musicProviders.spotifyStartPlayback({ deviceId, uri, contextUri, offsetUri, positionMs });
       sendJSON(res, { ok: true, requestId, targetUri: uri, contextUri, deviceId, started });
     } catch (error) { modernProviderError(res, error, 500); }

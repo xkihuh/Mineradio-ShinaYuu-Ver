@@ -1,16 +1,17 @@
-# ShinaYuu Music 2.1.4
+# ShinaYuu Music 2.1.5
 
-ShinaYuu Music 2.1.4 được phát triển trực tiếp từ source 2.1.3 mà người dùng cung cấp. Bản này ưu tiên sửa lỗi Spotify đăng nhập được nhưng không bắt đầu phát, đồng thời giữ nguyên UI/UX, YouTube, AutoMix, lyrics và các bản sửa pause/resume của 2.1.3.
+ShinaYuu Music 2.1.5 được phát triển từ source 2.1.3 người dùng cung cấp và bản sửa 2.1.4. Mục tiêu của bản này là xử lý đúng lỗi Spotify phát khoảng một giây, lặp lại từ đầu nhiều lần rồi tự chuyển sang bài khác.
 
 ## Sửa Spotify
 
-- Không còn coi trạng thái hồ sơ Spotify đang tải hoặc đang bị rate-limit là tài khoản Free.
-- Chỉ chặn phát khi Spotify đã xác nhận rõ tài khoản không phải Premium; trường hợp chưa có profile sẽ để Spotify Web Playback SDK xác minh.
-- Chờ Castlabs Electron/Widevine sẵn sàng thay vì kiểm tra một lần rồi thất bại ngay khi app vừa khởi động.
-- Kết thúc nhanh lỗi token/reauthorization thay vì để `Spotify.Player.connect()` treo đến timeout.
-- Kích hoạt thiết bị phát `ShinaYuu Music` trước lệnh phát bài đầu tiên và kích hoạt lại khi Spotify chưa kịp công bố device.
-- Xác nhận playback bằng cả `getCurrentState()` và Web API state để tránh rollback nhầm khi SDK phản hồi chậm.
-- Giữ exact Spotify Track ID/URI, seek, volume, lyrics, Discord Rich Presence và AutoMix ownership hiện có.
+- Bỏ thao tác `transfer(play:false)` trước lệnh phát đầu tiên. Lệnh transfer đến muộn có thể pause chính bài vừa bắt đầu.
+- Chỉ transfer/kích hoạt lại thiết bị `ShinaYuu Music` ở lần retry thứ hai trở đi, sau khi lệnh phát thật sự không được SDK xác nhận.
+- Chỉ dùng trạng thái của Spotify Web Playback SDK trong cửa sổ ShinaYuu để xác nhận âm thanh cục bộ; Web API không còn được dùng làm tín hiệu xác nhận thay thế.
+- Pause ngắn trong lúc Widevine/DRM khởi động chỉ gọi resume tại chỗ tối đa ba lần, không tạo một phiên phát mới từ vị trí 0.
+- Chặn vòng lặp recovery cùng Track URI: tối đa một lần recovery toàn cục trong 15 giây và không tự bỏ qua bài chỉ vì pause tạm thời.
+- Recovery trì hoãn phải kiểm tra lại SDK; nếu bài đang phát đúng thì recovery cũ bị hủy.
+- Log phát Spotify có thêm `reason=exact-start`, `exact-retry-2` hoặc `exact-retry-3`.
+- Giữ sửa lỗi profile đang pending, chờ Castlabs/Widevine, token/reauthorization, exact Track ID/URI, seek, volume, lyrics, Discord Rich Presence và AutoMix ownership.
 
 ## Chạy source
 
@@ -19,7 +20,17 @@ npm ci
 npm start
 ```
 
-Spotify trực tiếp yêu cầu tài khoản Premium, Spotify Client ID đã cấu hình và đăng nhập lại nếu token cũ thiếu quyền playback.
+Spotify trực tiếp yêu cầu tài khoản Premium, Spotify Client ID đã cấu hình và phiên đăng nhập có đủ các scope playback.
+
+## Dấu hiệu log đúng
+
+Khi chọn một bài, log bình thường chỉ nên có một dòng tương tự:
+
+```text
+[SpotifyPlayback] request=... target=spotify:track:... device=... position=0 reason=exact-start
+```
+
+`exact-retry-2` hoặc `exact-retry-3` chỉ xuất hiện khi lần phát trước thực sự không được SDK xác nhận. Không được xuất hiện chuỗi request mới liên tục ở vị trí 0–1000 ms.
 
 ## Build Windows
 
@@ -31,15 +42,15 @@ npm run release:win
 Installer dự kiến:
 
 ```text
-ShinaYuu-Music-2.1.4-Setup.exe
+ShinaYuu-Music-2.1.5-Setup.exe
 ```
 
 ## Phiên bản
 
 ```text
-Package version : 2.1.4
-Display version : 2.1.4
-Build version   : 2.1.4.0
+Package version : 2.1.5
+Display version : 2.1.5
+Build version   : 2.1.5.0
 ```
 ## Acknowledgments
 

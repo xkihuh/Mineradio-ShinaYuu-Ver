@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '2.1.4';
+  var VERSION = '2.1.5';
   var STORE_KEY = 'shinayuu-cuefield-automix-v2';
   var GAPLESS_STORE_KEY = 'shinayuu-album-gapless-v1';
   var PREPARE_DELAY_MS = 950;

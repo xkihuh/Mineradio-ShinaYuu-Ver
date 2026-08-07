@@ -8,7 +8,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('2.1.4 keeps lyrics resident on pause without requiring an HTML audio src', () => {
+test('2.1.5 keeps lyrics resident on pause without requiring an HTML audio src', () => {
   const stage = read('public/js/modules/02-visual/14-stage-lyrics-rendering.js');
   assert.match(stage, /function stageLyricPlaybackTrackAvailable\(\)/);
   assert.match(stage, /window\.spotifyDirectState/);
@@ -18,7 +18,7 @@ test('2.1.4 keeps lyrics resident on pause without requiring an HTML audio src',
   assert.doesNotMatch(stage, /pausedWithTrack = !!\(holdLyricsOnPause && audio && audio\.src/);
 });
 
-test('2.1.4 restores the current lyric mesh directly from the provider clock on resume', () => {
+test('2.1.5 restores the current lyric mesh directly from the provider clock on resume', () => {
   const stage = read('public/js/modules/02-visual/14-stage-lyrics-rendering.js');
   assert.match(stage, /function restoreStageLyricsAtPlaybackClock\(reason\)/);
   assert.match(stage, /var t = stageLyricPlaybackSeconds\(\)/);
@@ -27,7 +27,7 @@ test('2.1.4 restores the current lyric mesh directly from the provider clock on 
   assert.match(stage, /scheduleStageLyricPauseResumeRestore\(reason, 24\)/);
 });
 
-test('2.1.4 wires HTML and Spotify pause-resume events into the same lyric lifecycle', () => {
+test('2.1.5 wires HTML and Spotify pause-resume events into the same lyric lifecycle', () => {
   const core = read('public/js/modules/05-playback/12-playback-switch-core.js');
   const spotify = read('public/spotify-direct-player.js');
   assert.match(core, /reason === 'pause' \|\| reason === 'manual-pause'/);
@@ -36,14 +36,14 @@ test('2.1.4 wires HTML and Spotify pause-resume events into the same lyric lifec
   assert.match(spotify, /markStageLyricsPlaybackResume\('spotify-resume-confirmed'\)/);
 });
 
-test('2.1.4 release identity is synchronized', () => {
+test('2.1.5 release identity is synchronized', () => {
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
-  assert.equal(pkg.version, '2.1.4');
-  assert.equal(pkg.displayVersion, '2.1.4');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.4');
-  assert.equal(pkg.build.buildVersion, '2.1.4.0');
-  assert.equal(pkg.shinayuu.buildVersion, '2.1.4.0');
-  assert.equal(lock.version, '2.1.4');
-  assert.equal(lock.packages[''].version, '2.1.4');
+  assert.equal(pkg.version, '2.1.5');
+  assert.equal(pkg.displayVersion, '2.1.5');
+  assert.equal(pkg.shinayuu.displayVersion, '2.1.5');
+  assert.equal(pkg.build.buildVersion, '2.1.5.0');
+  assert.equal(pkg.shinayuu.buildVersion, '2.1.5.0');
+  assert.equal(lock.version, '2.1.5');
+  assert.equal(lock.packages[''].version, '2.1.5');
 });

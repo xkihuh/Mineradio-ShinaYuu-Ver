@@ -8,7 +8,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('2.1.4 serializes Spotify AutoMix volume commands instead of leaving overlapping writes', () => {
+test('2.1.5 serializes Spotify AutoMix volume commands instead of leaving overlapping writes', () => {
   const mix = read('public/js/modules/05-playback/18-cuefield-automix-integration.js');
   assert.match(mix, /var applied = await setSpotifyVolume\(from \+ \(to - from\) \* eased, executionSerial\)/);
   assert.match(mix, /if \(!applied\) return false/);
@@ -16,7 +16,7 @@ test('2.1.4 serializes Spotify AutoMix volume commands instead of leaving overla
   assert.match(mix, /return setSpotifyVolume\(to, executionSerial\)/);
 });
 
-test('2.1.4 restores only the provider that owns audible output after AutoMix', () => {
+test('2.1.5 restores only the provider that owns audible output after AutoMix', () => {
   const mix = read('public/js/modules/05-playback/18-cuefield-automix-integration.js');
   assert.match(mix, /function activeOutputOwner\(\)/);
   assert.match(mix, /function restoreAutoMixOutput\(reason, options\)/);

@@ -1,13 +1,14 @@
-# ShinaYuu Music 2.1.4
+# ShinaYuu Music 2.1.5
 
-- Sửa trường hợp OAuth đã hoàn tất nhưng profile Spotify còn pending/rate-limit bị hiểu nhầm thành tài khoản Free và chặn toàn bộ playback.
-- Chỉ chặn Premium khi product đã được Spotify xác nhận rõ; trạng thái chưa biết được chuyển cho Web Playback SDK kiểm tra chính thức.
-- Chờ Castlabs/Widevine sẵn sàng theo polling có giới hạn trước khi tạo Spotify SDK device.
-- Kích hoạt device `ShinaYuu Music` trước bài đầu tiên, kích hoạt lại khi device directory của Spotify cập nhật chậm.
-- Dùng Web API playback state làm kênh xác nhận dự phòng khi SDK `getCurrentState()` tạm thời trả về null.
-- Làm lỗi token/reauthorization kết thúc rõ ràng, không để `player.connect()` treo đến timeout.
-- Giữ nguyên lyrics pause/resume, exact Track ID/URI, seek, volume, AutoMix, YouTube, Discord và UI/UX từ 2.1.3.
-- Đồng bộ package/display/build identity lên 2.1.4 / 2.1.4.0.
+- Sửa vòng lặp Spotify chỉ phát khoảng một giây rồi quay lại đầu bài do lệnh `transfer(play:false)` chạy trước lệnh phát đầu tiên và có thể đến muộn.
+- Lệnh phát lần đầu giờ gửi thẳng exact Track URI đến đúng SDK device; chỉ transfer/kích hoạt lại device sau khi lần phát thật sự thất bại.
+- Không còn dùng Spotify Web API state để xác nhận âm thanh cục bộ. Chỉ `Spotify.Player.getCurrentState()` của SDK trong cửa sổ ShinaYuu mới được quyền xác nhận playback.
+- Pause tạm thời trong giai đoạn DRM/device khởi động chỉ được xử lý bằng resume tại chỗ, không gọi lại `/play` từ đầu.
+- Thêm cầu chì giới hạn một lần recovery toàn cục cho cùng URI trong 15 giây; vòng lặp tiếp theo bị chặn và không được tự nhảy sang bài khác.
+- Trước khi thực hiện recovery trì hoãn, app kiểm tra lại SDK; nếu đúng bài vẫn đang phát thì hủy recovery cũ.
+- Log `/api/spotify/player/play` bổ sung `reason=exact-start|exact-retry-*` để xác định chính xác lần phát đầu hay retry.
+- Giữ sửa lỗi profile Spotify pending, chờ Castlabs/Widevine, token failure, lyrics pause/resume, exact Track ID/URI, seek, volume, AutoMix, YouTube, Discord và UI/UX.
+- Đồng bộ package/display/build identity lên 2.1.5 / 2.1.5.0.
 
 # ShinaYuu Music 2.1.3
 

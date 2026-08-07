@@ -6,11 +6,11 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('2.1.4 version and update repository are configured', () => {
+test('2.1.5 version and update repository are configured', () => {
   const pkg = JSON.parse(read('package.json'));
-  assert.equal(pkg.version, '2.1.4');
-  assert.equal(pkg.build.buildVersion, '2.1.4.0');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.4');
+  assert.equal(pkg.version, '2.1.5');
+  assert.equal(pkg.build.buildVersion, '2.1.5.0');
+  assert.equal(pkg.shinayuu.displayVersion, '2.1.5');
   assert.equal(pkg.shinayuu.update.owner, 'xkihuh');
   assert.equal(pkg.shinayuu.update.repo, 'Mineradio-ShinaYuu-Ver');
 });
@@ -37,9 +37,9 @@ test('Spotify playback has SDK prewarm, resume, device recovery and YouTube fall
   const src = read('public/spotify-direct-player.js');
   assert.match(src, /shinayuu-spotify-login-ready/);
   assert.match(src, /state && match\.matched && state\.paused === true/);
-  assert.match(src, /function ensureSpotifyDeviceActivated\(/);
-  assert.match(src, /\/api\/spotify\/player\/transfer/);
-  assert.match(src, /device pre-activation pending/);
+  assert.doesNotMatch(src, /function ensureSpotifyDeviceActivated\(/);
+  assert.match(src, /if \(attempt >= 2\)[\s\S]*?\/api\/spotify\/player\/transfer/);
+  assert.match(src, /retry device activation failed/);
   assert.match(src, /captureSpotifyMediaActivation/);
   assert.doesNotMatch(src, /SDK reconnect failed/);
   assert.match(src, /function playSpotifyViaYouTubeFallback\(/);

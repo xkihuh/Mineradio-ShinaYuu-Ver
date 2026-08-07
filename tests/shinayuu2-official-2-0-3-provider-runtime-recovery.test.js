@@ -8,7 +8,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('2.1.4 treats Spotify, YouTube Music and YouTube Video as separate fallback platforms', () => {
+test('2.1.5 treats Spotify, YouTube Music and YouTube Video as separate fallback platforms', () => {
   const fallback = read('public/js/modules/05-playback/11-provider-fallback.js');
   assert.match(fallback, /SOURCE_FALLBACK_DIRECT_PROVIDERS = \['youtube-music', 'youtube-video', 'spotify'\]/);
   assert.match(fallback, /function playbackPlatformKey\(song\)/);
@@ -48,5 +48,7 @@ test('Spotify runtime guard escalates stuck SDK states into the common recovery 
   assert.match(player, /triggerSpotifyRuntimeFailureRecovery\(eventName, new Error\(msg\)/);
   assert.match(player, /triggerSpotifyRuntimeFailureRecovery\('wrong-track-stuck'/);
   assert.match(player, /triggerSpotifyRuntimeFailureRecovery\('sdk-state-missing'/);
-  assert.match(player, /triggerSpotifyRuntimeFailureRecovery\('unexpected-pause-still-paused'/);
+  assert.match(player, /if \(\/\^unexpected-pause\/\.test\(reason\)\) return false/);
+  assert.match(player, /scheduleUnexpectedSpotifyPauseRecovery\(current, 'local-resume-still-paused'\)/);
+  assert.match(player, /function spotifyRecoveryLoopAllowsRestart\(reason, uri\)/);
 });

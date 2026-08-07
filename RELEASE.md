@@ -1,8 +1,10 @@
-# ShinaYuu Music 2.1.4
+# ShinaYuu Music 2.1.5
 
-- Fixes Spotify sessions that were authorized but incorrectly blocked while the `/me` profile was still loading or rate-limited.
-- Waits for Castlabs Electron and Widevine readiness before creating the Spotify Web Playback SDK device.
-- Activates the in-app `ShinaYuu Music` Spotify device before the first exact-track play request and retries activation after propagation delays.
-- Confirms playback through both SDK state and Spotify Web API state to prevent false rollback when `getCurrentState()` is temporarily null.
-- Fails token/reauthorization requests deterministically instead of leaving SDK connection pending.
-- Preserves the 2.1.3 pause/resume lyrics lifecycle, YouTube playback, AutoMix ownership, Discord Rich Presence and existing UI/UX.
+- Removes the first-play `transfer(play:false)` race that could pause a Spotify track shortly after it started.
+- Sends the exact Track URI directly to the in-app SDK device on the first attempt and transfers the device only after a confirmed start failure.
+- Uses local Spotify Web Playback SDK state as the sole audible-start confirmation instead of accepting Web API state as a substitute.
+- Handles transient startup pauses with bounded local resume attempts without replaying the track from position zero.
+- Adds a same-URI recovery circuit breaker so repeated recovery cannot restart the track indefinitely or skip to the next queue item.
+- Revalidates the local SDK before a delayed runtime recovery and cancels stale recovery when the correct track is still playing.
+- Adds `reason=exact-start|exact-retry-*` to Spotify playback server logs.
+- Preserves the profile-pending entitlement fix, Castlabs/Widevine readiness wait, token failure handling, 2.1.3 lyrics pause/resume lifecycle, YouTube, AutoMix, Discord Rich Presence and existing UI/UX.

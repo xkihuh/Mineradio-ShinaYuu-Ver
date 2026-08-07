@@ -81,9 +81,11 @@
     lastPauseStateKey: '',
     activationWarmAt: 0,
     deviceRecoveryAt: 0,
-    deviceActivatedAt: 0,
-    activatedDeviceId: '',
-    lastApiStateProbeAt: 0,
+    startGuardUntil: 0,
+    recoveryLoopUri: '',
+    recoveryLoopStartedAt: 0,
+    recoveryLoopCount: 0,
+    recoveryLoopReason: '',
     lastGestureAt: 0,
     startupPrewarmScheduled: false,
     externalStopSerial: 0,
@@ -800,8 +802,44 @@
     spotifyDirectState.runtimeFailureRecoveryCount = 0;
   };
 
+  function spotifyRecoveryLoopAllowsRestart(reason, uri) {
+    var now = Date.now();
+    uri = String(uri || '');
+    reason = String(reason || 'runtime-failure');
+    if (!uri) return true;
+    if (spotifyDirectState.recoveryLoopUri !== uri || now - Number(spotifyDirectState.recoveryLoopStartedAt || 0) > 15000) {
+      spotifyDirectState.recoveryLoopUri = uri;
+      spotifyDirectState.recoveryLoopStartedAt = now;
+      spotifyDirectState.recoveryLoopCount = 0;
+    }
+    spotifyDirectState.recoveryLoopCount += 1;
+    spotifyDirectState.recoveryLoopReason = reason;
+    if (spotifyDirectState.recoveryLoopCount <= 1) return true;
+    console.warn('[SpotifyPlaybackGuard] blocked restart loop uri=' + uri + ' reason=' + reason + ' count=' + spotifyDirectState.recoveryLoopCount);
+    setSpotifyExpectedPlaying(false, 'restart-loop-blocked');
+    clearUnexpectedSpotifyPauseRecovery();
+    clearSpotifyRuntimeFailureRecovery();
+    try {
+      if (typeof window.showSourceFallbackNotice === 'function') {
+        window.showSourceFallbackNotice(
+          localized('Spotify đã bị tạm dừng', 'Spotify playback paused'),
+          localized('Ứng dụng đã chặn vòng lặp phát lại cùng một bài. Hãy bấm Phát một lần; bài sẽ không tự nhảy sang bài khác.', 'A same-track restart loop was blocked. Press Play once; the app will not skip to another track automatically.')
+        );
+      }
+    } catch (_) {}
+    return false;
+  }
+
   function triggerSpotifyRuntimeFailureRecovery(reason, error, delayMs) {
+    reason = String(reason || 'runtime-failure');
     if (!isSpotifyActive() || !spotifyDirectState.expectedPlaying || spotifyDirectState.switchingTrack) return false;
+    // A paused snapshot around DRM/device activation is not proof that the
+    // stream URL failed. Replaying the exact URI here caused 0-1 second loops
+    // and eventually made the global recovery skip to the next queue item.
+    if (/^unexpected-pause/.test(reason)) return false;
+    if (Date.now() < Number(spotifyDirectState.startGuardUntil || 0) && /playback_error|sdk-state-missing|clock-sync-failed/.test(reason)) {
+      delayMs = Math.max(Number(delayMs) || 0, Number(spotifyDirectState.startGuardUntil || 0) - Date.now() + 220);
+    }
     if (spotifyDirectState.runtimeFailureRecoveryPending || spotifyDirectState.runtimeFailureRecoveryTimer) return false;
     if (typeof window.recoverPlaybackAfterProviderFailure !== 'function') return false;
     var ownerToken = Number(window.trackSwitchToken);
@@ -818,6 +856,20 @@
       if (ownerToken !== Number(window.trackSwitchToken) || ownerIndex !== Number(window.currentIdx)) return;
       if (!isSpotifyActive() || !spotifyDirectState.expectedPlaying || spotifyDirectState.switchingTrack) return;
       if (ownerUri && spotifyDirectState.currentUri && ownerUri !== spotifyDirectState.currentUri) return;
+      if (/playback_error|sdk-state-missing|clock-sync-failed/.test(reason) && spotifyDirectState.sdkPlayer && typeof spotifyDirectState.sdkPlayer.getCurrentState === 'function') {
+        try {
+          var verifiedState = await spotifyDirectState.sdkPlayer.getCurrentState();
+          var verifiedTrack = spotifySdkCurrentTrack(verifiedState);
+          var verifiedMatch = spotifySdkTrackMatch(verifiedTrack, ownerUri || spotifyDirectState.currentUri, currentSong());
+          if (verifiedState && verifiedState.paused === false && verifiedMatch.matched) {
+            spotifyDirectState.sdkPlaybackError = '';
+            spotifyDirectState.sdkNullStateSince = 0;
+            spotifyDirectState.clockSyncFailureCount = 0;
+            return;
+          }
+        } catch (_) {}
+      }
+      if (!spotifyRecoveryLoopAllowsRestart(reason, ownerUri || spotifyDirectState.currentUri)) return;
       spotifyDirectState.runtimeFailureRecoveryPending = true;
       spotifyDirectState.runtimeFailureRecoveryCount += 1;
       try {
@@ -857,14 +909,24 @@
     if (!spotifyDirectState.sdkPlayer || typeof spotifyDirectState.sdkPlayer.getCurrentState !== 'function') return;
     var now = Date.now();
     var confirmedAge = now - Number(spotifyDirectState.playConfirmedAt || 0);
-    if (!spotifyDirectState.playConfirmedAt || confirmedAge < 250) return;
+    if (!spotifyDirectState.playConfirmedAt || confirmedAge < 900) return;
     if (spotifyDirectState.userPauseRequestedAt && now - spotifyDirectState.userPauseRequestedAt < 3200) return;
     var position = Math.max(0, Number(state.position || spotifyDirectState.positionMs || 0));
     var duration = Math.max(0, Number(state.duration || spotifyDirectState.durationMs || 0));
     if (duration > 0 && position >= duration - 3000) return;
     if (spotifyDirectState.unexpectedPauseRecoveryTimer) return;
-    if (spotifyDirectState.unexpectedPauseRecoveryCount >= 2) {
-      triggerSpotifyRuntimeFailureRecovery('unexpected-pause-exhausted', null, confirmedAge > 25000 ? 900 : 260);
+    if (spotifyDirectState.unexpectedPauseRecoveryCount >= 3) {
+      // Do not restart or skip the queue item. The user log showed each global
+      // recovery issuing a new /play at 0-40 ms, creating an audible loop.
+      setSpotifyExpectedPlaying(false, 'unexpected-pause-exhausted');
+      try {
+        if (typeof window.showSourceFallbackNotice === 'function') {
+          window.showSourceFallbackNotice(
+            localized('Spotify đang tạm dừng', 'Spotify is paused'),
+            localized('ShinaYuu đã ngăn bài hát tự phát lại từ đầu. Hãy bấm Phát để tiếp tục.', 'ShinaYuu prevented the track from restarting at the beginning. Press Play to continue.')
+          );
+        }
+      } catch (_) {}
       return;
     }
 
@@ -878,8 +940,12 @@
         spotifyDirectState.unexpectedPauseRecoveryCount += 1;
         activateSpotifyAudioFromGesture();
         await applySpotifySdkVolume(spotifyDirectState.sdkPlayer);
-        await spotifyDirectState.sdkPlayer.resume();
-        await spotifyDelay(220);
+        try {
+          await spotifyDirectState.sdkPlayer.resume();
+        } catch (resumeError) {
+          await postJson('/api/spotify/player/resume', { deviceId: spotifyDirectState.deviceId });
+        }
+        await spotifyDelay(420);
         current = await spotifyDirectState.sdkPlayer.getCurrentState() || current;
         var currentPosition = Math.max(0, Number(current.position || position));
         updateSpotifyState({
@@ -888,10 +954,10 @@
           isPlaying: current.paused === false
         }, 'unexpected-pause-recovery');
         console.info('[SpotifyPlaybackGuard] recovery=' + spotifyDirectState.unexpectedPauseRecoveryCount + ' playing=' + String(current.paused === false));
-        if (current.paused === true) triggerSpotifyRuntimeFailureRecovery('unexpected-pause-still-paused', null, 260);
+        if (current.paused === true) scheduleUnexpectedSpotifyPauseRecovery(current, 'local-resume-still-paused');
       } catch (error) {
         console.warn('[SpotifyPlaybackGuard] recovery failed', error && (error.message || error));
-        triggerSpotifyRuntimeFailureRecovery('unexpected-pause-error', error, 260);
+        if (spotifyDirectState.unexpectedPauseRecoveryCount < 3) scheduleUnexpectedSpotifyPauseRecovery(state, 'local-resume-error');
       }
     }, confirmedAge > 25000 ? 1200 : 320);
   }
@@ -1179,8 +1245,7 @@
     spotifyDirectState.sdkReady = false;
     spotifyDirectState.sdkCreatingPromise = null;
     spotifyDirectState.deviceId = '';
-    spotifyDirectState.deviceActivatedAt = 0;
-    spotifyDirectState.activatedDeviceId = '';
+    spotifyDirectState.startGuardUntil = 0;
     spotifyDirectState.deviceName = '';
     spotifyDirectState.sdkError = '';
     spotifyDirectState.sdkPlaybackError = '';
@@ -1246,13 +1311,6 @@
       paused: api.isPlaying !== true,
       track_window: { current_track: { uri: uri, id: id, name: String(track.name || track.title || ''), artists: artists } }
     };
-  }
-
-  async function readSpotifyApiPlaybackState() {
-    var now = Date.now();
-    if (now - Number(spotifyDirectState.lastApiStateProbeAt || 0) < 600) return null;
-    spotifyDirectState.lastApiStateProbeAt = now;
-    return window.apiJson('/api/spotify/player/state?t=' + now).catch(function () { return null; });
   }
 
   async function waitForRemoteHostReady(timeoutMs) {
@@ -1346,61 +1404,10 @@
         }
       }
 
-      // Some Castlabs/Widevine sessions begin audibly before getCurrentState()
-      // stops returning null. Confirm against the Web API as a bounded backup
-      // so a successful start is not rolled back as a false failure.
-      var apiState = await readSpotifyApiPlaybackState();
-      if (apiState && apiState.track) {
-        var apiSdkState = spotifyApiStateToSdkState(apiState);
-        var apiTrack = spotifySdkCurrentTrack(apiSdkState);
-        var apiMatch = spotifySdkTrackMatch(apiTrack, uri, expectedSong);
-        var apiDeviceId = String(apiState.device && apiState.device.id || '');
-        var correctDevice = !apiDeviceId || !spotifyDirectState.deviceId || apiDeviceId === spotifyDirectState.deviceId;
-        if (apiMatch.matched && correctDevice && apiState.isPlaying === true) {
-          spotifyDirectState.sdkPlaybackError = '';
-          syncSpotifySdkSongMetadata(apiTrack, apiSdkState, 'web-api-playback-confirm');
-          return apiSdkState;
-        }
-        if (apiMatch.matched && correctDevice && apiState.isPlaying !== true && !resumeAttempted) {
-          resumeAttempted = true;
-          try {
-            activateSpotifyAudioFromGesture();
-            if (typeof player.resume === 'function') await player.resume();
-            else await postJson('/api/spotify/player/resume', { deviceId: spotifyDirectState.deviceId });
-          } catch (apiResumeError) {
-            lastPlaybackError = String(apiResumeError && (apiResumeError.message || apiResumeError) || lastPlaybackError);
-          }
-        }
-      }
       await spotifyDelay(180);
     }
     if (lastPlaybackError) throw new Error(lastPlaybackError);
     throw new Error(spotifyDirectState.audioActivated ? 'SPOTIFY_SDK_PLAYBACK_NOT_CONFIRMED' : 'SPOTIFY_AUDIO_NOT_ACTIVATED');
-  }
-
-  async function ensureSpotifyDeviceActivated(device, requestId, force) {
-    if (!device || !device.id || usesRemoteSpotifyHost()) return true;
-    var alreadyActivated = spotifyDirectState.activatedDeviceId === device.id
-      && Date.now() - Number(spotifyDirectState.deviceActivatedAt || 0) < 30 * 60 * 1000;
-    if (alreadyActivated && !force) return true;
-    try {
-      await postJson('/api/spotify/player/transfer', {
-        deviceId: device.id,
-        play: false,
-        requestId: requestId || ''
-      });
-      spotifyDirectState.activatedDeviceId = device.id;
-      spotifyDirectState.deviceActivatedAt = Date.now();
-      spotifyDirectState.deviceRecoveryAt = Date.now();
-      await spotifyDelay(force ? 260 : 180);
-      return true;
-    } catch (error) {
-      // The ready event can beat Spotify's device directory by a few hundred
-      // milliseconds. The exact play request below is still allowed to try;
-      // later attempts force this activation again after propagation.
-      console.warn('[SpotifyPlayback] device pre-activation pending', error && (error.message || error));
-      return false;
-    }
   }
 
   async function playSpotifyUriExactly(device, uri, positionMs, requestId, expectedSong) {
@@ -1408,7 +1415,6 @@
     if (!spotifyTrackIdFromUri(uri)) throw new Error('SPOTIFY_TRACK_URI_REQUIRED');
 
     var lastError = null;
-    await ensureSpotifyDeviceActivated(device, requestId, false);
     for (var attempt = 1; attempt <= 3; attempt++) {
       spotifyDirectState.playRequestId = requestId;
       console.info('[SpotifyPlayback] request=' + requestId + ' attempt=' + attempt + ' target=' + uri + ' device=' + device.id);
@@ -1418,8 +1424,18 @@
       // appear dead. Retry by serially activating the same in-app device.
       if (attempt >= 2) {
         activateSpotifyAudioFromGesture();
-        await ensureSpotifyDeviceActivated(device, requestId, true);
-        await spotifyDelay(attempt === 2 ? 180 : 320);
+        // Only transfer after a real start failure. Transferring with play=false
+        // before the first /play request can arrive late and pause the same
+        // track a fraction of a second after it started.
+        await postJson('/api/spotify/player/transfer', {
+          deviceId: device.id,
+          play: false,
+          requestId: requestId
+        }).catch(function (error) {
+          console.warn('[SpotifyPlayback] retry device activation failed', error && (error.message || error));
+        });
+        spotifyDirectState.deviceRecoveryAt = Date.now();
+        await spotifyDelay(attempt === 2 ? 320 : 520);
       }
 
       try {
@@ -1428,7 +1444,8 @@
           uri: uri,
           positionMs: positionMs,
           requestId: requestId,
-          forceTrack: true
+          forceTrack: true,
+          reason: attempt === 1 ? 'exact-start' : 'exact-retry-' + attempt
         });
         if (attempt === 3 && spotifyDirectState.sdkPlayer && typeof spotifyDirectState.sdkPlayer.resume === 'function') {
           setTimeout(function () {
@@ -1638,8 +1655,6 @@
             spotifyDirectState.sdkPlaybackError = '';
             spotifyDirectState.deviceId = payload && payload.device_id || '';
             spotifyDirectState.deviceName = 'ShinaYuu Music';
-            spotifyDirectState.deviceActivatedAt = 0;
-            spotifyDirectState.activatedDeviceId = '';
             applySpotifySdkVolume(player).catch(function (error) { console.warn('[SpotifyVolume ready]', error); });
             if (spotifyDirectState.sdkResolve) spotifyDirectState.sdkResolve({ id: spotifyDirectState.deviceId, name: spotifyDirectState.deviceName, mode: 'sdk' });
           });
@@ -1647,8 +1662,6 @@
             if (!payload || !spotifyDirectState.deviceId || payload.device_id === spotifyDirectState.deviceId) {
               spotifyDirectState.sdkReady = false;
               spotifyDirectState.deviceId = '';
-              spotifyDirectState.deviceActivatedAt = 0;
-              spotifyDirectState.activatedDeviceId = '';
               clearSpotifySdkReadyPromise();
               if (spotifyDirectState.active && spotifyDirectState.expectedPlaying) {
                 triggerSpotifyRuntimeFailureRecovery('sdk-not-ready', new Error('SPOTIFY_SDK_NOT_READY'), 700);
@@ -1833,6 +1846,11 @@
       var estimatedMs = nowPositionMs();
       var driftMs = actualMs - estimatedMs;
       var sdkIsPlaying = spotifySdkPlaybackMoving(state, actualMs);
+      if (sdkIsPlaying && actualMs >= 5000 && spotifyDirectState.recoveryLoopUri === (match.actualUri || uri || spotifyDirectState.currentUri)) {
+        spotifyDirectState.recoveryLoopCount = 0;
+        spotifyDirectState.recoveryLoopStartedAt = Date.now();
+        spotifyDirectState.recoveryLoopReason = '';
+      }
       var playingChanged = spotifyDirectState.isPlaying !== sdkIsPlaying;
       // player_state_changed is documented to arrive at random intervals.
       // Re-anchor to the SDK clock when drift reaches roughly two frames so
@@ -2348,6 +2366,14 @@
       throw new Error('SPOTIFY_DESCRIPTOR_MISMATCH:' + selectedId + ':' + descriptorId);
     }
 
+    var now = Date.now();
+    if (spotifyDirectState.recoveryLoopUri !== targetUri || now - Number(spotifyDirectState.recoveryLoopStartedAt || 0) > 15000) {
+      spotifyDirectState.recoveryLoopUri = targetUri;
+      spotifyDirectState.recoveryLoopStartedAt = now;
+      spotifyDirectState.recoveryLoopCount = 0;
+      spotifyDirectState.recoveryLoopReason = '';
+    }
+
     var ownershipSerial = ++spotifyDirectState.ownershipSerial;
     var requestId = 'sy-' + Date.now().toString(36) + '-' + token + '-' + targetId.slice(-6);
     stopSpotifyRealtimeCapture();
@@ -2422,8 +2448,8 @@
     spotifyDirectState.requestedUri = targetUri;
     spotifyDirectState.wrongTrackSince = 0;
     spotifyDirectState.playConfirmedAt = Date.now();
+    spotifyDirectState.startGuardUntil = spotifyDirectState.playConfirmedAt + 5000;
     spotifyDirectState.unexpectedPauseRecoveryCount = 0;
-    spotifyDirectState.runtimeFailureRecoveryCount = 0;
     spotifyDirectState.sdkNullStateSince = 0;
     spotifyDirectState.clockSyncFailureCount = 0;
     setSpotifyExpectedPlaying(confirmedState.paused === false, 'start-confirmed');
