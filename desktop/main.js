@@ -1654,6 +1654,24 @@ async function readYouTubeCookiesFromElectronSession() {
   return { cookies: rows };
 }
 
+function configureSpotifyWidevineNetworkDiagnostics() {
+  const ses = session.defaultSession;
+  if (!ses || ses._shinayuuSpotifyWidevineDiagnosticsConfigured) return;
+  ses._shinayuuSpotifyWidevineDiagnosticsConfigured = true;
+  const filter = { urls: ['https://api.spotify.com/v1/widevine-license/*'] };
+  try {
+    ses.webRequest.onCompleted(filter, (details) => {
+      const status = Number(details && details.statusCode || 0);
+      console.log(`[SpotifyDRM] license completed status=${status} method=${String(details && details.method || '-')} resource=${String(details && details.resourceType || '-')} duration=${Math.round(Number(details && details.webRequestId || 0))}`);
+    });
+    ses.webRequest.onErrorOccurred(filter, (details) => {
+      console.warn(`[SpotifyDRM] license network error error=${String(details && details.error || '-')} method=${String(details && details.method || '-')} resource=${String(details && details.resourceType || '-')}`);
+    });
+  } catch (error) {
+    console.warn('[SpotifyDRM] license diagnostics unavailable:', error && (error.message || error));
+  }
+}
+
 function configureLocalAppPermissions() {
   const ses = session.defaultSession;
   if (!ses || ses._mineradioPermissionsConfigured) return;
@@ -2988,6 +3006,36 @@ function closeOverlayWindows(reason = 'overlay-close') {
   });
 }
 
+async function routeShinaYuuAudioOutput(sender, payload = {}) {
+  if (process.platform !== 'win32') return { ok: false, supported: false, reason: 'windows-only' };
+  const label = String(payload.deviceLabel || '').trim().slice(0, 256);
+  const clear = payload.clear === true || label === '';
+  let rootPid = 0;
+  try {
+    rootPid = sender && sender.getOSProcessId ? Number(sender.getOSProcessId()) : 0;
+  } catch (_) {}
+  if (!rootPid) return { ok: false, supported: true, reason: 'renderer-pid-unavailable' };
+  const scriptPath = path.join(__dirname, 'audio-output-router.ps1');
+  const args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, '-RootPid', String(Math.round(rootPid))];
+  if (clear) args.push('-Clear');
+  else args.push('-DeviceLabel', label);
+  return await new Promise((resolve) => {
+    execFile('powershell.exe', args, { windowsHide: true, timeout: 12000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+      const out = String(stdout || '').trim();
+      const err = String(stderr || '').trim();
+      if (error) {
+        console.warn('[AudioOutputNative]', err || error.message || error);
+        resolve({ ok: false, supported: true, reason: 'native-route-failed', error: err || error.message || String(error) });
+        return;
+      }
+      console.info('[AudioOutputNative] ' + (out || (clear ? 'clear' : 'route')));
+      resolve({ ok: true, supported: true, clear, deviceLabel: clear ? '' : label, output: out });
+    });
+  });
+}
+
+ipcMain.handle('shinayuu-audio-output-route', async (event, payload = {}) => routeShinaYuuAudioOutput(event.sender, payload));
+
 ipcMain.handle('desktop-window-minimize', async (event) => {
   const win = getSenderWindow(event);
   if (win === mainWindow && fullDesktopModeRuntime.getStatus('window-minimize').enabled === true) {
@@ -3916,7 +3964,8 @@ async function ensureLocalServerStarted() {
     if (injectedDelay) await startupDelay(injectedDelay);
     const port = await withStartupTimeout(findOpenPort(3000), 5000, 'findOpenPort');
     mainServerPort = port;
-    configureLocalAppPermissions();
+      configureSpotifyWidevineNetworkDiagnostics();
+configureLocalAppPermissions();
     configureLocalServerEnvironment(port);
     migrateLegacyAuthStorage();
 

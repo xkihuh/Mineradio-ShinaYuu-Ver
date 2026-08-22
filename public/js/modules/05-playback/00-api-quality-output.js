@@ -670,6 +670,18 @@ function openAudioOutputWorkflowPanel() {
 function closeAudioOutputWorkflowPanel() {
   closeGsapModal(document.getElementById('audio-output-workflow-modal'));
 }
+function reapplyNativeAudioOutputRoute(reason) {
+  if (!window.desktopWindow || typeof window.desktopWindow.routeAudioOutput !== 'function') return Promise.resolve(null);
+  var selected = audioOutputDeviceId ? audioOutputDeviceById(audioOutputDeviceId) : null;
+  return window.desktopWindow.routeAudioOutput({
+    deviceLabel: selected && selected.label || '',
+    clear: !audioOutputDeviceId,
+    reason: reason || 'refresh'
+  }).catch(function (error) {
+    console.warn('[AudioOutputNative]', error);
+    return null;
+  });
+}
 async function refreshAudioOutputDevices(showNotice) {
   if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
     audioOutputDevices = [];
@@ -681,6 +693,7 @@ async function refreshAudioOutputDevices(showNotice) {
   try {
     var devices = await navigator.mediaDevices.enumerateDevices();
     audioOutputDevices = devices.filter(function (device) { return device && device.kind === 'audiooutput' && device.deviceId !== 'default'; });
+    reapplyNativeAudioOutputRoute('device-refresh');
     audioInputDevices = devices.filter(function (device) { return device && device.kind === 'audioinput' && device.deviceId !== 'default'; });
     if (audioInputBridgeState && audioInputBridgeState.enabled && audioInputBridgeState.deviceId && !audioOutputDeviceById(audioInputBridgeState.deviceId)) {
       audioInputBridgeState.enabled = false;
@@ -869,7 +882,13 @@ function setAudioOutputDevice(deviceId, showNotice) {
   saveAudioOutputMirrorPreference();
   saveAudioOutputDevicePreference();
   renderAudioOutputDeviceUi();
-  Promise.resolve(applyAudioOutputDevice(audio)).then(function (ok) {
+  var nativeRoutePromise = reapplyNativeAudioOutputRoute('user-select');
+  Promise.all([Promise.resolve(applyAudioOutputDevice(audio)), nativeRoutePromise]).then(function (results) {
+    var ok = results[0];
+    var nativeRoute = results[1];
+    if (nativeRoute && nativeRoute.ok !== true && requestedDeviceId) {
+      console.warn('[AudioOutputNative] Spotify/system route unavailable');
+    }
     if (!showNotice) return;
     if (!requestedDeviceId) showToast('Đã chuyển về đầu ra mặc định hệ thống');
     else if (ok === true) showToast('Đã chuyển thiết bị đầu ra');

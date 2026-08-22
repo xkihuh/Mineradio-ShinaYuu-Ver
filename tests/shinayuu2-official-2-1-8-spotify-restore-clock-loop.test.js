@@ -34,11 +34,15 @@ test('Spotify consumes restore ownership while preserving same-track resume', ()
   assert.match(player, /consumeSpotifyRestoreStateForSelection\(requestedSong, opts\)/);
 });
 
-test('an accepted exact Spotify command is not repeated for late SDK confirmation', () => {
+test('Spotify startup targets the SDK directly and never replays a protected session after playback_error', () => {
   const player = read('public/spotify-direct-player.js');
   assert.match(player, /var sendExactPlay = async function \(reason\)/);
+  assert.doesNotMatch(player, /await postJson\('\/api\/spotify\/player\/transfer'/);
+  assert.match(player, /device_id.*already targets the SDK device|Web API play command already targets the freshly-created SDK device/);
   assert.match(player, /await sendExactPlay\('exact-start'\)/);
-  assert.match(player, /This is the only case where a second exact-track command is allowed/);
+  assert.match(player, /eventName !== 'playback_error'/);
+  assert.match(player, /playback_error diagnostic track=/);
+  assert.doesNotMatch(player, /playback-error-reactivate-retry/);
   assert.match(player, /exact replay suppressed request=/);
   assert.match(player, /return await waitForSdkPlayback\(uri, 6500, expectedSong\)/);
   assert.doesNotMatch(player, /for \(var attempt = 1; attempt <= 3; attempt\+\+\)/);
@@ -53,15 +57,15 @@ test('Spotify startup accepts forward clock movement and avoids replay on clock 
   assert.match(player, /var sameUriForEnd =/);
 });
 
-test('2.1.8 release identity and cache busting are synchronized', () => {
+test('2.1.9 release identity and cache busting are synchronized', () => {
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
   const html = read('public/index.html');
-  assert.equal(pkg.version, '2.1.8');
-  assert.equal(pkg.displayVersion, '2.1.8');
-  assert.equal(pkg.build.buildVersion, '2.1.8.0');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.8');
-  assert.equal(lock.version, '2.1.8');
-  assert.equal(lock.packages[''].version, '2.1.8');
-  assert.match(html, /spotify-direct-player\.js\?v=2\.1\.8/);
+  assert.equal(pkg.version, '2.1.9');
+  assert.equal(pkg.displayVersion, '2.1.9');
+  assert.equal(pkg.build.buildVersion, '2.1.9.0');
+  assert.equal(pkg.shinayuu.displayVersion, '2.1.9');
+  assert.equal(lock.version, '2.1.9');
+  assert.equal(lock.packages[''].version, '2.1.9');
+  assert.match(html, /spotify-direct-player\.js\?v=2\.1\.9/);
 });

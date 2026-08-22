@@ -61,6 +61,7 @@ contextBridge.exposeInMainWorld('desktopWindow', {
   updateDiscordActivity: (payload) => ipcRenderer.invoke('shinayuu-discord-update-activity', payload || {}),
   openDiscordDeveloperPortal: () => ipcRenderer.invoke('shinayuu-discord-open-portal'),
   getShinaYuuRuntimeStatus: () => ipcRenderer.invoke('shinayuu-runtime-get-status'),
+  routeAudioOutput: (payload) => ipcRenderer.invoke('shinayuu-audio-output-route', payload || {}),
   readShinaYuuLyricCache: (key) => ipcRenderer.invoke('shinayuu-cache-read-lyric', String(key || '')),
   writeShinaYuuLyricCache: (key, payload, sourceVersion) => ipcRenderer.invoke('shinayuu-cache-write-lyric', String(key || ''), payload || {}, String(sourceVersion || '')),
   pruneShinaYuuLyricCache: () => ipcRenderer.invoke('shinayuu-cache-prune-lyrics'),

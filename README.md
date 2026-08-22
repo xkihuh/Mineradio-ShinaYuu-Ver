@@ -1,71 +1,45 @@
-# ShinaYuu Music 2.1.6
+# ShinaYuu Music 2.1.9
 
-Bản sửa Spotify/Widevine được phát triển trực tiếp từ ShinaYuu Music 2.1.5.
+Bản 2.1.9 tiếp tục từ dòng ShinaYuu Music 2.1.8 và giữ nguyên các sửa ổn định Spotify/Widevine, YouTube compatibility, playback restore/clock và lyrics.
 
-## Sửa chính
+## Sửa chính 2.1.9
 
-- Cho phép quyền Electron `mediaKeySystem` chỉ với tài liệu ShinaYuu local và frame Spotify tin cậy.
-- Chờ `components.whenReady()` của Castlabs trước khi tạo BrowserWindow đầu tiên.
-- Sửa renderer gọi đúng `getShinaYuuRuntimeStatus()` và trả trạng thái `widevineReady` thật qua IPC.
-- Cập nhật Castlabs Electron ECS từ `42.5.2+wvcus` lên `42.8.0+wvcus`.
-- Thêm Permissions-Policy cho autoplay/encrypted-media trên trang loopback của app.
-- Đưa lỗi SDK Spotify ra terminal dưới dạng `[SpotifyHost] <error_type>: <message>`.
-- Giữ nguyên loop guard của 2.1.5, YouTube, AutoMix, lyrics, Discord và UI/UX.
+- Spotify audio output routing được kết nối với hệ thống phân phối đầu ra âm thanh của ShinaYuu ở cấp Windows process.
+- Khi thiết bị âm thanh thay đổi/refresh, routing Spotify được áp dụng lại theo thiết bị đầu ra chính mà app đang sử dụng.
+- Giữ nguyên Spotify Widevine playback sau production VMP signing.
+- Giữ nguyên Spotify restore clock và start-loop guard của 2.1.8.
+- Cải thiện shared lyrics clock stabilization cho Spotify, YouTube và local playback.
+- Đồng bộ package/display/build identity lên 2.1.9 / 2.1.9.0.
 
-## Log cần thấy
+## Log Spotify cần thấy
 
 ```text
 [SpotifyDRM] Castlabs components ready: ...
 [SpotifyDRM] mediaKeySystem allowed requester=... embedder=...
-[SpotifyDRM] runtime ready castlabs=42.8.0+wvcus components=true
 [SpotifyHost] ready device=...
+[SpotifyPlayback] request=... target=spotify:track:... device=...
 ```
 
-Nếu terminal hiện `account_error`, hãy kiểm tra tài khoản Spotify Premium, Client ID và Users Management trong Spotify Developer Dashboard.
+Khi chạy bản release Spotify, executable phải đi qua production VMP signing/verification của release pipeline trước khi kiểm thử playback DRM.
+
+## Audio output
+
+- YouTube/local playback tiếp tục sử dụng routing audio của renderer/media layer.
+- Spotify sử dụng routing theo Windows process vì Spotify Web Playback SDK không cung cấp API public để chọn sink audio riêng cho player.
+- Không capture/clone protected Spotify audio sang một playback pipeline thứ hai.
+
+## Lyrics synchronization
+
+Bản 2.1.9 giữ shared lyric clock stabilization cho cả ba nguồn phát và giảm sai lệch do snapshot clock của Spotify SDK. Timing của từng nguồn lyrics vẫn có thể cần offset riêng nếu dữ liệu lyric provider vốn đã lệch timestamp so với audio.
+
+## 2.1.8 YouTube Compatibility Hotfix
+
+This source also contains the current YouTube `android_vr` 403 compatibility fix from August 2026.
 
 ## 2.1.8 Spotify Restore Clock and Loop Fix
 
-This build isolates startup restore state from active Spotify playback and prevents exact-track replay loops.
+This historical 2.1.8 fix isolates startup restore state from active Spotify playback and prevents exact-track replay loops.
 
-## Chạy source
-
-```bat
-npm ci
-npm start
-```
-
-Spotify trực tiếp yêu cầu tài khoản Premium, Spotify Client ID đã cấu hình và phiên đăng nhập có đủ các scope playback.
-
-## Dấu hiệu log đúng
-
-Khi chọn một bài, log bình thường chỉ nên có một dòng tương tự:
-
-```text
-[SpotifyPlayback] request=... target=spotify:track:... device=... position=0 reason=exact-start
-```
-
-`exact-retry-2` hoặc `exact-retry-3` chỉ xuất hiện khi lần phát trước thực sự không được SDK xác nhận. Không được xuất hiện chuỗi request mới liên tục ở vị trí 0–1000 ms.
-
-## Build Windows
-
-```bat
-npm ci
-npm run release:win
-```
-
-Installer dự kiến:
-
-```text
-ShinaYuu-Music-2.1.8-Setup.exe
-```
-
-## Phiên bản
-
-```text
-Package version : 2.1.8
-Display version : 2.1.8
-Build version   : 2.1.8.0
-```
 ## Acknowledgments
 
 Mineradio was originally designed and developed by XxHuberrr, and is now being maintained and localized for global users by x.kihuh. Special thanks to **emily**, who co-created early concepts for the visual foundation and inspired the optimization direction for the `emily` visual preset.

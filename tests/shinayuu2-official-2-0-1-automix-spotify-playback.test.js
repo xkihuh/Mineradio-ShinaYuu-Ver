@@ -8,9 +8,9 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
 test('2.1.5 version and update repository are configured', () => {
   const pkg = JSON.parse(read('package.json'));
-  assert.equal(pkg.version, '2.1.8');
-  assert.equal(pkg.build.buildVersion, '2.1.8.0');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.8');
+  assert.equal(pkg.version, '2.1.9');
+  assert.equal(pkg.build.buildVersion, '2.1.9.0');
+  assert.equal(pkg.shinayuu.displayVersion, '2.1.9');
   assert.equal(pkg.shinayuu.update.owner, 'xkihuh');
   assert.equal(pkg.shinayuu.update.repo, 'Mineradio-ShinaYuu-Ver');
 });
@@ -38,8 +38,12 @@ test('Spotify playback has SDK prewarm, resume, device recovery and YouTube fall
   assert.match(src, /shinayuu-spotify-login-ready/);
   assert.match(src, /state\.paused === true && !resumeAttempted/);
   assert.doesNotMatch(src, /function ensureSpotifyDeviceActivated\(/);
-  assert.match(src, /This is the only case where a second exact-track command is allowed[\s\S]*?\/api\/spotify\/player\/transfer/);
-  assert.match(src, /device activation failed/);
+  assert.doesNotMatch(src, /await postJson\('\/api\/spotify\/player\/transfer'/);
+  assert.match(src, /Web API play command already targets the freshly-created SDK device/);
+  assert.match(src, /eventName !== 'playback_error'/);
+  assert.match(src, /playback_error diagnostic track=/);
+  assert.doesNotMatch(src, /playback-error-reactivate-retry/);
+  assert.doesNotMatch(src, /device activation failed/);
   assert.match(src, /captureSpotifyMediaActivation/);
   assert.doesNotMatch(src, /SDK reconnect failed/);
   assert.match(src, /function playSpotifyViaYouTubeFallback\(/);

@@ -11,7 +11,8 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 test('YouTube playback tries public Innertube clients before signed-in cookie recovery', () => {
   const providers = read('music-providers.js');
   const block = providers.slice(providers.indexOf('function ytDlpAuthStrategies'), providers.indexOf('function insertYtDlpStrategyArgs'));
-  assert.match(block, /public:android_vr/);
+  assert.doesNotMatch(block, /public:android_vr/);
+  assert.match(block, /public:default-no-android-vr/);
   assert.match(block, /public:web_embedded/);
   assert.match(block, /public:web_safari/);
   assert.ok(block.indexOf('public:android_vr') < block.indexOf('app-cookie'));

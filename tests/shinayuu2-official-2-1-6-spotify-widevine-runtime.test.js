@@ -57,10 +57,21 @@ test('2.1.6 treats Spotify account and authentication failures as deterministic,
   const player = read('public/spotify-direct-player.js');
   const providers = read('music-providers.js');
   assert.match(player, /var authorizationFailure = eventName === 'authentication_error' \|\| eventName === 'account_error'/);
-  assert.match(player, /if \(!authorizationFailure && spotifyDirectState\.active/);
+  assert.match(player, /if \(!authorizationFailure && eventName !== 'playback_error'/);
   assert.match(player, /Users Management in the Spotify Developer Dashboard/);
   assert.match(providers, /developerModeAccessHint: response\.status === 403/);
   assert.match(providers, /\[SpotifyAPI\]/);
+});
+
+
+test('Spotify Widevine failures expose license-network diagnostics without logging tokens', () => {
+  const main = read('desktop/main.js');
+  assert.match(main, /function configureSpotifyWidevineNetworkDiagnostics\(\)/);
+  assert.match(main, /https:\/\/api\.spotify\.com\/v1\/widevine-license\/\*/);
+  assert.match(main, /\[SpotifyDRM\] license completed status=/);
+  assert.match(main, /\[SpotifyDRM\] license network error/);
+  assert.doesNotMatch(main, /details\.requestHeaders/);
+  assert.doesNotMatch(main, /tok=/);
 });
 
 test('2.1.6 updates Castlabs ECS and release identity consistently', () => {
@@ -68,12 +79,12 @@ test('2.1.6 updates Castlabs ECS and release identity consistently', () => {
   const lock = JSON.parse(read('package-lock.json'));
   const ecs = JSON.parse(read('vendor/castlabs-electron/package.json'));
   const html = read('public/index.html');
-  assert.equal(pkg.version, '2.1.8');
-  assert.equal(pkg.displayVersion, '2.1.8');
-  assert.equal(pkg.build.buildVersion, '2.1.8.0');
-  assert.equal(lock.version, '2.1.8');
-  assert.equal(lock.packages[''].version, '2.1.8');
+  assert.equal(pkg.version, '2.1.9');
+  assert.equal(pkg.displayVersion, '2.1.9');
+  assert.equal(pkg.build.buildVersion, '2.1.9.0');
+  assert.equal(lock.version, '2.1.9');
+  assert.equal(lock.packages[''].version, '2.1.9');
   assert.equal(ecs.version, '42.8.0+wvcus');
   assert.equal(lock.packages['vendor/castlabs-electron'].version, '42.8.0+wvcus');
-  assert.match(html, /spotify-direct-player\.js\?v=2\.1\.8/);
+  assert.match(html, /spotify-direct-player\.js\?v=2\.1\.9/);
 });

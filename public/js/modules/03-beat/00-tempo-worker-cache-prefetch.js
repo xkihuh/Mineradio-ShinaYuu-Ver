@@ -371,7 +371,7 @@ async function fetchBeatPrefetchAudioUrl(song) {
     '&mediaMid=' + encodeURIComponent(song.mediaMid || song.media_mid || '') +
     '&quality=' + encodeURIComponent(requestedQuality), { timeoutMs: 15000 });
   if (!data || !data.url || data.trial) return null;
-  return '/api/audio?url=' + encodeURIComponent(data.url);
+  return data.proxyUrl || data.url || '';
 }
 
 function scheduleQueueBeatPrefetch(fromIdx, delayMs, state) {

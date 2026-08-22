@@ -58,6 +58,14 @@ function shinayuuDescriptorHasPlayback(data) {
   return !!(data && (data.url || data.spotifyUri || data.uri || data.playbackUri));
 }
 
+// A provider descriptor may expose a short-lived proxy URL/token in addition to
+// the upstream media URL. The proxy carries the exact yt-dlp headers and refresh
+// path, so HTML playback must prefer it instead of rebuilding /api/audio?url=.
+function playbackMediaUrlFromDescriptor(data) {
+  data = data || {};
+  return String(data.proxyUrl || data.url || '').trim();
+}
+
 function shinayuuPlaybackDescriptorKey(song, quality) {
   song = song || {};
   var sourceProvider = songProviderKey(song);
@@ -718,7 +726,7 @@ async function scheduleAlbumGaplessPreloadForCurrent(token, reason) {
       || !albumGaplessQueueCanAdvance(currentIdx)
     ) return false;
     if (!data || !data.url) return false;
-    var proxyAudioUrl = '/api/audio?url=' + encodeURIComponent(data.url);
+    var proxyAudioUrl = playbackMediaUrlFromDescriptor(data);
     var media = new Audio();
     media.crossOrigin = 'anonymous';
     media.preload = 'auto';
@@ -1246,7 +1254,13 @@ async function playQueueAt(idx, opts) {
         document.getElementById('trial-banner').classList.add('show');
       }
       markPlayPhase('audio-element');
-      var proxyAudioUrl = opts.preloadedProxyAudioUrl || '/api/audio?url=' + encodeURIComponent(data.url);
+      var proxyAudioUrl = opts.preloadedProxyAudioUrl || playbackMediaUrlFromDescriptor(data);
+      if (!proxyAudioUrl) {
+        var fallbackResult = await tryAutoPlaybackFallback(song, data, idx, token, retryPlaybackOpts);
+        if (fallbackResult !== null) return fallbackResult === true;
+        handlePlaybackUnavailable(song, data);
+        return false;
+      }
       if (albumGaplessHandoff) {
         audioFadeSerial++;
         clearAudioFadeTimers();

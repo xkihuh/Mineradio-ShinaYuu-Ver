@@ -281,7 +281,7 @@ var updatePreviewState = {
   installerPath: '',
   installerOpened: false,
   cached: false,
-  currentVersion: '2.1.8',
+  currentVersion: '2.1.9',
   version: '2.0.0',
   configured: false,
   preview: true,
@@ -18462,7 +18462,7 @@ async function fetchBeatPrefetchAudioUrl(song) {
     '&mediaMid=' + encodeURIComponent(song.mediaMid || song.media_mid || '') +
     '&quality=' + encodeURIComponent(requestedQuality), { timeoutMs: 15000 });
   if (!data || !data.url || data.trial) return null;
-  return '/api/audio?url=' + encodeURIComponent(data.url);
+  return data.proxyUrl || data.url || '';
 }
 
 function scheduleQueueBeatPrefetch(fromIdx, delayMs, state) {
@@ -19731,7 +19731,7 @@ async function analyzePodcastDjBeats(audioUrl, token, durationSec) {
       hideBeatChip();
       if (durationSec <= 0 || durationSec > 3300) return null;
     }
-    var fetchAudioUrl = /^https?:\/\//i.test(audioUrl || '') ? ('/api/audio?url=' + encodeURIComponent(audioUrl)) : audioUrl;
+    var fetchAudioUrl = audioUrl;
     var resp = await fetch(fetchAudioUrl);
     if (token !== djBeatMapToken || !djMode.active) { hideBeatChip(); return null; }
     var ab = await resp.arrayBuffer();
@@ -24854,6 +24854,18 @@ function openAudioOutputWorkflowPanel() {
 function closeAudioOutputWorkflowPanel() {
   closeGsapModal(document.getElementById('audio-output-workflow-modal'));
 }
+function reapplyNativeAudioOutputRoute(reason) {
+  if (!window.desktopWindow || typeof window.desktopWindow.routeAudioOutput !== 'function') return Promise.resolve(null);
+  var selected = audioOutputDeviceId ? audioOutputDeviceById(audioOutputDeviceId) : null;
+  return window.desktopWindow.routeAudioOutput({
+    deviceLabel: selected && selected.label || '',
+    clear: !audioOutputDeviceId,
+    reason: reason || 'refresh'
+  }).catch(function (error) {
+    console.warn('[AudioOutputNative]', error);
+    return null;
+  });
+}
 async function refreshAudioOutputDevices(showNotice) {
   if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
     audioOutputDevices = [];
@@ -24865,6 +24877,7 @@ async function refreshAudioOutputDevices(showNotice) {
   try {
     var devices = await navigator.mediaDevices.enumerateDevices();
     audioOutputDevices = devices.filter(function (device) { return device && device.kind === 'audiooutput' && device.deviceId !== 'default'; });
+    reapplyNativeAudioOutputRoute('device-refresh');
     audioInputDevices = devices.filter(function (device) { return device && device.kind === 'audioinput' && device.deviceId !== 'default'; });
     if (audioInputBridgeState && audioInputBridgeState.enabled && audioInputBridgeState.deviceId && !audioOutputDeviceById(audioInputBridgeState.deviceId)) {
       audioInputBridgeState.enabled = false;
@@ -25053,7 +25066,13 @@ function setAudioOutputDevice(deviceId, showNotice) {
   saveAudioOutputMirrorPreference();
   saveAudioOutputDevicePreference();
   renderAudioOutputDeviceUi();
-  Promise.resolve(applyAudioOutputDevice(audio)).then(function (ok) {
+  var nativeRoutePromise = reapplyNativeAudioOutputRoute('user-select');
+  Promise.all([Promise.resolve(applyAudioOutputDevice(audio)), nativeRoutePromise]).then(function (results) {
+    var ok = results[0];
+    var nativeRoute = results[1];
+    if (nativeRoute && nativeRoute.ok !== true && requestedDeviceId) {
+      console.warn('[AudioOutputNative] Spotify/system route unavailable');
+    }
     if (!showNotice) return;
     if (!requestedDeviceId) showToast('Đã chuyển về đầu ra mặc định hệ thống');
     else if (ok === true) showToast('Đã chuyển thiết bị đầu ra');
@@ -33726,6 +33745,14 @@ function shinayuuDescriptorHasPlayback(data) {
   return !!(data && (data.url || data.spotifyUri || data.uri || data.playbackUri));
 }
 
+// A provider descriptor may expose a short-lived proxy URL/token in addition to
+// the upstream media URL. The proxy carries the exact yt-dlp headers and refresh
+// path, so HTML playback must prefer it instead of rebuilding /api/audio?url=.
+function playbackMediaUrlFromDescriptor(data) {
+  data = data || {};
+  return String(data.proxyUrl || data.url || '').trim();
+}
+
 function shinayuuPlaybackDescriptorKey(song, quality) {
   song = song || {};
   var sourceProvider = songProviderKey(song);
@@ -34386,7 +34413,7 @@ async function scheduleAlbumGaplessPreloadForCurrent(token, reason) {
       || !albumGaplessQueueCanAdvance(currentIdx)
     ) return false;
     if (!data || !data.url) return false;
-    var proxyAudioUrl = '/api/audio?url=' + encodeURIComponent(data.url);
+    var proxyAudioUrl = playbackMediaUrlFromDescriptor(data);
     var media = new Audio();
     media.crossOrigin = 'anonymous';
     media.preload = 'auto';
@@ -34914,7 +34941,13 @@ async function playQueueAt(idx, opts) {
         document.getElementById('trial-banner').classList.add('show');
       }
       markPlayPhase('audio-element');
-      var proxyAudioUrl = opts.preloadedProxyAudioUrl || '/api/audio?url=' + encodeURIComponent(data.url);
+      var proxyAudioUrl = opts.preloadedProxyAudioUrl || playbackMediaUrlFromDescriptor(data);
+      if (!proxyAudioUrl) {
+        var fallbackResult = await tryAutoPlaybackFallback(song, data, idx, token, retryPlaybackOpts);
+        if (fallbackResult !== null) return fallbackResult === true;
+        handlePlaybackUnavailable(song, data);
+        return false;
+      }
       if (albumGaplessHandoff) {
         audioFadeSerial++;
         clearAudioFadeTimers();
@@ -37145,7 +37178,7 @@ function clearPlayerControlFocusState(reason) {
 (function () {
   'use strict';
 
-  var VERSION = '2.1.8';
+  var VERSION = '2.1.9';
   var STORE_KEY = 'shinayuu-cuefield-automix-v2';
   var GAPLESS_STORE_KEY = 'shinayuu-album-gapless-v1';
   var PREPARE_DELAY_MS = 950;
@@ -37869,7 +37902,7 @@ function clearPlayerControlFocusState(reason) {
       }
       if (!data || data.trial || (!data.url && !data.proxyUrl)) return null;
       var local = providerKey(song) === 'local' || song.type === 'local' || song.localUrl;
-      var proxyUrl = local ? (data.proxyUrl || data.url) : (data.proxyUrl || ('/api/audio?url=' + encodeURIComponent(data.url)));
+      var proxyUrl = local ? (data.proxyUrl || data.url) : (data.proxyUrl || data.url);
       var descriptor = { proxyUrl: proxyUrl, playbackData: data, expiresAt: Date.now() + 3.5 * 60 * 1000 };
       state.descriptorCache[key] = descriptor;
       return descriptor;

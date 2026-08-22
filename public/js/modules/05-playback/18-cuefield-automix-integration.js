@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '2.1.8';
+  var VERSION = '2.1.9';
   var STORE_KEY = 'shinayuu-cuefield-automix-v2';
   var GAPLESS_STORE_KEY = 'shinayuu-album-gapless-v1';
   var PREPARE_DELAY_MS = 950;
@@ -725,7 +725,7 @@
       }
       if (!data || data.trial || (!data.url && !data.proxyUrl)) return null;
       var local = providerKey(song) === 'local' || song.type === 'local' || song.localUrl;
-      var proxyUrl = local ? (data.proxyUrl || data.url) : (data.proxyUrl || ('/api/audio?url=' + encodeURIComponent(data.url)));
+      var proxyUrl = local ? (data.proxyUrl || data.url) : (data.proxyUrl || data.url);
       var descriptor = { proxyUrl: proxyUrl, playbackData: data, expiresAt: Date.now() + 3.5 * 60 * 1000 };
       state.descriptorCache[key] = descriptor;
       return descriptor;

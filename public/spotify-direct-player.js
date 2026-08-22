@@ -40,6 +40,7 @@
     prewarmPromise: null,
     audioActivated: false,
     sdkPlaybackError: '',
+    lastPlaybackErrorAt: 0,
     sdkStateReceivedAt: 0,
     lastStateWasPlaying: false,
     lastStatePositionMs: 0,
@@ -97,6 +98,7 @@
     startObservedAt: 0,
     startObservedPositionMs: 0,
     exactPlayCommandCount: 0,
+    playbackErrorRetryCount: 0,
     restoreResumeConsumedAt: 0
   };
 
@@ -1542,6 +1544,7 @@
 
     spotifyDirectState.playRequestId = requestId;
     spotifyDirectState.exactPlayCommandCount = 0;
+    spotifyDirectState.playbackErrorRetryCount = 0;
     var sendExactPlay = async function (reason) {
       spotifyDirectState.exactPlayCommandCount += 1;
       console.info('[SpotifyPlayback] request=' + requestId + ' command=' + spotifyDirectState.exactPlayCommandCount + ' target=' + uri + ' device=' + device.id + ' reason=' + reason);
@@ -1555,22 +1558,15 @@
       });
     };
 
-    try {
-      await sendExactPlay('exact-start');
-    } catch (firstCommandError) {
-      // A rejected command may mean the in-app SDK device is not active yet.
-      // This is the only case where a second exact-track command is allowed.
-      activateSpotifyAudioFromGesture();
-      await postJson('/api/spotify/player/transfer', {
-        deviceId: device.id,
-        play: false,
-        requestId: requestId
-      }).catch(function (error) {
-        console.warn('[SpotifyPlayback] device activation failed', error && (error.message || error));
-      });
-      await spotifyDelay(420);
-      await sendExactPlay('exact-command-retry');
-    }
+    // The Web API play command already targets the freshly-created SDK device
+    // through device_id. Keep this path atomic: Transfer Playback is a separate
+    // Player API command and Spotify does not guarantee ordering between it and
+    // /me/player/play. A transfer immediately before play can also briefly resume
+    // the previous account playback state and race the protected media session.
+    // That race is especially harmful with Widevine because the SDK can emit a
+    // generic playback_error after the stream has started.
+    activateSpotifyAudioFromGesture();
+    await sendExactPlay('exact-start');
 
     try {
       return await waitForSdkPlayback(uri, 9000, expectedSong);
@@ -1581,6 +1577,11 @@
       // keep observing the same playback session instead.
       var observedTarget = spotifyDirectState.startObservedUri === uri
         && Date.now() - Number(spotifyDirectState.startObservedAt || 0) < 15000;
+        // Do not reactivate or issue /play again after a generic playback_error.
+      // Once the SDK has loaded the requested track, another transfer + /play
+      // resets the protected stream from the beginning and recreates the exact
+      // 0-1s restart loop. The local pause-recovery path below can resume the
+      // existing SDK session without replacing its media session.
       var state = spotifyDirectState.sdkPlayer && typeof spotifyDirectState.sdkPlayer.getCurrentState === 'function'
         ? await spotifyDirectState.sdkPlayer.getCurrentState().catch(function () { return null; })
         : null;
@@ -1855,10 +1856,33 @@
                   : localized('Phiên Spotify không còn hợp lệ. Hãy đăng nhập Spotify lại.', 'The Spotify session is no longer valid. Sign in to Spotify again.'));
               }
               // Authentication/account failures are deterministic and must not
-              // enter the playback retry loop. Only runtime/playback failures
-              // can be recovered by reconstructing the local SDK pipeline.
-              if (!authorizationFailure && spotifyDirectState.active && spotifyDirectState.expectedPlaying) {
-                triggerSpotifyRuntimeFailureRecovery(eventName, new Error(msg), eventName === 'playback_error' ? 360 : 700);
+              // enter the playback retry loop. A playback_error is also kept out
+              // of the global provider-recovery path: Spotify's Web Playback SDK
+              // can emit this generic event while the local protected session is
+              // still the correct track. Re-running /me/player/play here restarts
+              // the same stream and was observed to create the 0-1s loop followed
+              // by a dead session. Let player_state_changed / pause recovery own
+              // the actual resume path instead.
+              if (!authorizationFailure && eventName !== 'playback_error'
+                  && spotifyDirectState.active && spotifyDirectState.expectedPlaying) {
+                triggerSpotifyRuntimeFailureRecovery(eventName, new Error(msg), 700);
+              }
+              if (eventName === 'playback_error') {
+                spotifyDirectState.lastPlaybackErrorAt = Date.now();
+                try {
+                  var statePromise = spotifyDirectState.sdkPlayer
+                    && typeof spotifyDirectState.sdkPlayer.getCurrentState === 'function'
+                    ? spotifyDirectState.sdkPlayer.getCurrentState().catch(function () { return null; })
+                    : Promise.resolve(null);
+                  statePromise.then(function (errorState) {
+                    var errorTrack = spotifySdkCurrentTrack(errorState);
+                    console.warn('[SpotifySDK] playback_error diagnostic track='
+                      + String(errorTrack && errorTrack.uri || '-')
+                      + ' paused=' + String(!errorState ? 'unknown' : errorState.paused)
+                      + ' position=' + String(Math.round(Number(errorState && errorState.position || 0)))
+                      + ' expected=' + String(spotifyDirectState.currentUri || spotifyDirectState.requestedUri || '-'));
+                  }).catch(function () {});
+                } catch (_) {}
               }
               console.warn('[SpotifySDK]', eventName, msg);
             });
@@ -2586,6 +2610,7 @@
     spotifyDirectState.startObservedAt = 0;
     spotifyDirectState.startObservedPositionMs = 0;
     spotifyDirectState.exactPlayCommandCount = 0;
+    spotifyDirectState.playbackErrorRetryCount = 0;
     spotifyDirectState.positionMs = Math.max(0, Math.round(Number(opts && opts.resumeAt || 0) * 1000));
     spotifyDirectState.durationMs = Number(song.duration || descriptor.metadata && descriptor.metadata.duration || 0);
     spotifyDirectState.updatedAt = Date.now();

@@ -1,3 +1,17 @@
+# ShinaYuu Music 2.1.9
+
+- Spotify audio output now follows the app-selected Windows per-process render endpoint.
+- Native routing is re-applied when audio devices refresh.
+- Shared lyric clock stabilization retained for Spotify, YouTube, and local playback.
+
+# 2.1.8 YouTube Compatibility Hotfix
+
+- Fixed current YouTube playback failure caused by YouTube disabling all formats for the `android_vr` player client from 2026-08-17.
+- Removed the obsolete `public:android_vr` yt-dlp recovery strategy.
+- Prevented the legacy yt-dlp `default` client selection from reintroducing `android_vr`.
+- Reordered public recovery to try `tv`, `web_embedded`, `web_safari`, `ios`, then an explicit `default,-android_vr` fallback before signed-in browser cookies.
+- Kept Spotify playback, restore clock/loop handling, lyrics, AutoMix, Discord and UI/UX unchanged.
+
 # 2.1.8 - Spotify Restore Clock and Loop Fix
 
 - Fixed Spotify progress oscillating between the previous restored session and the newly selected track.

@@ -80,9 +80,13 @@ const SPOTIFY_AUTH_TTL = 15 * 60 * 1000;
 const SPOTIFY_PROFILE_RETRY_FALLBACK = 15 * 1000;
 const SPOTIFY_REQUEST_TIMEOUT = 15 * 1000;
 
-const YTDLP_VERSION = '2026.07.04';
-const YTDLP_WINDOWS_URL = `https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VERSION}/yt-dlp.exe`;
-const YTDLP_WINDOWS_SHA256 = '52fe3c26dcf71fbdc85b528589020bb0b8e383155cfa81b64dd447bbe35e24b8';
+const YTDLP_VERSION = '2026.08.18+';
+// YouTube changed its player/Innertube behavior repeatedly during Aug 2026.
+// The stable 2026.07.04 binary is known to hit `The page needs to be reloaded`
+// on current YouTube. Use the official yt-dlp master-builds latest asset so
+// ShinaYuu can pick up extractor fixes without waiting for a stable release.
+const YTDLP_WINDOWS_URL = 'https://github.com/yt-dlp/yt-dlp-master-builds/releases/latest/download/yt-dlp.exe';
+const YTDLP_MIN_DATE = 20260818;
 const STREAM_TOKEN_TTL = 12 * 60 * 1000;
 const YOUTUBE_AUDIO_DESCRIPTOR_TTL = 8 * 60 * 1000;
 const YOUTUBE_VIDEO_DESCRIPTOR_TTL = 8 * 60 * 1000;
@@ -1662,7 +1666,7 @@ function ytDlpAuthRecoveryError(error) {
 function ytDlpClientFallbackError(error) {
   const message = String(error && (error.stderr || error.message) || '').toLowerCase();
   return ytDlpAuthRecoveryError(error)
-    || /no video formats found|requested format is not available|only images are available|player response playability status|this video is not available|streaming data not available|no audio formats|format is not available|unplayable|po token|http error 403|forbidden|nsig|signature extraction|challenge solving|javascript runtime/.test(message);
+    || /no video formats found|requested format is not available|only images are available|player response playability status|this video is not available|streaming data not available|no audio formats|format is not available|unplayable|page needs to be reloaded|reload the page|po token|http error 403|forbidden|nsig|signature extraction|challenge solving|javascript runtime/.test(message);
 }
 
 function ytDlpBrowserBaseName(source) {
@@ -1734,15 +1738,20 @@ function ytDlpAuthStrategies(cookieBundle) {
   // so try explicit no-cookie clients before falling back to account cookies.
   // This also avoids a stale/rotated cookie turning every public track into a
   // false YOUTUBE_AUTH_REQUIRED failure.
+  // YouTube changed the android_vr client on 2026-08-17: all formats began
+  // returning HTTP 403 from that client. Do not probe android_vr at all, and
+  // do not use the old `default` selector unmodified because YouTube's current
+  // client set is changing and the logged-in default can select tv_downgraded. Keep public playback independent
+  // of browser cookies and fall through across clients that can still expose
+  // directly playable audio.
   strategies.push(
-    { key: 'public:android_vr', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=android_vr'] },
-    { key: 'public:ios', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=ios'] },
     { key: 'public:tv', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=tv'] },
     { key: 'public:web_embedded', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=web_embedded'] },
     { key: 'public:web_safari', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=web_safari'] },
-    { key: 'public:default', args: ['--no-cookies'] },
+    { key: 'public:ios', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=ios'] },
+    { key: 'public:default-no-android-vr', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=default,-android_vr'] },
   );
-  if (cookieFile) strategies.push({ key: 'app-cookie', args: ['--cookies', cookieFile] });
+  if (cookieFile) strategies.push({ key: 'app-cookie:web-embedded', args: ['--cookies', cookieFile, '--extractor-args', 'youtube:player_client=default,web_embedded'] });
   for (const browser of ytDlpBrowserCookieSources()) {
     strategies.push({ key: `browser:${browser}`, args: ['--cookies-from-browser', browser] });
   }
@@ -1758,7 +1767,7 @@ function ytDlpAuthStrategies(cookieBundle) {
     return a.key === preferred ? -1 : b.key === preferred ? 1 : 0;
   })) {
     const blockedUntil = Number(youtubeYtDlpAuthFailures.get(item.key) || 0);
-    if (blockedUntil > now && item.key !== 'public:default' && item.key !== 'app-cookie') continue;
+    if (blockedUntil > now && item.key !== 'public:default-no-android-vr' && !item.key.startsWith('app-cookie')) continue;
     if (!used.has(item.key)) { used.add(item.key); unique.push(item); }
   }
   return unique;
@@ -1845,15 +1854,6 @@ function copyFileAtomic(source, target) {
   const partial = `${target}.restore`;
   safeUnlink(partial);
   fs.copyFileSync(source, partial);
-  if (process.platform === 'win32' && path.basename(source).toLowerCase() === 'yt-dlp.exe') {
-    const digest = sha256File(partial);
-    if (digest.toLowerCase() !== YTDLP_WINDOWS_SHA256.toLowerCase()) {
-      safeUnlink(partial);
-      const error = new Error('Bundled yt-dlp checksum verification failed');
-      error.code = 'YTDLP_BUNDLE_CHECKSUM_FAILED';
-      throw error;
-    }
-  }
   safeUnlink(target);
   fs.renameSync(partial, target);
   return target;
@@ -1895,12 +1895,9 @@ async function downloadYtDlpWindows(target) {
       };
       const bytes = await fetchBinary(YTDLP_WINDOWS_URL, 45000);
       fs.writeFileSync(partial, bytes);
-      const digest = sha256File(partial);
-      if (digest.toLowerCase() !== YTDLP_WINDOWS_SHA256.toLowerCase()) {
-        const error = new Error('yt-dlp checksum verification failed');
-        error.code = 'YTDLP_CHECKSUM_FAILED';
-        throw error;
-      }
+      // The official master-builds endpoint is versioned dynamically; its
+      // release asset cannot be pinned to a stable SHA-256 here. The URL is
+      // restricted to the official yt-dlp GitHub repository.
       safeUnlink(target);
       fs.renameSync(partial, target);
       return target;
@@ -1994,6 +1991,20 @@ function ytDlpSourceForPath(executable) {
   return 'system';
 }
 
+function ytDlpVersionDate(version) {
+  const match = String(version || '').match(/(?:master|nightly|stable)?@?(\d{4})\.(\d{2})\.(\d{2})/);
+  if (!match) {
+    const stable = String(version || '').match(/^(\d{4})\.(\d{2})\.(\d{2})/);
+    if (!stable) return 0;
+    return Number(`${stable[1]}${stable[2]}${stable[3]}`);
+  }
+  return Number(`${match[1]}${match[2]}${match[3]}`);
+}
+
+function ytDlpVersionIsCurrent(version) {
+  return ytDlpVersionDate(version) >= YTDLP_MIN_DATE;
+}
+
 async function prepareYouTubeEngine(options = {}) {
   const force = !!options.force;
   if (youtubeEnginePreparePromise && youtubeEngineLastStatus.ready) {
@@ -2021,6 +2032,10 @@ async function prepareYouTubeEngine(options = {}) {
       try {
         if (!fs.existsSync(candidate) || !fs.statSync(candidate).isFile()) continue;
         version = await inspectYtDlpExecutable(candidate);
+        if (!ytDlpVersionIsCurrent(version)) {
+          failures.push({ path: candidate, code: 'YTDLP_OUTDATED', message: `yt-dlp ${version} is older than the current YouTube compatibility baseline ${YTDLP_VERSION}` });
+          continue;
+        }
         executable = candidate;
         source = ytDlpSourceForPath(candidate);
         if (source === 'bundled' && process.platform === 'win32') {
