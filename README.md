@@ -1,12 +1,6 @@
-<<<<<<< HEAD
 # ShinaYuu Music 2.1.9
 
 Bản 2.1.9 tiếp tục từ dòng ShinaYuu Music 2.1.8 và giữ nguyên các sửa ổn định Spotify/Widevine, YouTube compatibility, playback restore/clock và lyrics.
-=======
-# ShinaYuu Music 2.1.8
-
-Bản sửa Spotify/Widevine được phát triển trực tiếp từ ShinaYuu Music 2.1.7
->>>>>>> ac3d45f77c6dfd415da4bc70bd3e9dedea0e247b
 
 ## Sửa chính 2.1.9
 

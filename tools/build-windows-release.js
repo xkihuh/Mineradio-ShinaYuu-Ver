@@ -25,17 +25,39 @@ const legacyPatchFromVersion = cliValue('--patch-from-version') || process.env.S
 
 function fail(message) { throw new Error(message); }
 
+function quoteWindowsCmdArg(value) {
+  const text = String(value ?? '');
+  if (!/[\s&()\[\]{}^=;!'+,`~]/.test(text)) return text;
+  return `\"${text.replace(/(\\*)\"/g, '$1$1\\\"').replace(/(\\*)$/g, '$1$1')}\"`;
+}
+
 function run(command, args, options = {}) {
   const commandText = String(command || '');
-  const useWindowsCommandShell = process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(commandText);
+  const isWindowsCmd = process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(commandText);
   console.log(`\n[Release] ${commandText} ${args.join(' ')}`);
-  const result = spawnSync(commandText, args, {
+
+  let spawnCommand = commandText;
+  let spawnArgs = args;
+  let spawnOptions = {
     cwd: root,
     env: { ...process.env, ...options.env },
     stdio: 'inherit',
-    shell: useWindowsCommandShell,
+    shell: false,
     windowsHide: false,
-  });
+  };
+
+  // Windows .cmd launchers require cmd.exe. Using shell:true with an absolute
+  // launcher path breaks when the project directory contains spaces or
+  // parentheses (for example, `... (1)`). Build the command line explicitly
+  // and hand it to ComSpec so the launcher path and every argument are parsed
+  // atomically.
+  if (isWindowsCmd) {
+    const commandLine = [quoteWindowsCmdArg(commandText), ...args.map(quoteWindowsCmdArg)].join(' ');
+    spawnCommand = process.env.ComSpec || 'cmd.exe';
+    spawnArgs = ['/d', '/s', '/c', commandLine];
+  }
+
+  const result = spawnSync(spawnCommand, spawnArgs, spawnOptions);
   if (result.error) fail(`${commandText} could not be started: ${result.error.message}`);
   if (result.status !== 0) fail(`${commandText} exited with code ${result.status}`);
 }
