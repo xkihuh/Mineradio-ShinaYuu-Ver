@@ -5,17 +5,15 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('2.1.5 embeds Discord Liquid Glass configuration directly in Advanced', () => {
+test('2.1.10 Discord configuration is launched from its own standalone Liquid Glass card', () => {
   const html = read('public/index.html');
-  const alpha = read('public/js/shinayuu-alpha2-features.js');
-  const css = read('public/css/shinayuu-alpha3.0.5-fixes.css');
-  assert.match(html, /fx-discord-inline-panel/);
-  assert.match(html, /id="discord-application-id"/);
-  assert.match(html, /id="discord-large-image-key"/);
-  assert.match(html, /saveDiscordAdvancedSettings\(\)/);
-  assert.doesNotMatch(html, /id="discord-setup-btn"/);
-  assert.match(alpha, /saveDiscordAdvancedSettings/);
-  assert.match(css, /\.fx-discord-inline-panel/);
+  const native = read('public/js/shinayuu-v2-native.js');
+  assert.match(html, /id="shinayuu-standalone-tools"/);
+  assert.match(html, /id="shinayuu-discord-standalone-card"/);
+  assert.match(html, /id="shinayuu-standalone-discord-open"/);
+  assert.doesNotMatch(html, /id="discord-advanced-card"/);
+  assert.match(native, /openDiscordSettings/);
+  assert.match(html, /shinayuu-discord-standalone-2-1-10/);
 });
 
 test('2.1.5 update checker uses the real app logo, bilingual note and emoji artwork', () => {

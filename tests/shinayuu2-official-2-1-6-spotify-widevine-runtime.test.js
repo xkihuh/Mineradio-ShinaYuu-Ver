@@ -79,12 +79,12 @@ test('2.1.6 updates Castlabs ECS and release identity consistently', () => {
   const lock = JSON.parse(read('package-lock.json'));
   const ecs = JSON.parse(read('vendor/castlabs-electron/package.json'));
   const html = read('public/index.html');
-  assert.equal(pkg.version, '2.1.9');
-  assert.equal(pkg.displayVersion, '2.1.9');
-  assert.equal(pkg.build.buildVersion, '2.1.9.0');
-  assert.equal(lock.version, '2.1.9');
-  assert.equal(lock.packages[''].version, '2.1.9');
+  assert.equal(pkg.version, '2.1.10');
+  assert.equal(pkg.displayVersion, '2.1.10');
+  assert.equal(pkg.build.buildVersion, '2.1.10.0');
+  assert.equal(lock.version, '2.1.10');
+  assert.equal(lock.packages[''].version, '2.1.10');
   assert.equal(ecs.version, '42.8.0+wvcus');
   assert.equal(lock.packages['vendor/castlabs-electron'].version, '42.8.0+wvcus');
-  assert.match(html, /spotify-direct-player\.js\?v=2\.1\.9/);
+  assert.match(html, /spotify-direct-player\.js\?v=2\.1\.10/);
 });

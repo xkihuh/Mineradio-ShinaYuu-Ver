@@ -1566,6 +1566,14 @@
     // That race is especially harmful with Widevine because the SDK can emit a
     // generic playback_error after the stream has started.
     activateSpotifyAudioFromGesture();
+    // Same-provider Spotify -> Spotify switches do not need to wait for an
+    // external HTML/Cuefield stop barrier. Waiting here can consume 1-2 seconds
+    // before the SDK receives the exact-track command. Cross-provider switches
+    // keep a short bounded barrier so the old provider can relinquish output.
+    var sameSpotifySession = window.activePlaybackTransport === 'spotify' && spotifyDirectState.active === true;
+    if (!sameSpotifySession) {
+      if (!await awaitCuefieldSpotifyStopBarrier(token, 650)) return false;
+    }
     await sendExactPlay('exact-start');
 
     try {
@@ -2540,7 +2548,8 @@
   }
   window.prepareSpotifyDirectForSong = prepareSpotifyDirectForSong;
 
-  async function awaitCuefieldSpotifyStopBarrier(token) {
+  async function awaitCuefieldSpotifyStopBarrier(token, timeoutMs) {
+    timeoutMs = Math.max(180, Math.min(900, Number(timeoutMs) || 650));
     var barriers = [];
     try {
       var cuefieldBarrier = typeof window.getCuefieldProviderStopBarrier === 'function'
@@ -2556,7 +2565,7 @@
     try {
       await Promise.race([
         Promise.allSettled(barriers),
-        spotifyDelay(2600)
+        spotifyDelay(timeoutMs)
       ]);
     } catch (_) { }
     return token === window.trackSwitchToken;

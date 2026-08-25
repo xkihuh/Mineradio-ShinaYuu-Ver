@@ -1,3 +1,22 @@
+# ShinaYuu Music 2.1.10
+
+## 2.1.10 — Discord UI + Visible Lyrics sequence fix
+
+- Replaced the legacy Discord connection form controls with a dedicated Liquid Glass dialog using modern glass cards and switch buttons.
+- Discord Visible Lyrics now listens to the actual Stage lyric transition event instead of relying on coarse polling.
+- Immediate Discord activity updates are serialized so short lyric lines are not overwritten by the next line before the RPC request is applied.
+- Kept 2.1.10 playback, VMP, audio routing, startup latency and MV background behavior unchanged.
+
+ Discord Connect is now a clearly separated Liquid Glass control surface with a live activity card and dedicated VISIBLE LYRICS preview; Stage lyric transitions are forwarded directly to Discord so short lyric lines are not lost between polling frames.
+
+- Discord settings refined into a stronger Liquid Glass modal with live connection status, compact controls and a Live Lyrics preview. Discord Rich Presence can now mirror the exact lyric sentence currently visible on the Stage.
+
+- Reduced Spotify and YouTube startup latency by tightening provider handoff barriers.
+- Avoids unnecessary same-provider stop waits before audible playback starts.
+- MV background startup now prioritizes a fast FHD-class stream and upgrades quality after the background is already running.
+- Keeps MV quality upgrades off the critical audio playback path.
+- Retains Spotify VMP/Widevine, audio routing, restore-clock and lyrics synchronization fixes from 2.1.9.
+
 # ShinaYuu Music 2.1.9
 
 - Spotify audio output now follows the app-selected Windows per-process render endpoint.

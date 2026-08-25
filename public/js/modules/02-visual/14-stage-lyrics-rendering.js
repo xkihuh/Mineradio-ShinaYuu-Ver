@@ -3345,6 +3345,14 @@ function tickLyricsParticles() {
     }
     stageLyrics.currentIdx = newIdx;
     displayedNewLine = true;
+    // Discord must follow the actual Stage transition, not a coarse polling snapshot.
+    // This preserves short lyric lines that can exist for only a few hundred ms.
+    try {
+      var stageLineText = displayPayload && (displayPayload.text || displayPayload.line || displayPayload.lyric) || '';
+      document.dispatchEvent(new CustomEvent('shinayuu-stage-lyric-changed', {
+        detail: { index: newIdx, text: String(stageLineText).replace(/\s+/g, ' ').trim(), key: displayPayload && displayPayload.key || '', time: lyricT }
+      }));
+    } catch (_) {}
   }
   if (stageLyrics.current) {
     var curLine = lyricsLines[newIdx] || { t: lyricT };

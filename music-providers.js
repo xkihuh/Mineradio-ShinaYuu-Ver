@@ -4925,16 +4925,29 @@ async function resolveYouTubeVideoBackground(videoId, quality = 'auto', options 
   // Compatibility recovery must let yt-dlp enforce its H.264/MP4 format
   // selection. Racing an arbitrary Innertube codec here could repeatedly pick
   // the same undecodable stream on older or policy-managed Windows 10 PCs.
-  const fastPromise = options && options.compatibility
-    ? youtubeVideoViaYtDlp(id, quality, options)
-    : youtubeVideoViaInnertube(id, quality, options);
-  const ytDlpPromise = options && options.compatibility
-    ? Promise.reject(new Error('compatibility route uses yt-dlp only'))
-    : new Promise((resolve) => setTimeout(resolve, 220)).then(() => youtubeVideoViaYtDlp(id, quality, options));
+  // Compatibility mode intentionally uses yt-dlp only. In normal mode we
+  // race the fast Innertube path against yt-dlp, but never insert a synthetic
+  // rejected Promise: that rejection used to surface as an UnhandledRejection
+  // when both real providers failed and obscured the actual failure reason.
+  if (options && options.compatibility) {
+    const stream = await youtubeVideoViaYtDlp(id, quality, options);
+    return {
+      ...stream,
+      proxyUrl: stream.streamToken ? `/api/media?stream=${encodeURIComponent(stream.streamToken)}` : stream.proxyUrl,
+      provider: 'youtube',
+      playbackProvider: 'youtube',
+      mediaKind: 'video',
+      muted: true,
+      playable: !!(stream.url || stream.proxyUrl),
+      requestedQuality: mode,
+      compatibility: true,
+    };
+  }
+
+  const fastPromise = youtubeVideoViaInnertube(id, quality, options);
+  const ytDlpPromise = new Promise((resolve) => setTimeout(resolve, 220)).then(() => youtubeVideoViaYtDlp(id, quality, options));
   try {
-    const stream = options && options.compatibility
-      ? await fastPromise
-      : await Promise.any([fastPromise, ytDlpPromise]);
+    const stream = await Promise.any([fastPromise, ytDlpPromise]);
     return {
       ...stream,
       proxyUrl: stream.streamToken ? `/api/media?stream=${encodeURIComponent(stream.streamToken)}` : stream.proxyUrl,

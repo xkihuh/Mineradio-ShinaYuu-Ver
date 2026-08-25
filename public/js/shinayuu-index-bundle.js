@@ -281,7 +281,7 @@ var updatePreviewState = {
   installerPath: '',
   installerOpened: false,
   cached: false,
-  currentVersion: '2.1.9',
+  currentVersion: '2.1.10',
   version: '2.0.0',
   configured: false,
   preview: true,
@@ -16299,6 +16299,14 @@ function tickLyricsParticles() {
     }
     stageLyrics.currentIdx = newIdx;
     displayedNewLine = true;
+    // Discord must follow the actual Stage transition, not a coarse polling snapshot.
+    // This preserves short lyric lines that can exist for only a few hundred ms.
+    try {
+      var stageLineText = displayPayload && (displayPayload.text || displayPayload.line || displayPayload.lyric) || '';
+      document.dispatchEvent(new CustomEvent('shinayuu-stage-lyric-changed', {
+        detail: { index: newIdx, text: String(stageLineText).replace(/\s+/g, ' ').trim(), key: displayPayload && displayPayload.key || '', time: lyricT }
+      }));
+    } catch (_) {}
   }
   if (stageLyrics.current) {
     var curLine = lyricsLines[newIdx] || { t: lyricT };
@@ -34601,6 +34609,7 @@ async function playQueueAt(idx, opts) {
   var albumGaplessAdoptedGain = 0;
   var playbackMedia = null;
   var previousSongForTransition = currentIdx >= 0 && currentIdx < playQueue.length ? playQueue[currentIdx] : null;
+  var previousPlaybackTransport = String(window.activePlaybackTransport || 'none');
   if (
     playMode === 'shuffle'
     && !opts.skipShuffleOrder
@@ -35112,11 +35121,18 @@ async function playQueueAt(idx, opts) {
       // This prevents a late provider-stop completion from clearing the new
       // HTML transport or leaving both providers fighting over playback state.
       var providerStopPromise = window.pendingExternalProviderStopPromise;
+      var crossProviderStop = previousPlaybackTransport !== 'none'
+        && previousPlaybackTransport !== 'html-audio'
+        && playbackProvider !== 'spotify';
       if (!albumGaplessHandoff && providerStopPromise && typeof providerStopPromise.then === 'function') {
+        // Same-provider HTML starts should not wait at all. Cross-provider starts
+        // keep only a short bounded drain window; the previous 1800ms budget was
+        // directly audible on Spotify -> YouTube switches.
+        var providerStopBudget = crossProviderStop ? 650 : 260;
         try {
           await Promise.race([
             providerStopPromise,
-            new Promise(function (resolve) { setTimeout(function () { resolve(false); }, 1800); })
+            new Promise(function (resolve) { setTimeout(function () { resolve(false); }, providerStopBudget); })
           ]);
         } catch (_) { }
         // Do not clear a stop that merely exceeded the HTML start budget. A later
@@ -37178,7 +37194,7 @@ function clearPlayerControlFocusState(reason) {
 (function () {
   'use strict';
 
-  var VERSION = '2.1.9';
+  var VERSION = '2.1.10';
   var STORE_KEY = 'shinayuu-cuefield-automix-v2';
   var GAPLESS_STORE_KEY = 'shinayuu-album-gapless-v1';
   var PREPARE_DELAY_MS = 950;

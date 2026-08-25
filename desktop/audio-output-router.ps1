@@ -114,19 +114,19 @@ namespace ShinaYuu.AudioRouting {
       IPropertyStore store = null;
       try {
         int hr = device.OpenPropertyStore(0, out store);
-        if (hr != 0 || store == null) return '';
+        if (hr != 0 || store == null) return "";
         PROPVARIANT pv;
         hr = store.GetValue(ref FriendlyNameKey, out pv);
-        if (hr != 0) return '';
+        if (hr != 0) return "";
         try {
           // VT_LPWSTR = 31, VT_LPSTR = 30, VT_BSTR = 8
-          if (pv.vt == 31 && pv.ptr != IntPtr.Zero) return Marshal.PtrToStringUni(pv.ptr) ?? '';
-          if (pv.vt == 8 && pv.ptr != IntPtr.Zero) return Marshal.PtrToStringBSTR(pv.ptr) ?? '';
-          return '';
+          if (pv.vt == 31 && pv.ptr != IntPtr.Zero) return Marshal.PtrToStringUni(pv.ptr) ?? "";
+          if (pv.vt == 8 && pv.ptr != IntPtr.Zero) return Marshal.PtrToStringBSTR(pv.ptr) ?? "";
+          return "";
         } finally {
           try { PropVariantClear(ref pv); } catch { }
         }
-      } catch { return ''; }
+      } catch { return ""; }
       finally { if (store != null && Marshal.IsComObject(store)) Marshal.ReleaseComObject(store); }
     }
 
@@ -134,7 +134,7 @@ namespace ShinaYuu.AudioRouting {
     static extern int PropVariantClear(ref PROPVARIANT pvar);
 
     static string Normalize(string value) {
-      value = (value ?? '').Trim();
+      value = (value ?? "").Trim();
       return value.Normalize(System.Text.NormalizationForm.FormKC).ToLowerInvariant();
     }
 

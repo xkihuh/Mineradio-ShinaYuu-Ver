@@ -142,18 +142,16 @@ test('track metadata updates immediately and likely next choices are prefetched'
   assert.match(native, /addEventListener\('shinayuu-track-change'/);
 });
 
-test('Discord connection is restored inside Advanced as an inline Liquid Glass panel', () => {
+test('Discord connection uses a standalone launcher outside Advanced and opens the native Liquid Glass dialog', () => {
   const html = read('public/index.html');
-  const alpha2 = read('public/js/shinayuu-alpha2-features.js');
+  const native = read('public/js/shinayuu-v2-native.js');
   const preload = read('desktop/preload.js');
-  assert.match(html, /id="discord-advanced-card"/);
-  assert.match(html, /fx-discord-inline-panel/);
-  assert.match(html, /id="discord-application-id"/);
-  assert.match(html, /id="discord-large-image-key"/);
-  assert.match(html, /saveDiscordAdvancedSettings\(\)/);
-  assert.doesNotMatch(html, /id="discord-setup-btn"/);
-  assert.match(alpha2, /window\.saveDiscordAdvancedSettings/);
-  assert.match(alpha2, /window\.reconnectDiscordAdvanced/);
+  assert.match(html, /id="shinayuu-standalone-tools"/);
+  assert.match(html, /id="shinayuu-discord-standalone-card"/);
+  assert.match(html, /id="shinayuu-standalone-discord-open"/);
+  assert.doesNotMatch(html, /id="discord-advanced-card"/);
+  assert.doesNotMatch(native, /shinayuu-native-discord-open/);
+  assert.match(native, /openDiscordSettings/);
   assert.match(preload, /getDiscordState/);
   assert.match(preload, /configureDiscord/);
   assert.match(preload, /reconnectDiscord/);

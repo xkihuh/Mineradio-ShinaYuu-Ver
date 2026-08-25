@@ -1,3 +1,18 @@
+### 2.1.10 Discord UI / Visible Lyrics follow-up
+
+The 2.1.10 release retains the signed release pipeline and adds a native Liquid Glass Discord configuration dialog. Visible Lyrics is driven by the Stage transition event and immediate Discord activity updates are serialized to preserve short lyric lines.
+
+# ShinaYuu Music 2.1.10
+
+## Playback Startup + Fast MV Background
+
+- Spotify and YouTube provider handoff no longer waits on unnecessary same-provider stop barriers.
+- External provider stop waits are bounded so audible playback can start sooner after a manual selection.
+- YouTube MV background startup uses a fast FHD-class stream first, then upgrades quality after the video is already running.
+- MV background quality upgrades are kept off the critical audio playback path.
+- Retains Spotify VMP/Widevine playback, Windows audio routing, restore-clock protection and shared lyrics clock stabilization from 2.1.9.
+- Package/display/build identity is synchronized to 2.1.10 / 2.1.10.0.
+
 # ShinaYuu Music 2.1.9
 
 ## Spotify Audio Routing + Lyrics Clock Fix

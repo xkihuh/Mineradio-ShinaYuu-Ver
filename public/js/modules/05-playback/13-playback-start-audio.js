@@ -914,6 +914,7 @@ async function playQueueAt(idx, opts) {
   var albumGaplessAdoptedGain = 0;
   var playbackMedia = null;
   var previousSongForTransition = currentIdx >= 0 && currentIdx < playQueue.length ? playQueue[currentIdx] : null;
+  var previousPlaybackTransport = String(window.activePlaybackTransport || 'none');
   if (
     playMode === 'shuffle'
     && !opts.skipShuffleOrder
@@ -1425,11 +1426,18 @@ async function playQueueAt(idx, opts) {
       // This prevents a late provider-stop completion from clearing the new
       // HTML transport or leaving both providers fighting over playback state.
       var providerStopPromise = window.pendingExternalProviderStopPromise;
+      var crossProviderStop = previousPlaybackTransport !== 'none'
+        && previousPlaybackTransport !== 'html-audio'
+        && playbackProvider !== 'spotify';
       if (!albumGaplessHandoff && providerStopPromise && typeof providerStopPromise.then === 'function') {
+        // Same-provider HTML starts should not wait at all. Cross-provider starts
+        // keep only a short bounded drain window; the previous 1800ms budget was
+        // directly audible on Spotify -> YouTube switches.
+        var providerStopBudget = crossProviderStop ? 650 : 260;
         try {
           await Promise.race([
             providerStopPromise,
-            new Promise(function (resolve) { setTimeout(function () { resolve(false); }, 1800); })
+            new Promise(function (resolve) { setTimeout(function () { resolve(false); }, providerStopBudget); })
           ]);
         } catch (_) { }
         // Do not clear a stop that merely exceeded the HTML start budget. A later

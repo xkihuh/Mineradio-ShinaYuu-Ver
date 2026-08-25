@@ -57,15 +57,15 @@ test('Spotify startup accepts forward clock movement and avoids replay on clock 
   assert.match(player, /var sameUriForEnd =/);
 });
 
-test('2.1.9 release identity and cache busting are synchronized', () => {
+test('2.1.10 release identity and cache busting are synchronized', () => {
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
   const html = read('public/index.html');
-  assert.equal(pkg.version, '2.1.9');
-  assert.equal(pkg.displayVersion, '2.1.9');
-  assert.equal(pkg.build.buildVersion, '2.1.9.0');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.9');
-  assert.equal(lock.version, '2.1.9');
-  assert.equal(lock.packages[''].version, '2.1.9');
-  assert.match(html, /spotify-direct-player\.js\?v=2\.1\.9/);
+  assert.equal(pkg.version, '2.1.10');
+  assert.equal(pkg.displayVersion, '2.1.10');
+  assert.equal(pkg.build.buildVersion, '2.1.10.0');
+  assert.equal(pkg.shinayuu.displayVersion, '2.1.10');
+  assert.equal(lock.version, '2.1.10');
+  assert.equal(lock.packages[''].version, '2.1.10');
+  assert.match(html, /spotify-direct-player\.js\?v=2\.1\.10/);
 });
