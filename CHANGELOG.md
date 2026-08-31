@@ -1,3 +1,11 @@
+# ShinaYuu Music 2.2.0 — Stable
+
+- Promoted the Desktop 2.2.x SoundCloud integration to stable `2.2.0`.
+- SoundCloud remains discovery + exact-track URL playback through ShinaYuu; no user Client ID/Secret.
+- Liquid Glass surface controls now allow 0% fill opacity while retaining borders/highlights.
+- Playlist shelf surface/background opacity can reach fully transparent without hiding its content.
+- Preserved the established playback, lyrics, Discord and visual core.
+
 # ShinaYuu Music 2.1.10
 
 ## 2.1.10 — Discord UI + Visible Lyrics sequence fix

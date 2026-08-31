@@ -7,7 +7,7 @@
   var state = {
     folderPath: '', folderName: '', items: [], filter: 'all', query: '',
     truncated: false, loading: false, renderToken: 0, idleHandle: 0,
-    previewObserver: null
+    previewObserver: null, imageQueue: [], imageActive: 0, imageQueued: new WeakSet()
   };
 
   function byId(id) { return document.getElementById(id); }
@@ -40,20 +40,72 @@
     if (!state.previewObserver) return;
     try { state.previewObserver.disconnect(); } catch (_) {}
     state.previewObserver = null;
+    state.imageQueue = [];
+    state.imageActive = 0;
+    state.imageQueued = new WeakSet();
   }
-  function ensureObserver() {
+  function pumpImageQueue() {
+    if (state.imageActive >= 2 || !state.imageQueue.length) return;
+    var media = state.imageQueue.shift();
+    if (!media || !media.dataset || !media.dataset.src || media.getAttribute('src')) {
+      pumpImageQueue();
+      return;
+    }
+    state.imageActive += 1;
+    media.src = media.dataset.src;
+    var done = false;
+    var release = function () {
+      if (done) return;
+      done = true;
+      state.imageActive = Math.max(0, state.imageActive - 1);
+      pumpImageQueue();
+    };
+    media.addEventListener('load', release, { once: true });
+    media.addEventListener('error', release, { once: true });
+    setTimeout(release, 8000);
+  }
+  function queueImage(media) {
+    if (!media || !media.dataset || !media.dataset.src || media.getAttribute('src')) return;
+    try {
+      if (state.imageQueued.has(media)) return;
+      state.imageQueued.add(media);
+    } catch (_) {}
+    state.imageQueue.push(media);
+    pumpImageQueue();
+  }
+  function ensureImageObserver() {
     if (state.previewObserver || typeof IntersectionObserver !== 'function') return state.previewObserver;
-    state.previewObserver = new IntersectionObserver(function (entries, observer) {
+    state.previewObserver = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
-        if (!entry.isIntersecting) return;
         var media = entry.target;
-        var src = media && media.dataset ? media.dataset.src : '';
-        if (src && !media.getAttribute('src')) media.src = src;
-        observer.unobserve(media);
+        if (!media) return;
+        if (entry.isIntersecting) queueImage(media);
       });
-    }, { root: document.querySelector('.bg-media-library-body') || null, rootMargin: '220px 0px', threshold: 0.01 });
+    }, { root: document.querySelector('.bg-media-library-body') || null, rootMargin: '48px 0px', threshold: 0.01 });
     return state.previewObserver;
   }
+  function startVideoPreview(media) {
+    if (!media || media.tagName !== 'VIDEO' || !media.dataset || !media.dataset.src) return;
+    if (!media.getAttribute('src')) {
+      media.preload = 'metadata';
+      media.src = media.dataset.src;
+      media.load();
+    }
+    var play = function () {
+      var promise = media.play();
+      if (promise && promise.catch) promise.catch(function () {});
+    };
+    if (media.readyState >= 2) play();
+    else media.addEventListener('canplay', play, { once: true });
+  }
+  function stopVideoPreview(media) {
+    if (!media || media.tagName !== 'VIDEO') return;
+    try { media.pause(); media.currentTime = 0; } catch (_) {}
+    // Keep metadata around after the first hover so repeated previews do not
+    // trigger a fresh disk decode. The video is removed only when the card is
+    // recycled/closed by the library.
+  }
+
   function formatBytes(value) {
     var bytes = Math.max(0, Number(value) || 0);
     if (bytes < 1024) return bytes + ' B';
@@ -258,18 +310,20 @@
     var media;
     if (item.type === 'video') {
       media = document.createElement('video');
+      media.className = 'bg-media-card-video';
       media.muted = true; media.loop = true; media.playsInline = true; media.preload = 'none';
-      card.addEventListener('mouseenter', function () {
-        if (!media.getAttribute('src')) { media.src = item.url; media.preload = 'metadata'; }
-        var promise = media.play(); if (promise && promise.catch) promise.catch(function () {});
-      });
-      card.addEventListener('mouseleave', function () {
-        try { media.pause(); media.removeAttribute('src'); media.preload = 'none'; media.load(); } catch (_) {}
-      });
+      media.dataset.src = item.url;
+      media.setAttribute('aria-label', item.name || 'Video preview');
+      var beginPreview = function () { startVideoPreview(media); preview.classList.add('is-previewing'); };
+      var endPreview = function () { stopVideoPreview(media); preview.classList.remove('is-previewing'); };
+      card.addEventListener('mouseenter', beginPreview, { passive: true });
+      card.addEventListener('mouseleave', endPreview, { passive: true });
+      card.addEventListener('focusin', beginPreview);
+      card.addEventListener('focusout', endPreview);
     } else {
       media = document.createElement('img');
       media.alt = item.name || ''; media.loading = 'lazy'; media.decoding = 'async'; media.dataset.src = item.url;
-      var observer = ensureObserver(); if (observer) observer.observe(media); else media.src = item.url;
+      var observer = ensureImageObserver(); if (observer) observer.observe(media); else queueImage(media);
     }
     preview.appendChild(media);
     var type = document.createElement('span'); type.className = 'bg-media-card-type'; type.textContent = item.type === 'video' ? 'VIDEO' : 'IMAGE'; preview.appendChild(type);
@@ -339,18 +393,10 @@
   function setQuery(value) { state.query = String(value || '').trim().toLowerCase(); render(); }
   function handleMask(event) { if (event && event.target && event.target.id === 'background-media-library') closeLibrary(); }
   function bindPointer() {
-    var modal = byId('background-media-library'); if (!modal || modal.dataset.pointerBound === '1') return;
-    modal.dataset.pointerBound = '1';
-    var frame = 0, lastEvent = null;
-    modal.addEventListener('pointermove', function (event) {
-      lastEvent = event; if (frame) return;
-      frame = requestAnimationFrame(function () {
-        frame = 0; var shell = modal.querySelector('.bg-media-library-shell'); if (!shell || !lastEvent) return;
-        var rect = shell.getBoundingClientRect();
-        shell.style.setProperty('--bg-media-x', (((lastEvent.clientX - rect.left) / Math.max(1, rect.width)) * 100).toFixed(1) + '%');
-        shell.style.setProperty('--bg-media-y', (((lastEvent.clientY - rect.top) / Math.max(1, rect.height)) * 100).toFixed(1) + '%');
-      });
-    }, { passive: true });
+    // Deliberately no pointer-move animation here. The library is a media
+    // browser; changing blur/gradient variables for every mouse movement
+    // causes unnecessary paint/compositor work and visible stutter while
+    // scrolling or moving across cards.
   }
   function boot() {
     var saved = readSavedFolder(); state.folderPath = String(saved.folderPath || ''); state.folderName = String(saved.folderName || '');

@@ -20,6 +20,7 @@ const SPOTIFY_LYRICS_BASE = 'https://spclient.wg.spotify.com/color-lyrics/v2/tra
 const lyricSync = require('./public/lyrics-sync');
 const youtubeCaptions = require('./youtube-caption-provider');
 const youtubeForcedAligner = require('./youtube-forced-aligner');
+const soundcloudApi = require('./soundcloud-api');
 const crossProviderLyrics = require('./desktop/cross-provider-lyrics');
 
 const spotifyTrackCache = new Map();
@@ -134,6 +135,7 @@ function providerConfig() {
     spotifyMarket: String(process.env.SPOTIFY_MARKET || stored.spotifyMarket || 'VN').trim().toUpperCase(),
     youtubeClientId: String(process.env.YOUTUBE_CLIENT_ID || stored.youtubeClientId || bundledYoutube.oauthClientId || '').trim(),
     youtubeClientSecret: String(process.env.YOUTUBE_CLIENT_SECRET || stored.youtubeClientSecret || bundledYoutube.oauthClientSecret || '').trim(),
+    // SoundCloud 2.2.x is public-web/yt-dlp based; no user credentials are read.
     language: String(stored.language || 'vi').trim().toLowerCase() === 'en' ? 'en' : 'vi',
   };
 }
@@ -145,6 +147,8 @@ function updateProviderConfig(input) {
     spotifyMarket: String(input && input.spotifyMarket != null ? input.spotifyMarket : previous.spotifyMarket).trim().toUpperCase() || 'VN',
     youtubeClientId: String(input && input.youtubeClientId != null ? input.youtubeClientId : previous.youtubeClientId).trim(),
     youtubeClientSecret: String(input && input.youtubeClientSecret != null ? input.youtubeClientSecret : previous.youtubeClientSecret).trim(),
+    soundcloudClientId: String(input && input.soundcloudClientId != null ? input.soundcloudClientId : previous.soundcloudClientId).trim(),
+    soundcloudClientSecret: String(input && input.soundcloudClientSecret != null ? input.soundcloudClientSecret : previous.soundcloudClientSecret).trim(),
     language: String(input && input.language != null ? input.language : previous.language).trim().toLowerCase() === 'en' ? 'en' : 'vi',
   };
   writeJson(CONFIG_FILE, next);
@@ -2467,6 +2471,9 @@ function publicProviderConfig(config = providerConfig(), baseUrl = '') {
     youtubeRedirectUri: youtubeRedirectUri(baseUrl),
     language: config.language,
     spotifyRedirectUri: spotifyRedirectUri(baseUrl),
+    soundcloudClientId: String(config.soundcloudClientId || '').trim(),
+    soundcloudConfigured: !!(config.soundcloudClientId && config.soundcloudClientSecret),
+    soundcloudClientSecretConfigured: !!config.soundcloudClientSecret,
   };
 }
 
@@ -3604,6 +3611,19 @@ function mapSpotifyTrack(track) {
   };
   if (song.id) spotifyTrackCache.set(song.id, song);
   return song;
+}
+
+
+async function soundcloudSearch(query, limit = 30, offset = 0) {
+  return soundcloudApi.search(query, limit, offset);
+}
+
+async function resolveSoundCloudPlayback(trackId, quality = 'standard') {
+  return soundcloudApi.resolveStream(trackId, quality);
+}
+
+function soundcloudStatus() {
+  return { provider: 'soundcloud', configured: true, available: true, publicCatalog: true, searchReady: true, loggedIn: false, nickname: 'SoundCloud', message: 'SoundCloud web search + URL resolver sẵn sàng.' };
 }
 
 async function spotifySearch(query, limit = 18) {
@@ -5832,6 +5852,68 @@ async function lyricsFor(id, provider, query = {}) {
     }
   }
 
+  // When a normal YouTube video is the selected playback item but does not
+  // expose usable caption timing, prefer the exact corresponding YouTube Music
+  // song lyrics as text and align them against THIS video's audio. This keeps
+  // the user's chosen MV intact while recovering lyrics from the music catalog.
+  if (provider === 'youtube' && youtubeSourceType === 'video' && id) {
+    try {
+      let ytmFallback = null;
+      try { ytmFallback = await youtubeMusicNativeLyrics(id); } catch (_) { ytmFallback = null; }
+      if (!ytmFallback || !ytmFallback.plainLyric) {
+        ytmFallback = await youtubeMusicReferenceLyrics(metadata, query);
+      }
+      const ytmPlain = ytmFallback && String(ytmFallback.plainLyric || '').trim();
+      if (ytmPlain) {
+        const alignResult = await youtubeForcedAlignmentService.request(id, {
+          syncedLyric: '',
+          plainLyric: ytmPlain,
+          duration,
+          language: query.language || providerConfig().language || 'auto',
+          track: trackName,
+          artist: artistName,
+          exactVideoAlignment: true,
+        }, {
+          getYtDlpEngine: prepareYouTubeEngine,
+          findNodeRuntime,
+        });
+        const ref = ytmFallback.youtubeMusicReference || null;
+        const ytmMeta = {
+          available: true,
+          provider: ytmFallback.provider || 'YouTube Music',
+          syncType: ytmFallback.syncType || 'UNSYNCED',
+          reference: ref || undefined,
+        };
+        if (alignResult && alignResult.status === 'ready' && alignResult.result) {
+          return {
+            ...alignResult.result,
+            metadataProvider: 'youtube-video',
+            metadata,
+            match: ref ? { score: Number(ref.score || 96), duration: Number(ref.duration || duration), source: 'youtube-music-reference' } : { score: 100, duration, source: 'youtube-music-exact-id' },
+            exactVideoTiming: true,
+            youtubeMusicLyrics: ytmMeta,
+            alignment: { status: 'ready', stage: 'ready', source: 'youtube-music-text-on-selected-video' },
+          };
+        }
+        if (alignResult && alignResult.status === 'processing') {
+          return {
+            lyric: '', tlyric: '', yrc: '', plainLyric: '',
+            pendingPlainLyric: ytmPlain,
+            source: 'youtube-video-ytm-alignment-pending',
+            metadataProvider: 'youtube-video',
+            metadata,
+            match: ref ? { score: Number(ref.score || 96), duration: Number(ref.duration || duration), source: 'youtube-music-reference' } : { score: 100, duration, source: 'youtube-music-exact-id' },
+            exactVideoTiming: false,
+            youtubeMusicLyrics: ytmMeta,
+            alignment: alignResult,
+          };
+        }
+      }
+    } catch (error) {
+      console.warn('[YouTubeVideoYtmLyricsFallback]', error && error.message || error);
+    }
+  }
+
   // YouTube Music keeps the previous fallback behaviour: use captions only when
   // QQ/NetEase and native music lyrics provide no usable text.
   if (provider === 'youtube' && youtubeSourceType !== 'video' && id && !(primaryCrossLyrics && (primaryCrossLyrics.plainLyric || primaryCrossLyrics.lyric || primaryCrossLyrics.yrc))) {
@@ -6316,6 +6398,11 @@ module.exports = {
   spotifyLoginResult,
   clearSpotifyToken,
   spotifySearch,
+  soundcloudSearch,
+  soundcloudStatus,
+  resolveSoundCloudPlayback,
+  updateSoundCloudConfig: soundcloudApi.updateConfig,
+  soundcloudPublicConfig: soundcloudApi.publicConfig,
   spotifyUserPlaylists,
   spotifyPlaylistTracks,
   spotifyLikedCheck,

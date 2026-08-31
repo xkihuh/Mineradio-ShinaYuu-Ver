@@ -220,10 +220,13 @@ function syncAccountProviderOrderUi() {
 function platformMeta(provider) {
   if (provider === 'youtube') return { key: 'youtube', short: 'YT', label: 'YouTube Music', app: 'YouTube', dot: 'youtube' };
   if (provider === 'spotify') return { key: 'spotify', short: 'SP', label: 'Spotify', app: 'Spotify', dot: 'spotify' };
+  if (provider === 'soundcloud') return { key: 'soundcloud', short: 'SC', label: 'SoundCloud', app: 'SoundCloud', dot: 'soundcloud' };
   return { key: 'youtube', short: 'YT', label: 'YouTube Music', app: 'YouTube', dot: 'youtube' };
 }
 function platformStatus(provider) {
-  return provider === 'spotify' ? spotifyLoginStatus : youtubeLoginStatus;
+  if (provider === 'spotify') return spotifyLoginStatus;
+  if (provider === 'soundcloud') return soundcloudLoginStatus;
+  return youtubeLoginStatus;
 }
 function providerVipType(provider, status) {
   status = status || platformStatus(provider) || {};

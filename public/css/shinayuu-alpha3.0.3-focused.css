@@ -90,3 +90,45 @@
 .bg-media-library-foot{min-height:48px;border-top:1px solid rgba(255,255,255,.075);color:rgba(255,255,255,.42);font-size:11px}.bg-media-library-foot span:first-child{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 body.bg-media-library-open #fx-panel{pointer-events:none}
 @media(max-width:760px){#background-media-library{padding:12px}.bg-media-library-shell{width:100%;height:100%;border-radius:22px}.bg-media-library-head,.bg-media-library-tools{flex-wrap:wrap;padding-left:14px;padding-right:14px}.bg-media-library-search{min-width:100%;order:2}.bg-media-library-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.bg-media-library-body{padding-left:14px;padding-right:14px}}
+
+
+/* SY 2.2 media-library smooth preview */
+.bg-media-library-body {
+  scroll-behavior: auto;
+  overscroll-behavior: contain;
+  contain: strict;
+}
+.bg-media-library-grid { contain: layout paint; }
+.bg-media-card {
+  contain: layout paint;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+.bg-media-card:hover {
+  transform: none;
+  border-color: rgba(var(--fc-accent-rgb),.34);
+  box-shadow: 0 14px 34px rgba(0,0,0,.18), 0 0 0 1px rgba(var(--fc-accent-rgb),.06), inset 0 1px 0 rgba(255,255,255,.14);
+}
+.bg-media-card-preview { contain: strict; }
+.bg-media-card-preview img,
+.bg-media-card-preview video {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+.bg-media-card-preview video { opacity: .92; }
+.bg-media-card-preview.is-previewing video { opacity: 1; }
+
+/* Nearly-clear Liquid Glass: fills may become very transparent while the
+   fixed edge/highlight remains visible for separation from the wallpaper. */
+html.sy-control-panel-opacity-custom #fx-panel,
+html.sy-left-shelf-opacity-custom #playlist-panel {
+  border-color: rgba(255,255,255,.18) !important;
+  box-shadow: 0 18px 54px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.18), inset 0 0 0 1px rgba(255,255,255,.04) !important;
+}
+html.sy-control-panel-opacity-custom #fx-panel .fx-console-group,
+html.sy-control-panel-opacity-custom #fx-panel .fx-fold,
+html.sy-left-shelf-opacity-custom #playlist-panel .playlist-panel-sticky,
+html.sy-left-shelf-opacity-custom #playlist-panel .queue-toolbar {
+  border-color: rgba(255,255,255,.14) !important;
+}

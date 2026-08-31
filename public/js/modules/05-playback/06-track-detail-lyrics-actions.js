@@ -4,13 +4,15 @@ function currentCoverSong() {
 }
 function songDurationLabel(song) {
   var sec = playbackDurationFromSong(song);
-  if (!sec && audio && isFinite(audio.duration) && audio.duration > 0) sec = audio.duration;
+  var provider = song && String(song.provider || song.source || song.type || '').toLowerCase();
+  if (!sec && provider !== 'soundcloud' && audio && isFinite(audio.duration) && audio.duration > 0) sec = audio.duration;
   if (!sec) return 'Không rõ';
   return formatProgramTime(sec);
 }
 function songSourceLabel(song) {
   if (!song) return 'Không rõ';
   if (song.provider === 'spotify' || song.source === 'spotify' || song.type === 'spotify' || song.spotifyId || song.spotifyUri) return 'Spotify';
+  if (song.provider === 'soundcloud' || song.source === 'soundcloud' || song.type === 'soundcloud' || song.soundcloudId || song.soundcloudPermalink) return 'SoundCloud';
   if (song.sourceType === 'video' || song.youtubeSourceType === 'video' || song.provider === 'youtube-video' || song.source === 'youtube-video') return 'YouTube Video';
   if (song.provider === 'youtube' || song.source === 'youtube' || song.type === 'youtube' || song.provider === 'qq' || song.source === 'qq' || song.youtubeId || song.videoId) return 'YouTube Music';
   if (song.type === 'local' || song.source === 'local' || song.localKey) return localizeUiMessage('Nhạc cục bộ');
@@ -1055,11 +1057,19 @@ var SONG_ACCOUNT_ACTION_ADAPTERS = {
     provider: 'youtube', label: 'YouTube Music', like: false, collect: false, createPlaylist: false,
     likeCheckUrl: '', likeUrl: '', playlistAddUrl: '', playlistCreateUrl: '',
     playlistTracksUrl: '/api/youtube-music/playlist/tracks'
+  },
+  soundcloud: {
+    provider: 'soundcloud', label: 'SoundCloud', like: false, collect: false, createPlaylist: false,
+    likeCheckUrl: '', likeUrl: '', playlistAddUrl: '', playlistCreateUrl: '',
+    playlistTracksUrl: ''
   }
 };
 function songAccountProvider(song) {
   if (!song) return 'youtube';
-  return songProviderKey(song) === 'spotify' ? 'spotify' : 'youtube';
+  var provider = songProviderKey(song);
+  if (provider === 'spotify') return 'spotify';
+  if (provider === 'soundcloud') return 'soundcloud';
+  return 'youtube';
 }
 function songAccountAdapter(songOrProvider) {
   var provider = typeof songOrProvider === 'string' ? normalizePlaybackProvider(songOrProvider) : songAccountProvider(songOrProvider);

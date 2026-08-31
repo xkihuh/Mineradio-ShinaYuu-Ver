@@ -31,6 +31,7 @@ var youtubeLoginStatus = { provider: 'youtube', loggedIn: false, preview: false,
 var youtubeLoginAutoRefreshTimer = null;
 var youtubeLoginStatusLastForcedAt = 0;
 var spotifyLoginStatus = { provider: 'spotify', loggedIn: false, configured: false, oauthConfigured: false, oauthMissing: [], preview: false, nickname: 'Spotify', userId: '', avatar: '', product: '', vipType: 0, vipLevel: 'none', isVip: false, isSvip: false, playbackKeyReady: false, playbackMode: 'recommend-match' };
+var soundcloudLoginStatus = { provider: 'soundcloud', loggedIn: false, configured: false, searchReady: false, publicCatalog: false, nickname: 'SoundCloud', userId: '', avatar: '', vipType: 0, vipLevel: 'none', isVip: false, isSvip: false, playbackKeyReady: false, playbackMode: 'direct' };
 var spotifyLoginAutoRefreshTimer = null;
 var youtubeLoginWasLoggedIn = false;
 var spotifyLoginWasLoggedIn = false;
@@ -126,7 +127,7 @@ var AUDIO_INPUT_BRIDGE_STORE_KEY = 'mineradio-audio-input-bridge-v1';
 var PROVIDER_VIP_AUDIT_STORE_KEY = 'mineradio-provider-vip-audit-v1';
 var YouTube_PLAYBACK_VIP_EVIDENCE_STORE_KEY = 'mineradio-youtube-playback-vip-evidence-v1';
 var LOGIN_COOKIE_EXPORT_STORE_KEY = 'mineradio-login-cookie-export-v1';
-var PLAYBACK_QUALITY_DEFAULTS = { youtube: 'hires', spotify: 'standard' };
+var PLAYBACK_QUALITY_DEFAULTS = { youtube: 'hires', spotify: 'standard', soundcloud: 'standard' };
 var PLAYBACK_QUALITY_OPTIONS = {
   youtube: [
     { key: 'hires', title: 'Chất lượng cao', sub: 'YouTube Music · ưu tiên chất lượng' },
@@ -136,6 +137,10 @@ var PLAYBACK_QUALITY_OPTIONS = {
   ],
   spotify: [
     { key: 'standard', title: 'Spotify Premium', sub: 'Phát trực tiếp qua Spotify' }
+  ],
+  soundcloud: [
+    { key: 'standard', title: 'SoundCloud 160 kbps', sub: 'AAC HLS · ưu tiên chất lượng' },
+    { key: 'low', title: 'SoundCloud 96 kbps', sub: 'AAC HLS · tiết kiệm băng thông' }
   ]
 };
 var UPLOAD_TIP_STORE_KEY = 'mineradio-upload-tip-seen';
@@ -7405,8 +7410,8 @@ function readSavedLyricLayout() {
       shelfOffsetZ: clampRange(raw.shelfOffsetZ == null ? fxDefaults.shelfOffsetZ : Number(raw.shelfOffsetZ), -0.9, 0.9),
       shelfAngleY: savedShelfAngle,
       shelfAngleYManual: savedShelfAngleManual,
-      shelfOpacity: clampRange(raw.shelfOpacity == null ? fxDefaults.shelfOpacity : Number(raw.shelfOpacity), 0.25, 1),
-      shelfBgOpacity: clampRange(raw.shelfBgOpacity == null ? fxDefaults.shelfBgOpacity : Number(raw.shelfBgOpacity), 0.25, 0.98),
+      shelfOpacity: clampRange(raw.shelfOpacity == null ? fxDefaults.shelfOpacity : Number(raw.shelfOpacity), 0, 1),
+      shelfBgOpacity: clampRange(raw.shelfBgOpacity == null ? fxDefaults.shelfBgOpacity : Number(raw.shelfBgOpacity), 0, 0.98),
       shelfAccentColor: normalizeHexColor(raw.shelfAccentColor || fxDefaults.shelfAccentColor, fxDefaults.shelfAccentColor),
       shelfDetailOffsetX: clampRange(raw.shelfDetailOffsetX == null ? fxDefaults.shelfDetailOffsetX : Number(raw.shelfDetailOffsetX), -4.8, 4.8),
       shelfDetailOffsetY: clampRange(raw.shelfDetailOffsetY == null ? fxDefaults.shelfDetailOffsetY : Number(raw.shelfDetailOffsetY), -3.6, 3.6),
@@ -7693,8 +7698,8 @@ function currentFxAutosaveCriticalPatch() {
     shelfOffsetZ: clampRange(fx.shelfOffsetZ == null ? fxDefaults.shelfOffsetZ : Number(fx.shelfOffsetZ), -0.9, 0.9),
     shelfAngleY: clampRange(fx.shelfAngleY == null ? fxDefaults.shelfAngleY : Number(fx.shelfAngleY), -30, 30),
     shelfAngleYManual: fx.shelfAngleYManual === true,
-    shelfOpacity: clampRange(fx.shelfOpacity == null ? fxDefaults.shelfOpacity : Number(fx.shelfOpacity), 0.25, 1),
-    shelfBgOpacity: clampRange(fx.shelfBgOpacity == null ? fxDefaults.shelfBgOpacity : Number(fx.shelfBgOpacity), 0.25, 0.98),
+    shelfOpacity: clampRange(fx.shelfOpacity == null ? fxDefaults.shelfOpacity : Number(fx.shelfOpacity), 0, 1),
+    shelfBgOpacity: clampRange(fx.shelfBgOpacity == null ? fxDefaults.shelfBgOpacity : Number(fx.shelfBgOpacity), 0, 0.98),
     shelfAccentColor: normalizeHexColor(fx.shelfAccentColor || fxDefaults.shelfAccentColor, fxDefaults.shelfAccentColor)
   };
 }
@@ -7891,8 +7896,8 @@ function saveLyricLayout(opts) {
       shelfOffsetZ: clampRange(fx.shelfOffsetZ == null ? fxDefaults.shelfOffsetZ : Number(fx.shelfOffsetZ), -0.9, 0.9),
       shelfAngleY: clampRange(fx.shelfAngleY == null ? fxDefaults.shelfAngleY : Number(fx.shelfAngleY), -30, 30),
       shelfAngleYManual: fx.shelfAngleYManual === true,
-      shelfOpacity: clampRange(fx.shelfOpacity == null ? fxDefaults.shelfOpacity : Number(fx.shelfOpacity), 0.25, 1),
-      shelfBgOpacity: clampRange(fx.shelfBgOpacity == null ? fxDefaults.shelfBgOpacity : Number(fx.shelfBgOpacity), 0.25, 0.98),
+      shelfOpacity: clampRange(fx.shelfOpacity == null ? fxDefaults.shelfOpacity : Number(fx.shelfOpacity), 0, 1),
+      shelfBgOpacity: clampRange(fx.shelfBgOpacity == null ? fxDefaults.shelfBgOpacity : Number(fx.shelfBgOpacity), 0, 0.98),
       shelfAccentColor: normalizeHexColor(fx.shelfAccentColor || fxDefaults.shelfAccentColor, fxDefaults.shelfAccentColor),
       shelfDetailOffsetX: clampRange(fx.shelfDetailOffsetX == null ? fxDefaults.shelfDetailOffsetX : Number(fx.shelfDetailOffsetX), -4.8, 4.8),
       shelfDetailOffsetY: clampRange(fx.shelfDetailOffsetY == null ? fxDefaults.shelfDetailOffsetY : Number(fx.shelfDetailOffsetY), -3.6, 3.6),
@@ -8039,8 +8044,8 @@ function shelfSettings() {
     y: normalizedShelfNumber('shelfOffsetY', fxDefaults.shelfOffsetY, -0.9, 0.9),
     z: normalizedShelfNumber('shelfOffsetZ', fxDefaults.shelfOffsetZ, -0.9, 0.9),
     angle: angleDeg * Math.PI / 180,
-    opacity: normalizedShelfNumber('shelfOpacity', fxDefaults.shelfOpacity, 0.25, 1),
-    bgOpacity: normalizedShelfNumber('shelfBgOpacity', fxDefaults.shelfBgOpacity, 0.25, 0.98),
+    opacity: normalizedShelfNumber('shelfOpacity', fxDefaults.shelfOpacity, 0, 1),
+    bgOpacity: normalizedShelfNumber('shelfBgOpacity', fxDefaults.shelfBgOpacity, 0, 0.98),
     accent: normalizeHexColor((fx && fx.shelfAccentColor) || fxDefaults.shelfAccentColor, fxDefaults.shelfAccentColor)
   };
 }
@@ -23084,9 +23089,9 @@ function makeContentListManager() {
     makeRoundRect(ctx, 24, 28, W - 48, H - 56, 34);
     var bg = ctx.createLinearGradient(0, 0, W, H);
     var panelBgAlpha = shelfSettings().bgOpacity;
-    bg.addColorStop(0, 'rgba(0,0,0,' + Math.min(0.98, panelBgAlpha + 0.02).toFixed(3) + ')');
-    bg.addColorStop(0.42, 'rgba(0,0,0,' + panelBgAlpha.toFixed(3) + ')');
-    bg.addColorStop(1, 'rgba(0,0,0,' + Math.max(0.20, panelBgAlpha - 0.04).toFixed(3) + ')');
+    bg.addColorStop(0, 'rgba(0,0,0,' + Math.min(0.98, Math.max(0, panelBgAlpha + (panelBgAlpha > 0 ? 0.02 : 0))).toFixed(3) + ')');
+    bg.addColorStop(0.42, 'rgba(0,0,0,' + Math.max(0, panelBgAlpha).toFixed(3) + ')');
+    bg.addColorStop(1, 'rgba(0,0,0,' + Math.max(0, panelBgAlpha - 0.04).toFixed(3) + ')');
     ctx.fillStyle = bg; ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.16)';
     ctx.lineWidth = 1.4;
@@ -23170,14 +23175,14 @@ function makeContentListManager() {
     makeRoundRect(ctx, 14, 10, W - 28, H - 20, 22);
     var rowGrad = ctx.createLinearGradient(0, 0, W, H);
     var rowBgAlpha = shelfSettings().bgOpacity;
-    var centerRowBgAlpha = isCenter ? Math.max(rowBgAlpha, 0.92) : rowBgAlpha;
+    var centerRowBgAlpha = isCenter ? Math.max(rowBgAlpha, 0) : rowBgAlpha;
     if (isCenter) {
       rowGrad.addColorStop(0, 'rgba(8,14,24,' + Math.min(0.985, centerRowBgAlpha + 0.040).toFixed(3) + ')');
       rowGrad.addColorStop(0.48, 'rgba(0,0,0,' + Math.min(0.985, centerRowBgAlpha + 0.030).toFixed(3) + ')');
       rowGrad.addColorStop(1, 'rgba(0,0,0,' + Math.min(0.98, centerRowBgAlpha + 0.015).toFixed(3) + ')');
     } else {
-      rowGrad.addColorStop(0, 'rgba(16,16,20,' + Math.max(0.20, rowBgAlpha - 0.02).toFixed(3) + ')');
-      rowGrad.addColorStop(1, 'rgba(0,0,0,' + Math.max(0.20, rowBgAlpha - 0.04).toFixed(3) + ')');
+      rowGrad.addColorStop(0, 'rgba(16,16,20,' + Math.max(0, rowBgAlpha - 0.02).toFixed(3) + ')');
+      rowGrad.addColorStop(1, 'rgba(0,0,0,' + Math.max(0, rowBgAlpha - 0.04).toFixed(3) + ')');
     }
     if (isCenter) {
       ctx.shadowColor = canvasAccent(0.20);
@@ -24234,6 +24239,7 @@ function normalizePlaybackQuality(value) {
 }
 function normalizePlaybackProvider(provider) {
   if (provider === 'spotify') return 'spotify';
+  if (provider === 'soundcloud') return 'soundcloud';
   if (provider === 'local') return 'local';
   return 'youtube';
 }
@@ -24241,6 +24247,7 @@ function normalizePlaybackQualityForProvider(value, provider) {
   provider = normalizePlaybackProvider(provider);
   var q = normalizePlaybackQuality(value);
   if (provider === 'youtube' && q === 'jymaster') return 'hires';
+  if (provider === 'soundcloud' && q !== 'low') return 'standard';
   return q;
 }
 function playbackQualityOptions(provider) {
@@ -24360,7 +24367,7 @@ function playbackResolvedQualityText(data, provider) {
   return br ? (label + ' · ' + br) : label;
 }
 function readPlaybackQualityPreference() {
-  var fallback = { youtube: PLAYBACK_QUALITY_DEFAULTS.youtube, spotify: PLAYBACK_QUALITY_DEFAULTS.spotify };
+  var fallback = { youtube: PLAYBACK_QUALITY_DEFAULTS.youtube, spotify: PLAYBACK_QUALITY_DEFAULTS.spotify, soundcloud: PLAYBACK_QUALITY_DEFAULTS.soundcloud };
   try {
     var raw = localStorage.getItem(PLAYBACK_QUALITY_STORE_KEY) || '';
     if (!raw) return fallback;
@@ -25188,6 +25195,12 @@ function coverProxySrc(url, cacheBust) {
 function coverUrlWithSize(url, size) {
   if (!url || isInlineCoverSrc(url) || !/^https?:\/\//i.test(url)) return url || '';
   if (!size) return url;
+  // SoundCloud CDN artwork uses filename size variants (t300x300, t500x500,
+  // etc.), not the QQ-style ?param=WxH query used by other providers.
+  if (/sndcdn\.com\//i.test(url)) {
+    var scToken = size >= 500 ? 't500x500' : size >= 400 ? 'crop' : size >= 300 ? 't300x300' : size >= 100 ? 'large' : 'small';
+    return url.replace(/-(?:mini|tiny|small|badge|t67x67|large|t300x300|crop|t500x500|original)\.(jpg|png)(?:\?.*)?$/i, '-' + scToken + '.$1');
+  }
   var param = 'param=' + size + 'y' + size;
   if (/[?&]param=\d+y\d+/i.test(url)) return url.replace(/([?&])param=\d+y\d+/i, '$1' + param);
   return url + (url.indexOf('?') >= 0 ? '&' : '?') + param;
@@ -25316,7 +25329,7 @@ function listenReportProvider(snapshot) {
     (snapshot && (snapshot.provider || snapshot.sourceKey || snapshot.resolvedPlaybackProvider)) || ''
   ).trim().toLowerCase();
   if (provider === 'song' || provider === 'music' || !provider) provider = 'youtube';
-  if (/^(youtube|spotify)$/.test(provider) && typeof normalizePlaybackProvider === 'function') {
+  if (/^(youtube|spotify|soundcloud)$/.test(provider) && typeof normalizePlaybackProvider === 'function') {
     provider = normalizePlaybackProvider(provider);
   }
   return provider;
@@ -28561,13 +28574,15 @@ function currentCoverSong() {
 }
 function songDurationLabel(song) {
   var sec = playbackDurationFromSong(song);
-  if (!sec && audio && isFinite(audio.duration) && audio.duration > 0) sec = audio.duration;
+  var provider = song && String(song.provider || song.source || song.type || '').toLowerCase();
+  if (!sec && provider !== 'soundcloud' && audio && isFinite(audio.duration) && audio.duration > 0) sec = audio.duration;
   if (!sec) return 'Không rõ';
   return formatProgramTime(sec);
 }
 function songSourceLabel(song) {
   if (!song) return 'Không rõ';
   if (song.provider === 'spotify' || song.source === 'spotify' || song.type === 'spotify' || song.spotifyId || song.spotifyUri) return 'Spotify';
+  if (song.provider === 'soundcloud' || song.source === 'soundcloud' || song.type === 'soundcloud' || song.soundcloudId || song.soundcloudPermalink) return 'SoundCloud';
   if (song.sourceType === 'video' || song.youtubeSourceType === 'video' || song.provider === 'youtube-video' || song.source === 'youtube-video') return 'YouTube Video';
   if (song.provider === 'youtube' || song.source === 'youtube' || song.type === 'youtube' || song.provider === 'qq' || song.source === 'qq' || song.youtubeId || song.videoId) return 'YouTube Music';
   if (song.type === 'local' || song.source === 'local' || song.localKey) return localizeUiMessage('Nhạc cục bộ');
@@ -29612,11 +29627,19 @@ var SONG_ACCOUNT_ACTION_ADAPTERS = {
     provider: 'youtube', label: 'YouTube Music', like: false, collect: false, createPlaylist: false,
     likeCheckUrl: '', likeUrl: '', playlistAddUrl: '', playlistCreateUrl: '',
     playlistTracksUrl: '/api/youtube-music/playlist/tracks'
+  },
+  soundcloud: {
+    provider: 'soundcloud', label: 'SoundCloud', like: false, collect: false, createPlaylist: false,
+    likeCheckUrl: '', likeUrl: '', playlistAddUrl: '', playlistCreateUrl: '',
+    playlistTracksUrl: ''
   }
 };
 function songAccountProvider(song) {
   if (!song) return 'youtube';
-  return songProviderKey(song) === 'spotify' ? 'spotify' : 'youtube';
+  var provider = songProviderKey(song);
+  if (provider === 'spotify') return 'spotify';
+  if (provider === 'soundcloud') return 'soundcloud';
+  return 'youtube';
 }
 function songAccountAdapter(songOrProvider) {
   var provider = typeof songOrProvider === 'string' ? normalizePlaybackProvider(songOrProvider) : songAccountProvider(songOrProvider);
@@ -30035,7 +30058,7 @@ var searchLastResultQuery = '';
 var searchProviderNotice = '';
 var SEARCH_HISTORY_STORE_KEY = 'shinayuu-v2-search-history';
 var SEARCH_HISTORY_STORE_VERSION = 3;
-var SEARCH_HISTORY_MODES = ['song', 'netease', 'ytmusic', 'ytvideo', 'podcast'];
+var SEARCH_HISTORY_MODES = ['song', 'netease', 'soundcloud', 'ytmusic', 'ytvideo', 'podcast'];
 var MUSIC_SEARCH_INITIAL_VISIBLE = 18;
 var MUSIC_SEARCH_APPEND_BATCH = 14;
 var MUSIC_SEARCH_MAX_RESULTS = 180;
@@ -30191,11 +30214,13 @@ function runSearchHistory(q) {
 function updateSearchModeTabs() {
   var songBtn = document.getElementById('search-mode-song');
   var neteaseBtn = document.getElementById('search-mode-netease');
+  var soundcloudBtn = document.getElementById('search-mode-soundcloud');
   var ytMusicBtn = document.getElementById('search-mode-ytmusic');
   var ytVideoBtn = document.getElementById('search-mode-ytvideo');
   var podcastBtn = document.getElementById('search-mode-podcast');
   if (songBtn) { songBtn.classList.toggle('active', searchMode === 'song'); songBtn.setAttribute('aria-selected', searchMode === 'song' ? 'true' : 'false'); songBtn.textContent = window.appLanguage === 'en' ? 'All' : 'Tất cả'; }
   if (neteaseBtn) { neteaseBtn.classList.toggle('active', searchMode === 'netease'); neteaseBtn.setAttribute('aria-selected', searchMode === 'netease' ? 'true' : 'false'); neteaseBtn.textContent = 'Spotify'; }
+  if (soundcloudBtn) { soundcloudBtn.classList.toggle('active', searchMode === 'soundcloud'); soundcloudBtn.setAttribute('aria-selected', searchMode === 'soundcloud' ? 'true' : 'false'); soundcloudBtn.textContent = 'SoundCloud'; }
   if (ytMusicBtn) { ytMusicBtn.classList.toggle('active', searchMode === 'ytmusic'); ytMusicBtn.setAttribute('aria-selected', searchMode === 'ytmusic' ? 'true' : 'false'); ytMusicBtn.textContent = 'YouTube Music'; }
   if (ytVideoBtn) { ytVideoBtn.classList.toggle('active', searchMode === 'ytvideo'); ytVideoBtn.setAttribute('aria-selected', searchMode === 'ytvideo' ? 'true' : 'false'); ytVideoBtn.textContent = 'YouTube Video'; }
   if (podcastBtn) { podcastBtn.classList.toggle('active', searchMode === 'podcast'); podcastBtn.setAttribute('aria-selected', searchMode === 'podcast' ? 'true' : 'false'); podcastBtn.textContent = 'Podcast'; }
@@ -30204,6 +30229,7 @@ function updateSearchModeTabs() {
     else if (searchMode === 'ytmusic') $input.placeholder = window.appLanguage === 'en' ? 'Search YouTube Music songs...' : 'Tìm bài hát trên YouTube Music...';
     else if (searchMode === 'ytvideo') $input.placeholder = window.appLanguage === 'en' ? 'Search normal YouTube videos...' : 'Tìm video YouTube thông thường...';
     else if (searchMode === 'netease') $input.placeholder = window.appLanguage === 'en' ? 'Search Spotify...' : 'Tìm trên Spotify...';
+    else if (searchMode === 'soundcloud') $input.placeholder = window.appLanguage === 'en' ? 'Search SoundCloud...' : 'Tìm trên SoundCloud...';
     else $input.placeholder = window.appLanguage === 'en' ? 'Search songs and artists...' : 'Tìm bài hát, nghệ sĩ...';
   }
   requestAnimationFrame(updateSearchPillGlassDisplacementMap);
@@ -30212,7 +30238,7 @@ function setSearchMode(mode) {
   if (mode === 'qq' || mode === 'youtube') mode = 'ytmusic';
   if (mode === 'youtube-video') mode = 'ytvideo';
   if (mode === 'spotify') mode = 'netease';
-  mode = (mode === 'podcast' || mode === 'netease' || mode === 'ytmusic' || mode === 'ytvideo') ? mode : 'song';
+  mode = (mode === 'podcast' || mode === 'netease' || mode === 'soundcloud' || mode === 'ytmusic' || mode === 'ytvideo') ? mode : 'song';
   if (searchMode === mode) { updateSearchModeTabs(); return; }
   searchMode = mode;
   updateSearchModeTabs();
@@ -30449,6 +30475,7 @@ updateSearchModeTabs();
 function songProviderKey(song) {
   if (song && (song.type === 'local' || song.source === 'local' || song.provider === 'local' || song.localUrl)) return 'local';
   if (song && (song.provider === 'spotify' || song.source === 'spotify' || song.type === 'spotify' || song.spotifyId || song.spotifyUri)) return 'spotify';
+  if (song && (song.provider === 'soundcloud' || song.source === 'soundcloud' || song.type === 'soundcloud' || song.soundcloudId || song.soundcloudPermalink)) return 'soundcloud';
   if (song && (song.sourceType === 'video' || song.youtubeSourceType === 'video' || song.provider === 'youtube-video' || song.source === 'youtube-video')) return 'youtube-video';
   return 'youtube';
 }
@@ -30456,7 +30483,7 @@ function songSourceTagHtml(song, opts) {
   opts = opts || {};
   var rawKey = song && (song.resolvedPlaybackProvider || song.playbackProvider || song.audioProvider || song.providerResolved || '');
   var key = String(rawKey || '') === 'spotify' ? 'spotify' : songProviderKey(song);
-  var label = key === 'youtube' ? 'YM' : (key === 'youtube-video' ? 'MV' : (key === 'spotify' ? 'SP' : 'LC'));
+  var label = key === 'youtube' ? 'YM' : (key === 'youtube-video' ? 'MV' : (key === 'spotify' ? 'SP' : (key === 'soundcloud' ? 'SC' : 'LC')));
   if (opts.switcher) {
     return '<button type="button" class="tag-source ' + key + ' control-source-chip" title="Chuyển nguồn phát" aria-haspopup="true" onclick="toggleControlSourceSwitcher(event)">' + label + '</button>';
   }
@@ -30466,6 +30493,7 @@ var controlSourceSwitcherState = { open: false, loading: false, requestId: 0, an
 function controlSourceProviders() {
   return [
     { key: 'spotify', label: 'SP', title: 'Spotify' },
+    { key: 'soundcloud', label: 'SC', title: 'SoundCloud' },
     { key: 'youtube', label: 'YM', title: 'YouTube Music' },
     { key: 'youtube-video', label: 'MV', title: 'YouTube Video' },
     { key: 'local', label: 'LC', title: 'Local Music' }
@@ -30477,6 +30505,7 @@ function controlSourceProviderTitle(provider) {
 }
 function controlSourceSearchUrl(provider, query) {
   if (provider === 'spotify') return '/api/spotify/search?keywords=' + encodeURIComponent(query) + '&limit=8';
+  if (provider === 'soundcloud') return '/api/soundcloud/search?keywords=' + encodeURIComponent(query) + '&limit=8';
   if (provider === 'youtube-video') return '/api/youtube-video/search?keywords=' + encodeURIComponent(query) + '&limit=8';
   if (provider === 'local') return '/api/local/search?keywords=' + encodeURIComponent(query) + '&limit=8';
   return '/api/youtube-music/search?keywords=' + encodeURIComponent(query) + '&limit=8';
@@ -30725,6 +30754,7 @@ function searchResultMetaText(song) {
   if (song.album) bits.push(song.album);
   if (songProviderKey(song) === 'youtube' && !song.playable) bits.push('YouTube Music cần phiên đăng nhập hoặc quyền phát');
   if (songProviderKey(song) === 'spotify' && !song.playable) bits.push('Spotify cần đăng nhập Premium để phát trong ứng dụng');
+  if (songProviderKey(song) === 'soundcloud' && song.externalUrl) bits.push('SoundCloud · ' + song.artist);
   return bits.join('  ·  ') || songSourceLabel(song);
 }
 function searchResultMetaHtml(song, index) {
@@ -30734,6 +30764,7 @@ function searchResultMetaHtml(song, index) {
   if (song.album) bits.push(song.album);
   if (songProviderKey(song) === 'youtube' && !song.playable) bits.push('YouTube Music cần phiên đăng nhập hoặc quyền phát');
   if (songProviderKey(song) === 'spotify' && !song.playable) bits.push('Spotify cần đăng nhập Premium để phát trong ứng dụng');
+  if (songProviderKey(song) === 'soundcloud' && song.externalUrl) bits.push('SoundCloud · ' + song.artist);
   var tail = bits.length ? (' · ' + escHtml(bits.join('  ·  '))) : '';
   if (!artist) return escHtml(searchResultMetaText(song));
   return '<button class="search-artist-link" type="button" onclick="event.stopPropagation();openSearchResultArtist(' + index + ')">' + escHtml(artist) + '</button>' + tail;
@@ -30747,10 +30778,11 @@ function searchIntentPrefersYouTube(q) {
   q = String(q || '').toLowerCase();
   return /(^|\s)youtube($|\s)|youtube音乐|youtube音樂/.test(q);
 }
-var MUSIC_SEARCH_PROVIDER_ORDER = ['spotify', 'youtube', 'youtube-video'];
+var MUSIC_SEARCH_PROVIDER_ORDER = ['spotify', 'soundcloud', 'youtube', 'youtube-video'];
 function searchProviderStatus(provider) {
   if (provider === 'spotify') return spotifyLoginStatus || {};
   if (provider === 'local') return { loggedIn: true, searchReady: true, publicCatalog: true };
+  if (provider === 'soundcloud') return { loggedIn: false, searchReady: true, publicCatalog: true, message: 'SoundCloud web search sẵn sàng · không cần Client ID / Client Secret' };
   return youtubeLoginStatus || {};
 }
 function searchProviderIsLoggedIn(provider) {
@@ -30772,6 +30804,7 @@ function searchProviderCanSearch(provider) {
 }
 function searchModeProvider(mode) {
   if (mode === 'netease' || mode === 'spotify') return 'spotify';
+  if (mode === 'soundcloud') return 'soundcloud';
   if (mode === 'ytmusic' || mode === 'qq' || mode === 'youtube') return 'youtube';
   if (mode === 'ytvideo' || mode === 'youtube-video') return 'youtube-video';
   return '';
@@ -30793,6 +30826,7 @@ function searchProviderUrl(provider, q, limit, offset) {
   var suffix = '&limit=' + limit + '&offset=' + Math.max(0, Number(offset) || 0);
   if (provider === 'spotify') return '/api/spotify/search?keywords=' + encodeURIComponent(q) + suffix;
   if (provider === 'youtube-video') return '/api/youtube-video/search?keywords=' + encodeURIComponent(q) + suffix;
+  if (provider === 'soundcloud') return '/api/soundcloud/search?keywords=' + encodeURIComponent(q) + suffix;
   if (provider === 'local') return '/api/local/search?keywords=' + encodeURIComponent(q) + suffix;
   return '/api/youtube-music/search?keywords=' + encodeURIComponent(q) + suffix;
 }
@@ -31017,6 +31051,7 @@ function scoreSongSearchResult(song, q, sourceIndex) {
 }
 function searchSourceGroupForProvider(provider) {
   if (provider === 'spotify') return 'netease';
+  if (provider === 'soundcloud') return 'soundcloud';
   if (provider === 'youtube-video') return 'ytvideo';
   return 'ytmusic';
 }
@@ -31035,7 +31070,7 @@ function prepareSourceSearchResults(items, q, provider) {
       song.youtubeSurface = 'video';
       song.isYouTubeMusicResult = false;
     }
-    var id = song.mid || song.songmid || song.videoId || song.youtubeId || song.spotifyId || song.id || (song.name + '|' + song.artist);
+    var id = song.mid || song.songmid || song.videoId || song.youtubeId || song.spotifyId || song.soundcloudId || song.id || (song.name + '|' + song.artist);
     var key = provider + ':' + id;
     if (seen[key]) return;
     seen[key] = true;
@@ -31050,7 +31085,7 @@ function appendUniqueSearchGroup(target, source, count, seenIds) {
   var added = 0;
   for (var i = 0; i < source.length && added < count; i++) {
     var song = source[i];
-    var id = song.mid || song.songmid || song.videoId || song.youtubeId || song.spotifyId || song.id || (song.name + '|' + song.artist);
+    var id = song.mid || song.songmid || song.videoId || song.youtubeId || song.spotifyId || song.soundcloudId || song.id || (song.name + '|' + song.artist);
     var provider = songProviderKey(song);
     var crossSourceKey = (provider === 'youtube' || provider === 'youtube-video') ? ('youtube:' + id) : (provider + ':' + id);
     if (seenIds[crossSourceKey]) continue;
@@ -31074,6 +31109,7 @@ function mergeSongSearchResults(pools, limit, q, mode) {
   limit = Math.max(1, Number(limit) || 20);
   mode = mode || searchMode || 'song';
   var spotify = prepareSourceSearchResults(pools && pools.spotify, q, 'spotify');
+  var soundcloud = prepareSourceSearchResults(pools && pools.soundcloud, q, 'soundcloud');
   var music = prepareSourceSearchResults(pools && pools.youtube, q, 'youtube');
   var videos = prepareSourceSearchResults(pools && pools['youtube-video'], q, 'youtube-video');
   var seen = {};
@@ -31084,9 +31120,12 @@ function mergeSongSearchResults(pools, limit, q, mode) {
   }
   var out = [];
   if (mode === 'netease' || mode === 'spotify') out = select(spotify, limit, []);
+  else if (mode === 'soundcloud') out = select(soundcloud, limit, []);
   else if (mode === 'ytvideo' || mode === 'youtube-video') out = select(videos, limit, []);
   else if (mode === 'ytmusic' || mode === 'qq' || mode === 'youtube') out = select(music, limit, []);
   else {
+    var soundcloudQuota = Math.min(soundcloud.length, Math.max(4, Math.floor(limit * 0.25)));
+    select(soundcloud, soundcloudQuota, out);
     var spotifyQuota = Math.min(spotify.length, Math.max(5, Math.floor(limit * 0.35)));
     var musicQuota = Math.min(music.length, Math.max(7, Math.floor(limit * 0.45)));
     var videoQuota = Math.min(videos.length, Math.max(3, limit - spotifyQuota - musicQuota));
@@ -31115,7 +31154,7 @@ function searchProviderPagesHaveMore(providerPages) {
   });
 }
 function mergeUniqueSearchSongPools(existing, incoming) {
-  var pools = { spotify: [], youtube: [], 'youtube-video': [] };
+  var pools = { spotify: [], soundcloud: [], youtube: [], 'youtube-video': [] };
   (existing || []).concat(incoming || []).forEach(function (song) {
     var provider = songProviderKey(song);
     if (!pools[provider]) return;
@@ -31135,7 +31174,7 @@ async function fetchMusicSearchResults(q, mode, previousPages) {
   Object.keys(previousPages || {}).forEach(function (provider) {
     providerPages[provider] = Object.assign({}, previousPages[provider]);
   });
-  var pageLimitByProvider = { youtube: 18, 'youtube-video': 18, spotify: 14, local: 24 };
+  var pageLimitByProvider = { youtube: 18, 'youtube-video': 18, spotify: 14, soundcloud: 50, local: 24 };
   var fetchProviders = providers.filter(function (provider) {
     return !previousPages || !previousPages[provider] || previousPages[provider].hasMore;
   });
@@ -31147,7 +31186,7 @@ async function fetchMusicSearchResults(q, mode, previousPages) {
       return { provider: provider, offset: offset, requestedLimit: limit, value: value || {} };
     });
   }));
-  var songsByProvider = { youtube: [], 'youtube-video': [], spotify: [], local: [] };
+  var songsByProvider = { youtube: [], 'youtube-video': [], spotify: [], soundcloud: [], local: [] };
   fetchProviders.forEach(function (provider, index) {
     var entry = result[index];
     if (!entry || entry.status !== 'fulfilled') {
@@ -32188,6 +32227,7 @@ function playbackRestoreSongSnapshot(song) {
   [
     'provider', 'source', 'type', 'id', 'mid', 'songmid', 'mediaMid', 'media_mid', 'youtubeId',
     'spotifyId', 'spotifyUri', 'spotifyUrl', 'uri', 'albumUri',
+    'soundcloudId', 'soundcloudPermalink', 'soundcloudUrl', 'externalUrl',
     'hash', 'fileHash', 'audioHash', 'albumId', 'album_id', 'albumMid', 'albummid', 'albumAudioId', 'album_audio_id', 'mixSongId', 'hqHash', 'sqHash', 'resHash',
     'name', 'title', 'artist', 'album', 'cover', 'duration', 'durationMs', 'dt', 'fee',
     'playable', 'playbackMode', 'recommendationSource', 'programId', 'radioId', 'radioName', 'localKey'
@@ -32632,6 +32672,7 @@ function playbackPlatformKey(song) {
 function playbackProviderLabel(song) {
   var platform = playbackPlatformKey(song);
   if (platform === 'spotify') return 'Spotify';
+  if (platform === 'soundcloud') return 'SoundCloud';
   if (platform === 'youtube-video') return 'YouTube Video';
   return 'YouTube Music';
 }
@@ -32927,7 +32968,7 @@ function isSameTitleArtist(source, candidate) {
   return a.some(function (name) { return b.indexOf(name) >= 0; });
 }
 var SOURCE_FALLBACK_SEARCH_TIMEOUT_MS = 6500;
-var SOURCE_FALLBACK_DIRECT_PROVIDERS = ['youtube-music', 'youtube-video', 'spotify'];
+var SOURCE_FALLBACK_DIRECT_PROVIDERS = ['youtube-music', 'youtube-video', 'spotify', 'soundcloud'];
 var SOURCE_FALLBACK_RECOVERY_TIMEOUT_MS = 20000;
 var SOURCE_FALLBACK_MAX_QUEUE_ADVANCES = 2;
 var SOURCE_FALLBACK_MAX_PROVIDER_ATTEMPTS = 4;
@@ -33218,6 +33259,7 @@ function awaitSourceFallbackBudget(promise, recovery) {
 function sourceFallbackProviderTitle(provider) {
   provider = sourceFallbackLogicalProviderKey(provider);
   if (provider === 'spotify') return 'Spotify';
+  if (provider === 'soundcloud') return 'SoundCloud';
   if (provider === 'youtube-video') return 'YouTube Video';
   return 'YouTube Music';
 }
@@ -33225,16 +33267,22 @@ function sourceFallbackProviderReady(provider) {
   provider = sourceFallbackLogicalProviderKey(provider);
   if (SOURCE_FALLBACK_DIRECT_PROVIDERS.indexOf(provider) < 0) return false;
   if (provider === 'youtube-music' || provider === 'youtube-video') return true;
+  if (provider === 'soundcloud') {
+    var sc = typeof platformStatus === 'function' ? platformStatus('soundcloud') : null;
+    return !!(sc && sc.configured && sc.searchReady);
+  }
   var status = typeof platformStatus === 'function' ? platformStatus('spotify') : null;
   return !!(status && status.loggedIn);
 }
 function alternatePlaybackProviders(song) {
   var currentProvider = playbackPlatformKey(song);
   var preferred = currentProvider === 'spotify'
-    ? ['youtube-music', 'youtube-video']
+    ? ['youtube-music', 'youtube-video', 'soundcloud']
     : (currentProvider === 'youtube-video'
-      ? ['youtube-music', 'spotify']
-      : ['youtube-video', 'spotify']);
+      ? ['youtube-music', 'spotify', 'soundcloud']
+      : (currentProvider === 'soundcloud'
+        ? ['youtube-music', 'youtube-video', 'spotify']
+        : ['youtube-video', 'spotify', 'soundcloud']));
   var accountOrder = typeof accountProviderOrder === 'function' ? accountProviderOrder() : [];
   accountOrder.forEach(function (provider) {
     provider = sourceFallbackLogicalProviderKey(provider);
@@ -33460,6 +33508,10 @@ async function skipFailedQueueItem(idx, token, message, opts) {
 }
 async function tryAutoPlaybackFallback(song, data, idx, token, opts) {
   opts = opts || {};
+  // A SoundCloud search result is an exact user-selected track. Never silently
+  // replace it with a YouTube/Spotify match: that can change the remix/version.
+  // Let the SoundCloud resolver report the real playback failure instead.
+  if (song && typeof songProviderKey === 'function' && songProviderKey(song) === 'soundcloud') return null;
   if (opts.fallbackDepth > 0) {
     if (opts.fallbackOriginalSong && opts.fallbackCandidateSong) {
       restoreSourceFallbackQueueItem(idx, opts.fallbackOriginalSong, opts.fallbackCandidateSong, token);
@@ -33767,7 +33819,7 @@ function shinayuuPlaybackDescriptorKey(song, quality) {
   var provider = normalizePlaybackProvider(sourceProvider);
   var id = provider === 'spotify'
     ? (song.spotifyId || song.id || song.providerSongId || '')
-    : (song.youtubeId || song.id || song.mid || song.songmid || '');
+    : (provider === 'soundcloud' ? (song.externalUrl || song.soundcloudPermalink || song.soundcloudUrl || song.soundcloudId || song.id || song.providerSongId || '') : (song.youtubeId || song.id || song.mid || song.songmid || ''));
   var sourceType = sourceProvider === 'youtube-video' ? 'video' : 'music';
   return [provider, sourceType, String(id), String(quality || '')].join('|');
 }
@@ -33781,13 +33833,15 @@ async function resolvePlaybackDescriptor(song, quality, options) {
   var key = shinayuuPlaybackDescriptorKey(song, requestedQuality);
   var now = Date.now();
   var cached = shinayuuPlaybackDescriptorCache.get(key);
-  var ttl = provider === 'spotify' ? SHINAYUU_SPOTIFY_DESCRIPTOR_TTL_MS : SHINAYUU_YOUTUBE_DESCRIPTOR_TTL_MS;
+  var ttl = provider === 'spotify' ? SHINAYUU_SPOTIFY_DESCRIPTOR_TTL_MS : (provider === 'soundcloud' ? 90 * 1000 : SHINAYUU_YOUTUBE_DESCRIPTOR_TTL_MS);
   if (!options.refresh && cached && now - cached.at < ttl && cached.data && shinayuuDescriptorHasPlayback(cached.data)) return cached.data;
   if (!options.refresh && shinayuuPlaybackDescriptorInflight.has(key)) return shinayuuPlaybackDescriptorInflight.get(key);
   var qualityParam = '&quality=' + encodeURIComponent(requestedQuality);
   var promise;
   if (provider === 'spotify') {
     promise = apiJson('/api/spotify/song/url?id=' + encodeURIComponent(song.spotifyId || song.id || song.providerSongId || '') + qualityParam, { timeoutMs: options.prefetch ? 7000 : 9000 });
+  } else if (provider === 'soundcloud') {
+    promise = apiJson('/api/soundcloud/song/url?id=' + encodeURIComponent(song.externalUrl || song.soundcloudPermalink || song.soundcloudUrl || song.soundcloudId || song.id || song.providerSongId || '') + qualityParam, { timeoutMs: options.prefetch ? 9000 : 12000 });
   } else {
     promise = apiJson(youtubePlaybackUrlRoute(song) + '?id=' + encodeURIComponent(song.youtubeId || song.id || song.mid || song.songmid || '') + qualityParam + '&sourceType=' + encodeURIComponent(sourceProvider === 'youtube-video' ? 'video' : 'music'), { timeoutMs: options.prefetch ? 11000 : 15000 });
   }
@@ -33807,7 +33861,7 @@ function invalidatePlaybackDescriptorForSong(song) {
   var sourceProvider = songProviderKey(song);
   var id = provider === 'spotify'
     ? (song.spotifyId || song.id || song.providerSongId || '')
-    : (song.youtubeId || song.id || song.mid || song.songmid || '');
+    : (provider === 'soundcloud' ? (song.externalUrl || song.soundcloudPermalink || song.soundcloudUrl || song.soundcloudId || song.id || song.providerSongId || '') : (song.youtubeId || song.id || song.mid || song.songmid || ''));
   var sourceType = sourceProvider === 'youtube-video' ? 'video' : 'music';
   var prefix = [provider, sourceType, String(id), ''].join('|');
   Array.from(shinayuuPlaybackDescriptorCache.keys()).forEach(function (key) {
@@ -34241,6 +34295,9 @@ async function resolveAlbumGaplessPlaybackData(song) {
   }
   if (playbackProvider === 'spotify') {
     return apiJson('/api/spotify/song/url?id=' + encodeURIComponent(song.spotifyId || song.id || song.providerSongId || '') + qualityParam, { timeoutMs: 9000 });
+  }
+  if (playbackProvider === 'soundcloud') {
+    return apiJson('/api/soundcloud/song/url?id=' + encodeURIComponent(song.externalUrl || song.soundcloudPermalink || song.soundcloudUrl || song.soundcloudId || song.id || song.providerSongId || '') + qualityParam, { timeoutMs: 12000 });
   }
   return apiJson(youtubePlaybackUrlRoute(song) + '?id=' + encodeURIComponent(song.youtubeId || song.id || song.mid || song.songmid || '') + qualityParam + '&sourceType=' + encodeURIComponent(sourceProvider === 'youtube-video' ? 'video' : 'music'), { timeoutMs: 15000 });
 }
@@ -34891,6 +34948,14 @@ async function playQueueAt(idx, opts) {
         return settleExpiredSourceFallbackPlayback(idx, token, opts);
       }
       if (data) {
+        if (playbackProvider === 'soundcloud' && Number(data.duration) > 0) {
+          var soundcloudDurationMs = Number(data.duration);
+          // Backend duration is milliseconds; keep the queue item's duration in
+          // the same unit when it is declared that way, otherwise normalize from
+          // seconds. This value is authoritative for the progress clock.
+          song.duration = soundcloudDurationMs > 1000 ? Math.round(soundcloudDurationMs) : Math.round(soundcloudDurationMs * 1000);
+          song.durationMs = song.duration;
+        }
         song.resolvedPlaybackProvider = playbackProvider;
         song.playbackLevel = data.level || song.playbackLevel || '';
         if (!data.sourceMatch) song.playbackSource = data.source || data.provider || song.playbackSource || '';
@@ -35415,7 +35480,7 @@ function currentResumeSeconds(fallback) {
 function canRefreshCurrentPlaybackUrlForResume(song) {
   if (!song || song.type === 'local' || song.source === 'local' || song.localUrl) return false;
   var provider = normalizePlaybackProvider(songProviderKey(song));
-  return provider === 'youtube' || provider === 'spotify';
+  return provider === 'youtube' || provider === 'spotify' || provider === 'soundcloud';
 }
 
 function playbackResumeProvider(song) {
@@ -39088,6 +39153,13 @@ function lyricEndpointForSong(songOrId) {
   if (provider === 'local') {
     return '/api/local/lyrics?id=' + encodeURIComponent(song.localKey || song.id || song.providerSongId || '');
   }
+  if (provider === 'soundcloud') {
+    var soundcloudId = song.soundcloudId || song.id || song.providerSongId || '';
+    return '/api/soundcloud/lyric?id=' + encodeURIComponent(soundcloudId) +
+      '&track=' + encodeURIComponent(song.name || song.title || '') + '&artist=' + encodeURIComponent(song.artist || '') +
+      '&album=' + encodeURIComponent(song.album || '') + '&duration=' + encodeURIComponent(playbackDurationFromSong(song) || '') +
+      '&language=' + encodeURIComponent(window.appLanguage || 'vi');
+  }
   if (provider === 'spotify') {
     var exactSpotifyId = song.currentTrackId || song.actualSpotifyId || song.spotifyId || song.providerSongId || song.id || '';
     return '/api/spotify/lyric?id=' + encodeURIComponent(exactSpotifyId) +
@@ -39110,7 +39182,7 @@ function persistentLyricCacheKey(song) {
   var provider = typeof songProviderKey === 'function' ? songProviderKey(song) : (song.source || song.provider || 'youtube');
   var id = provider === 'spotify'
     ? (song.currentTrackId || song.actualSpotifyId || song.spotifyId || song.providerSongId || song.id || '')
-    : (song.id || song.mid || song.songmid || song.hash || '');
+    : (provider === 'soundcloud' ? (song.soundcloudId || song.providerSongId || song.id || '') : (song.id || song.mid || song.songmid || song.hash || ''));
   var artist = song.artist || song.singer || song.artists || '';
   return ['lyrics-v1', provider, id, song.name || song.title || '', artist].join('|');
 }
@@ -41783,13 +41855,20 @@ function activeAutoMixHandoffClock() {
   return clock;
 }
 function getPlaybackDurationSeconds() {
+  var currentSong = currentCoverSong();
+  var currentProvider = currentSong && String(currentSong.provider || currentSong.source || currentSong.type || '').toLowerCase();
+  var declaredDuration = playbackDurationFromSong(currentSong);
+  // SoundCloud is delivered through a live/transcoded proxy. Chromium and an
+  // AutoMix handoff media element can expose a bogus multi-hour duration for
+  // this kind of stream. The catalog duration is authoritative.
+  if (currentProvider === 'soundcloud' && declaredDuration > 0) return declaredDuration;
   var handoff = activeAutoMixHandoffClock();
   if (handoff) {
     var liveDuration = Number(handoff.media.duration) || Number(handoff.duration) || 0;
     if (liveDuration > 0) return liveDuration;
   }
-  if (audio && isFinite(audio.duration) && audio.duration > 0) return audio.duration;
-  return playbackDurationFromSong(currentCoverSong());
+  if (audio && isFinite(audio.duration) && audio.duration > 0 && audio.duration < 24 * 60 * 60) return audio.duration;
+  return declaredDuration;
 }
 function getPlaybackCurrentSeconds() {
   var handoff = activeAutoMixHandoffClock();
@@ -43491,8 +43570,8 @@ function normalizeFxArchiveSnapshot(raw) {
     shelfOffsetZ: archiveNumber(raw, 'shelfOffsetZ', fxDefaults.shelfOffsetZ, -0.9, 0.9),
     shelfAngleY: archiveNumber(raw, 'shelfAngleY', fxDefaults.shelfAngleY, -30, 30),
     shelfAngleYManual: raw.shelfAngleYManual === true,
-    shelfOpacity: archiveNumber(raw, 'shelfOpacity', fxDefaults.shelfOpacity, 0.25, 1),
-    shelfBgOpacity: archiveNumber(raw, 'shelfBgOpacity', fxDefaults.shelfBgOpacity, 0.25, 0.98),
+    shelfOpacity: archiveNumber(raw, 'shelfOpacity', fxDefaults.shelfOpacity, 0, 1),
+    shelfBgOpacity: archiveNumber(raw, 'shelfBgOpacity', fxDefaults.shelfBgOpacity, 0, 0.98),
     shelfAccentColor: normalizeHexColor(raw.shelfAccentColor || fxDefaults.shelfAccentColor, fxDefaults.shelfAccentColor),
     shelfDetailOffsetX: archiveNumber(raw, 'shelfDetailOffsetX', fxDefaults.shelfDetailOffsetX, -4.8, 4.8),
     shelfDetailOffsetY: archiveNumber(raw, 'shelfDetailOffsetY', fxDefaults.shelfDetailOffsetY, -3.6, 3.6),
@@ -44622,6 +44701,7 @@ function applyCustomBackground() {
   var override = albumMode || !!media || customColor || opacity < 1 || windowOpacity < 0.999 || glassActive;
   var root = document.documentElement;
   var layer = document.getElementById('custom-bg');
+  var coverImage = document.getElementById('custom-bg-image');
   var video = document.getElementById('custom-bg-video');
   root.style.setProperty('--custom-bg-color', color);
   root.style.setProperty('--custom-bg-color-rgb', rgb.r + ', ' + rgb.g + ', ' + rgb.b);
@@ -44631,12 +44711,22 @@ function applyCustomBackground() {
   document.body.classList.toggle('custom-background-flat', override && !media);
   document.body.classList.toggle('custom-background-album-cover', albumMode);
   document.body.classList.toggle('custom-background-video', hasVideo);
+  document.body.classList.toggle('custom-background-image-cover', albumMode && !!image);
   document.body.classList.toggle('custom-window-transparent', windowOpacity < 0.999);
   document.body.classList.toggle('custom-bg-glass-active', glassActive);
   if (layer) {
     layer.style.setProperty('--custom-bg-image', image ? 'url("' + cssImageUrl(image) + '")' : 'none');
     layer.style.setProperty('--custom-bg-image-opacity', image ? opacity.toFixed(3) : '0');
     layer.style.setProperty('--custom-bg-video-opacity', hasVideo ? opacity.toFixed(3) : '0');
+    if (coverImage) {
+      var coverSrc = albumMode ? image : '';
+      if (coverImage.getAttribute('src') !== coverSrc) coverImage.setAttribute('src', coverSrc);
+      coverImage.alt = albumMode ? 'Album cover' : '';
+      coverImage.style.setProperty('--custom-bg-cover-opacity', albumMode && image ? opacity.toFixed(3) : '0');
+      coverImage.style.setProperty('--custom-bg-cover-position-x', customBackgroundCropNumber('backgroundMediaCropX', fxDefaults.backgroundMediaCropX == null ? 50 : fxDefaults.backgroundMediaCropX, 0, 100).toFixed(1) + '%');
+      coverImage.style.setProperty('--custom-bg-cover-position-y', customBackgroundCropNumber('backgroundMediaCropY', fxDefaults.backgroundMediaCropY == null ? 50 : fxDefaults.backgroundMediaCropY, 0, 100).toFixed(1) + '%');
+      coverImage.style.setProperty('--custom-bg-cover-zoom', customBackgroundCropNumber('backgroundMediaZoom', fxDefaults.backgroundMediaZoom == null ? 1 : fxDefaults.backgroundMediaZoom, 1, 2.8).toFixed(3));
+    }
     layer.style.setProperty('--custom-bg-base-opacity', windowOpacity.toFixed(3));
     layer.style.setProperty('--custom-bg-overlay-opacity', overlayOpacity.toFixed(3));
     layer.style.setProperty('--custom-bg-glass-opacity', glassOpacity.toFixed(3));
@@ -49746,8 +49836,8 @@ function bindFxPanel() {
         fx.shelfAngleYManual = true;
         fx.shelfAngleY = Math.round(clampRange(fx.shelfAngleY, -30, 30));
       }
-      if (pair[1] === 'shelfOpacity') fx.shelfOpacity = clampRange(fx.shelfOpacity, 0.25, 1);
-      if (pair[1] === 'shelfBgOpacity') fx.shelfBgOpacity = clampRange(fx.shelfBgOpacity, 0.25, 0.98);
+      if (pair[1] === 'shelfOpacity') fx.shelfOpacity = clampRange(fx.shelfOpacity, 0, 1);
+      if (pair[1] === 'shelfBgOpacity') fx.shelfBgOpacity = clampRange(fx.shelfBgOpacity, 0, 0.98);
       if (pair[1] === 'shelfDetailOffsetX') fx.shelfDetailOffsetX = clampRange(fx.shelfDetailOffsetX, -4.8, 4.8);
       if (pair[1] === 'shelfDetailOffsetY') fx.shelfDetailOffsetY = clampRange(fx.shelfDetailOffsetY, -3.6, 3.6);
       if (pair[1] === 'shelfDetailOffsetZ') fx.shelfDetailOffsetZ = clampRange(fx.shelfDetailOffsetZ, -3.6, 3.6);
@@ -51734,10 +51824,13 @@ function syncAccountProviderOrderUi() {
 function platformMeta(provider) {
   if (provider === 'youtube') return { key: 'youtube', short: 'YT', label: 'YouTube Music', app: 'YouTube', dot: 'youtube' };
   if (provider === 'spotify') return { key: 'spotify', short: 'SP', label: 'Spotify', app: 'Spotify', dot: 'spotify' };
+  if (provider === 'soundcloud') return { key: 'soundcloud', short: 'SC', label: 'SoundCloud', app: 'SoundCloud', dot: 'soundcloud' };
   return { key: 'youtube', short: 'YT', label: 'YouTube Music', app: 'YouTube', dot: 'youtube' };
 }
 function platformStatus(provider) {
-  return provider === 'spotify' ? spotifyLoginStatus : youtubeLoginStatus;
+  if (provider === 'spotify') return spotifyLoginStatus;
+  if (provider === 'soundcloud') return soundcloudLoginStatus;
+  return youtubeLoginStatus;
 }
 function providerVipType(provider, status) {
   status = status || platformStatus(provider) || {};
@@ -51936,6 +52029,48 @@ function bindTopAccountPillSorting() {
 /* ===== js/modules/08-account/02-login-status.js ===== */
 'use strict';
 
+
+function normalizeSoundCloudLoginStatus(info) {
+  info = info || {};
+  return Object.assign({
+    provider: 'soundcloud',
+    loggedIn: false,
+    configured: false,
+    searchReady: false,
+    publicCatalog: false,
+    nickname: 'SoundCloud',
+    userId: '',
+    avatar: '',
+    vipType: 0,
+    vipLevel: 'none',
+    isVip: false,
+    isSvip: false,
+    playbackKeyReady: false,
+    playbackMode: 'direct'
+  }, info, {
+    provider: 'soundcloud',
+    loggedIn: false,
+    configured: !!info.configured,
+    searchReady: !!info.searchReady,
+    publicCatalog: !!info.publicCatalog,
+    nickname: 'SoundCloud',
+    playbackKeyReady: !!info.searchReady,
+    playbackMode: 'direct'
+  });
+}
+
+async function refreshSoundCloudLoginStatus() {
+  try {
+    var info = await apiJson('/api/soundcloud/status?t=' + Date.now());
+    soundcloudLoginStatus = normalizeSoundCloudLoginStatus(info);
+  } catch (error) {
+    console.warn('SoundCloud status failed:', error);
+    soundcloudLoginStatus = normalizeSoundCloudLoginStatus(null);
+  }
+  renderUserBtn();
+  return soundcloudLoginStatus;
+}
+
 function providerVipAuditSnapshot(provider, status) { return { provider: provider, loggedIn: !!(status && status.loggedIn) }; }
 function providerVipAuditLabel(provider, snapshot) { return snapshot && snapshot.loggedIn ? localizeUiMessage('Đã kết nối') : localizeUiMessage('Chưa kết nối'); }
 function auditProviderVipState() {}
@@ -52115,7 +52250,7 @@ function startSpotifyLoginStatusAutoRefresh() {
 }
 
 async function refreshLoginStatus() {
-  var results = await Promise.allSettled([refreshYouTubeLoginStatus(), refreshSpotifyLoginStatus()]);
+  var results = await Promise.allSettled([refreshYouTubeLoginStatus(), refreshSpotifyLoginStatus(), refreshSoundCloudLoginStatus()]);
   loginStatusChecked = true;
   loginStatusCheckFailed = results.every(function (result) { return result.status === 'rejected'; });
   return { youtube: youtubeLoginStatus, spotify: spotifyLoginStatus };
@@ -52164,13 +52299,23 @@ var providerConfigSnapshot = {
   spotifyRedirectUri: spotifyRedirectUri,
   youtubeClientId: '',
   youtubeConfigured: false,
-  youtubeRedirectUri: ''
+  youtubeRedirectUri: '',
+  soundcloudClientId: '',
+  soundcloudConfigured: true,
+  soundcloudClientSecretConfigured: false
 };
 var providerConfigOpen = false;
 
-function normalizeLoginProviderKey(provider) { return provider === 'spotify' ? 'spotify' : 'youtube'; }
+function normalizeLoginProviderKey(provider) {
+  provider = String(provider || '').toLowerCase();
+  if (provider === 'spotify') return 'spotify';
+  if (provider === 'soundcloud') return 'soundcloud';
+  return 'youtube';
+}
 function loginProviderSupportsCookieMode() { return false; }
 function loginProviderOfficialModeText(provider) {
+  provider = normalizeLoginProviderKey(provider);
+  if (provider === 'soundcloud') return { title: 'Web Search', sub: localizeUiMessage('Tìm kiếm SoundCloud công khai; ShinaYuu tự resolve đúng URL track khi phát.') };
   return provider === 'spotify'
     ? { title: 'OAuth', sub: localizeUiMessage('Mở trang ủy quyền Spotify trong trình duyệt mặc định.') }
     : { title: 'Google OAuth', sub: localizeUiMessage('Mở trang đăng nhập Google trong trình duyệt mặc định.') };
@@ -52199,19 +52344,27 @@ function startQrPoll() {}
 function stopQrPoll() {}
 
 function providerDisplayName(provider) {
-  return normalizeLoginProviderKey(provider) === 'spotify' ? 'Spotify' : 'YouTube Music';
+  provider = normalizeLoginProviderKey(provider);
+  if (provider === 'spotify') return 'Spotify';
+  if (provider === 'soundcloud') return 'SoundCloud';
+  return 'YouTube Music';
 }
 function providerStatusObject(provider) {
-  return normalizeLoginProviderKey(provider) === 'spotify' ? (spotifyLoginStatus || {}) : (youtubeLoginStatus || {});
+  provider = normalizeLoginProviderKey(provider);
+  if (provider === 'spotify') return spotifyLoginStatus || {};
+  if (provider === 'soundcloud') return soundcloudLoginStatus || {};
+  return youtubeLoginStatus || {};
 }
 function providerConfigured(provider) {
   provider = normalizeLoginProviderKey(provider);
   if (provider === 'spotify') return !!providerConfigSnapshot.spotifyConfigured;
+  if (provider === 'soundcloud') return !!providerConfigSnapshot.soundcloudConfigured;
   return !!providerConfigSnapshot.youtubeConfigured;
 }
 function providerConnectedText(provider, status) {
   provider = normalizeLoginProviderKey(provider);
   status = status || providerStatusObject(provider);
+  if (provider === 'soundcloud') return localizeUiMessage('Sẵn sàng · Không cần Client ID');
   if (status.loggedIn) {
     var nickname = status.nickname || status.displayName || providerDisplayName(provider);
     return localizeUiMessage('Đã kết nối') + (nickname ? ' · ' + nickname : '');
@@ -52237,6 +52390,11 @@ function youtubeLoginStatusText(info) {
   }
   return localizeUiMessage('Sẵn sàng đăng nhập Google để đồng bộ playlist YouTube Music.');
 }
+function soundcloudLoginStatusText(info) {
+  info = info || soundcloudLoginStatus || {};
+  return localizeUiMessage('SoundCloud đã sẵn sàng · không cần Client ID / Client Secret.');
+}
+
 
 async function loadProviderConfig(force) {
   if (!force && providerConfigSnapshot.__loaded) return providerConfigSnapshot;
@@ -52261,10 +52419,14 @@ function syncProviderConfigInputs() {
   var market = document.getElementById('spotify-market-input');
   var youtubeUri = document.getElementById('youtube-redirect-uri');
   var spotifyUri = document.getElementById('spotify-redirect-uri');
+  var soundcloudId = document.getElementById('soundcloud-client-id-input');
+  var soundcloudSecret = document.getElementById('soundcloud-client-secret-input');
   if (youtubeId && document.activeElement !== youtubeId) youtubeId.value = providerConfigSnapshot.youtubeClientId || '';
   // The secret is intentionally never returned by the backend.
   if (youtubeSecret && document.activeElement !== youtubeSecret && !youtubeSecret.value) youtubeSecret.value = '';
   if (spotifyId && document.activeElement !== spotifyId) spotifyId.value = providerConfigSnapshot.spotifyClientId || '';
+  if (soundcloudId && document.activeElement !== soundcloudId) soundcloudId.value = providerConfigSnapshot.soundcloudClientId || '';
+  if (soundcloudSecret && document.activeElement !== soundcloudSecret) soundcloudSecret.value = '';
   if (market && document.activeElement !== market) market.value = providerConfigSnapshot.spotifyMarket || 'VN';
   if (youtubeUri) youtubeUri.textContent = providerConfigSnapshot.youtubeRedirectUri || localizeUiMessage('Được tạo sau khi ứng dụng khởi động');
   if (spotifyUri) spotifyUri.textContent = providerConfigSnapshot.spotifyRedirectUri || spotifyRedirectUri;
@@ -52295,6 +52457,9 @@ async function saveProviderConfig(provider) {
       if (spotifyInput) spotifyInput.focus();
       return { ok: false, error: 'SPOTIFY_CLIENT_ID_REQUIRED' };
     }
+  } else if (provider === 'soundcloud') {
+    if (statusEl) { statusEl.className = 'ok'; statusEl.textContent = localizeUiMessage('SoundCloud không cần cấu hình Client ID / Client Secret.'); }
+    return { ok: true, provider: 'soundcloud' };
   } else {
     var youtubeInput = document.getElementById('youtube-client-id-input');
     var secretInput = document.getElementById('youtube-client-secret-input');
@@ -52316,7 +52481,7 @@ async function saveProviderConfig(provider) {
     providerConfigSnapshot = Object.assign({}, providerConfigSnapshot, info || {}, { __loaded: true });
     syncProviderConfigInputs();
     updateLoginProviderUi();
-    if (statusEl) { statusEl.className = 'ok'; statusEl.textContent = localizeUiMessage('Đã lưu cấu hình. Bạn có thể bắt đầu đăng nhập.'); }
+    if (statusEl) { statusEl.className = 'ok'; statusEl.textContent = provider === 'soundcloud' ? localizeUiMessage('Đã lưu cấu hình SoundCloud. Nguồn đã sẵn sàng để kiểm tra.') : localizeUiMessage('Đã lưu cấu hình. Bạn có thể bắt đầu đăng nhập.'); }
     return { ok: true, provider: provider };
   } catch (error) {
     if (statusEl) { statusEl.className = 'fail'; statusEl.textContent = localizeUiMessage('Không thể lưu cấu hình: ') + (error.message || error); }
@@ -52345,22 +52510,31 @@ function openSpotifyDeveloperDashboard() { window.open('https://developer.spotif
 function updateLoginProviderUi() {
   var provider = normalizeLoginProviderKey(loginProvider);
   var isSpotify = provider === 'spotify';
+  var isSoundCloud = provider === 'soundcloud';
   var youtubeCard = document.getElementById('login-provider-youtube');
   var spotifyCard = document.getElementById('login-provider-spotify');
+  var soundcloudCard = document.getElementById('login-provider-soundcloud');
   var youtubeStatus = providerConnectedText('youtube', youtubeLoginStatus);
   var spotifyStatus = providerConnectedText('spotify', spotifyLoginStatus);
+  var soundcloudStatusText = providerConnectedText('soundcloud', soundcloudLoginStatus);
   if (youtubeCard) {
-    youtubeCard.classList.toggle('active', !isSpotify);
+    youtubeCard.classList.toggle('active', !isSpotify && !isSoundCloud);
     youtubeCard.classList.toggle('connected', !!(youtubeLoginStatus && youtubeLoginStatus.loggedIn));
   }
   if (spotifyCard) {
     spotifyCard.classList.toggle('active', isSpotify);
     spotifyCard.classList.toggle('connected', !!(spotifyLoginStatus && spotifyLoginStatus.loggedIn));
   }
+  if (soundcloudCard) {
+    soundcloudCard.classList.toggle('active', isSoundCloud);
+    soundcloudCard.classList.toggle('connected', !!(soundcloudLoginStatus && soundcloudLoginStatus.configured && soundcloudLoginStatus.searchReady));
+  }
   var youtubeState = document.getElementById('login-provider-youtube-state');
   var spotifyState = document.getElementById('login-provider-spotify-state');
+  var soundcloudState = document.getElementById('login-provider-soundcloud-state');
   if (youtubeState) youtubeState.textContent = youtubeStatus;
   if (spotifyState) spotifyState.textContent = spotifyStatus;
+  if (soundcloudState) soundcloudState.textContent = soundcloudStatusText;
 
   var title = document.getElementById('login-modal-title');
   var desc = document.getElementById('login-modal-desc');
@@ -52369,32 +52543,38 @@ function updateLoginProviderUi() {
   var startButton = document.getElementById('refresh-qr-btn');
   var logoutButton = document.getElementById('provider-logout-btn');
   var currentStatus = providerStatusObject(provider);
-  if (title) title.textContent = isSpotify ? localizeUiMessage('Kết nối Spotify') : localizeUiMessage('Kết nối YouTube Music');
-  if (desc) desc.textContent = isSpotify
-    ? localizeUiMessage('Đăng nhập Spotify bằng OAuth chính thức để đồng bộ playlist, Liked Songs và phát trực tiếp bằng tài khoản Premium.')
-    : localizeUiMessage('YouTube Music có thể tìm và phát công khai. Đăng nhập Google chỉ cần thiết để đồng bộ playlist cá nhân.');
+  if (title) title.textContent = isSoundCloud ? localizeUiMessage('Cấu hình SoundCloud') : (isSpotify ? localizeUiMessage('Kết nối Spotify') : localizeUiMessage('Kết nối YouTube Music'));
+  if (desc) desc.textContent = isSoundCloud
+    ? localizeUiMessage('SoundCloud dùng Client ID + Client Secret để tìm kiếm và phát các track công khai. Không cần đăng nhập tài khoản SoundCloud.')
+    : (isSpotify
+      ? localizeUiMessage('Đăng nhập Spotify bằng OAuth chính thức để đồng bộ playlist, Liked Songs và phát trực tiếp bằng tài khoản Premium.')
+      : localizeUiMessage('YouTube Music có thể tìm và phát công khai. Đăng nhập Google chỉ cần thiết để đồng bộ playlist cá nhân.'));
   if (statusEl && !/^(loading|ok|fail)$/.test(statusEl.className || '')) {
-    statusEl.textContent = isSpotify ? spotifyLoginStatusText(spotifyLoginStatus) : youtubeLoginStatusText(youtubeLoginStatus);
+    statusEl.textContent = isSoundCloud ? soundcloudLoginStatusText(soundcloudLoginStatus) : (isSpotify ? spotifyLoginStatusText(spotifyLoginStatus) : youtubeLoginStatusText(youtubeLoginStatus));
   }
   if (badge) {
-    badge.className = 'provider-status-badge' + (currentStatus.loggedIn ? ' connected' : (providerConfigured(provider) ? ' ready' : ' needs-config'));
-    badge.textContent = currentStatus.loggedIn ? localizeUiMessage('Đã kết nối') : (providerConfigured(provider) ? localizeUiMessage('Sẵn sàng') : localizeUiMessage('Cần cấu hình'));
+    var ready = isSoundCloud ? !!(currentStatus.configured && currentStatus.searchReady) : !!currentStatus.loggedIn;
+    badge.className = 'provider-status-badge' + (ready ? ' connected' : (providerConfigured(provider) ? ' ready' : ' needs-config'));
+    badge.textContent = ready ? localizeUiMessage(isSoundCloud ? 'Sẵn sàng' : 'Đã kết nối') : (providerConfigured(provider) ? localizeUiMessage('Sẵn sàng') : localizeUiMessage('Cần cấu hình'));
   }
   if (startButton) {
-    startButton.textContent = currentStatus.loggedIn
-      ? localizeUiMessage('Đăng nhập lại')
-      : (isSpotify ? localizeUiMessage('Kết nối Spotify') : localizeUiMessage('Kết nối YouTube Music'));
+    startButton.textContent = isSoundCloud
+      ? (currentStatus.configured ? localizeUiMessage('Kiểm tra SoundCloud') : localizeUiMessage('Cấu hình SoundCloud'))
+      : (currentStatus.loggedIn ? localizeUiMessage('Đăng nhập lại') : (isSpotify ? localizeUiMessage('Kết nối Spotify') : localizeUiMessage('Kết nối YouTube Music')));
   }
-  if (logoutButton) logoutButton.disabled = !currentStatus.loggedIn;
+  if (logoutButton) logoutButton.disabled = isSoundCloud || !currentStatus.loggedIn;
 
   var youtubeGroup = document.getElementById('youtube-config-group');
   var spotifyGroup = document.getElementById('spotify-config-group');
-  if (youtubeGroup) youtubeGroup.hidden = isSpotify;
+  var soundcloudGroup = document.getElementById('soundcloud-config-group');
+  if (youtubeGroup) youtubeGroup.hidden = isSpotify || isSoundCloud;
   if (spotifyGroup) spotifyGroup.hidden = !isSpotify;
+  if (soundcloudGroup) soundcloudGroup.hidden = !isSoundCloud;
   var graph = document.getElementById('provider-login-source-grid');
   if (graph) graph.setAttribute('data-provider', provider);
   syncProviderConfigInputs();
 }
+
 function updateLoginNodeGraphUi() { updateLoginProviderUi(); }
 
 async function showLoginModal(opts) {
@@ -52403,7 +52583,7 @@ async function showLoginModal(opts) {
   openGsapModal(document.getElementById('login-modal'));
   var statusEl = document.getElementById('qr-status');
   if (statusEl) { statusEl.className = 'loading'; statusEl.textContent = localizeUiMessage('Đang kiểm tra trạng thái các nguồn nhạc…'); }
-  await Promise.allSettled([loadProviderConfig(true), refreshYouTubeLoginStatus(), refreshSpotifyLoginStatus()]);
+  await Promise.allSettled([loadProviderConfig(true), refreshYouTubeLoginStatus(), refreshSpotifyLoginStatus(), refreshSoundCloudLoginStatus()]);
   if (statusEl) statusEl.className = '';
   updateLoginProviderUi();
 }
@@ -52414,9 +52594,9 @@ function setLoginProvider(provider, silent) {
   var statusEl = document.getElementById('qr-status');
   if (statusEl) statusEl.className = '';
   updateLoginProviderUi();
-  if (!silent && statusEl) statusEl.textContent = loginProvider === 'spotify'
-    ? spotifyLoginStatusText(spotifyLoginStatus)
-    : youtubeLoginStatusText(youtubeLoginStatus);
+  if (!silent && statusEl) statusEl.textContent = loginProvider === 'soundcloud'
+    ? soundcloudLoginStatusText(soundcloudLoginStatus)
+    : (loginProvider === 'spotify' ? spotifyLoginStatusText(spotifyLoginStatus) : youtubeLoginStatusText(youtubeLoginStatus));
   return loginProvider;
 }
 
@@ -52439,6 +52619,32 @@ async function beginProviderLogin(provider) {
   await loadProviderConfig(false);
   var statusEl = document.getElementById('qr-status');
   var button = document.getElementById('refresh-qr-btn');
+  if (provider === 'soundcloud') {
+    if (!providerConfigured(provider)) {
+      toggleProviderConfigPanel(true);
+      updateLoginProviderUi();
+      if (statusEl) { statusEl.className = 'fail'; statusEl.textContent = localizeUiMessage('Hãy nhập và lưu SoundCloud Client ID + Client Secret trước khi kiểm tra.'); }
+      var scInput = document.getElementById('soundcloud-client-id-input');
+      if (scInput) scInput.focus();
+      return { ok: false, provider: provider, error: 'SOUNDCLOUD_CLIENT_CREDENTIALS_REQUIRED' };
+    }
+    if (button) button.disabled = true;
+    try {
+      if (statusEl) { statusEl.className = 'loading'; statusEl.textContent = localizeUiMessage('Đang kiểm tra kết nối SoundCloud…'); }
+      var scResult = await apiJson('/api/soundcloud/status?t=' + Date.now(), { timeoutMs: 12000 });
+      soundcloudLoginStatus = normalizeSoundCloudLoginStatus(scResult);
+      if (!soundcloudLoginStatus.searchReady) throw new Error(scResult && (scResult.message || scResult.error) || 'SOUNDCLOUD_NOT_READY');
+      if (statusEl) { statusEl.className = 'ok'; statusEl.textContent = localizeUiMessage('SoundCloud API đã sẵn sàng.'); }
+      updateLoginProviderUi();
+      return { ok: true, provider: provider };
+    } catch (error) {
+      if (statusEl) { statusEl.className = 'fail'; statusEl.textContent = localizeUiMessage('Không thể kết nối SoundCloud: ') + (error.message || error); }
+      updateLoginProviderUi();
+      return { ok: false, provider: provider, error: error.message || 'SOUNDCLOUD_STATUS_FAILED' };
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
   if (!providerConfigured(provider)) {
     toggleProviderConfigPanel(true);
     updateLoginProviderUi();
@@ -52519,9 +52725,15 @@ async function refreshSelectedProviderStatus() {
   if (statusEl) { statusEl.className = 'loading'; statusEl.textContent = localizeUiMessage('Đang làm mới trạng thái đăng nhập…'); }
   try {
     await loadProviderConfig(true);
-    if (loginProvider === 'spotify') await refreshSpotifyLoginStatus();
+    if (loginProvider === 'soundcloud') await refreshSoundCloudLoginStatus();
+    else if (loginProvider === 'spotify') await refreshSpotifyLoginStatus();
     else await refreshYouTubeLoginStatus({ force: true });
-    if (statusEl) { statusEl.className = providerStatusObject(loginProvider).loggedIn ? 'ok' : ''; statusEl.textContent = loginProvider === 'spotify' ? spotifyLoginStatusText(spotifyLoginStatus) : youtubeLoginStatusText(youtubeLoginStatus); }
+    if (statusEl) {
+      var refreshStatus = providerStatusObject(loginProvider);
+      var refreshReady = loginProvider === 'soundcloud' ? !!(refreshStatus.configured && refreshStatus.searchReady) : !!refreshStatus.loggedIn;
+      statusEl.className = refreshReady ? 'ok' : '';
+      statusEl.textContent = loginProvider === 'soundcloud' ? soundcloudLoginStatusText(soundcloudLoginStatus) : (loginProvider === 'spotify' ? spotifyLoginStatusText(spotifyLoginStatus) : youtubeLoginStatusText(youtubeLoginStatus));
+    }
     updateLoginProviderUi();
     renderUserBtn();
     return { ok: true };
@@ -52537,6 +52749,10 @@ async function logoutSelectedLoginProvider() {
   var provider = normalizeLoginProviderKey(loginProvider);
   var statusEl = document.getElementById('qr-status');
   try {
+    if (provider === 'soundcloud') {
+      if (statusEl) { statusEl.className = ''; statusEl.textContent = localizeUiMessage('SoundCloud là nguồn API công khai; hãy sửa Client ID/Secret trong phần cấu hình.'); }
+      return { ok: false, provider: provider, error: 'SOUNDCLOUD_NOT_ACCOUNT_LOGIN' };
+    }
     var bridge = window.desktopWindow;
     if (provider === 'spotify') {
       if (bridge && typeof bridge.clearSpotifyMusicLogin === 'function') await bridge.clearSpotifyMusicLogin();

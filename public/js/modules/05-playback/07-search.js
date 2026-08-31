@@ -5,7 +5,7 @@ var searchLastResultQuery = '';
 var searchProviderNotice = '';
 var SEARCH_HISTORY_STORE_KEY = 'shinayuu-v2-search-history';
 var SEARCH_HISTORY_STORE_VERSION = 3;
-var SEARCH_HISTORY_MODES = ['song', 'netease', 'ytmusic', 'ytvideo', 'podcast'];
+var SEARCH_HISTORY_MODES = ['song', 'netease', 'soundcloud', 'ytmusic', 'ytvideo', 'podcast'];
 var MUSIC_SEARCH_INITIAL_VISIBLE = 18;
 var MUSIC_SEARCH_APPEND_BATCH = 14;
 var MUSIC_SEARCH_MAX_RESULTS = 180;
@@ -161,11 +161,13 @@ function runSearchHistory(q) {
 function updateSearchModeTabs() {
   var songBtn = document.getElementById('search-mode-song');
   var neteaseBtn = document.getElementById('search-mode-netease');
+  var soundcloudBtn = document.getElementById('search-mode-soundcloud');
   var ytMusicBtn = document.getElementById('search-mode-ytmusic');
   var ytVideoBtn = document.getElementById('search-mode-ytvideo');
   var podcastBtn = document.getElementById('search-mode-podcast');
   if (songBtn) { songBtn.classList.toggle('active', searchMode === 'song'); songBtn.setAttribute('aria-selected', searchMode === 'song' ? 'true' : 'false'); songBtn.textContent = window.appLanguage === 'en' ? 'All' : 'Tất cả'; }
   if (neteaseBtn) { neteaseBtn.classList.toggle('active', searchMode === 'netease'); neteaseBtn.setAttribute('aria-selected', searchMode === 'netease' ? 'true' : 'false'); neteaseBtn.textContent = 'Spotify'; }
+  if (soundcloudBtn) { soundcloudBtn.classList.toggle('active', searchMode === 'soundcloud'); soundcloudBtn.setAttribute('aria-selected', searchMode === 'soundcloud' ? 'true' : 'false'); soundcloudBtn.textContent = 'SoundCloud'; }
   if (ytMusicBtn) { ytMusicBtn.classList.toggle('active', searchMode === 'ytmusic'); ytMusicBtn.setAttribute('aria-selected', searchMode === 'ytmusic' ? 'true' : 'false'); ytMusicBtn.textContent = 'YouTube Music'; }
   if (ytVideoBtn) { ytVideoBtn.classList.toggle('active', searchMode === 'ytvideo'); ytVideoBtn.setAttribute('aria-selected', searchMode === 'ytvideo' ? 'true' : 'false'); ytVideoBtn.textContent = 'YouTube Video'; }
   if (podcastBtn) { podcastBtn.classList.toggle('active', searchMode === 'podcast'); podcastBtn.setAttribute('aria-selected', searchMode === 'podcast' ? 'true' : 'false'); podcastBtn.textContent = 'Podcast'; }
@@ -174,6 +176,7 @@ function updateSearchModeTabs() {
     else if (searchMode === 'ytmusic') $input.placeholder = window.appLanguage === 'en' ? 'Search YouTube Music songs...' : 'Tìm bài hát trên YouTube Music...';
     else if (searchMode === 'ytvideo') $input.placeholder = window.appLanguage === 'en' ? 'Search normal YouTube videos...' : 'Tìm video YouTube thông thường...';
     else if (searchMode === 'netease') $input.placeholder = window.appLanguage === 'en' ? 'Search Spotify...' : 'Tìm trên Spotify...';
+    else if (searchMode === 'soundcloud') $input.placeholder = window.appLanguage === 'en' ? 'Search SoundCloud...' : 'Tìm trên SoundCloud...';
     else $input.placeholder = window.appLanguage === 'en' ? 'Search songs and artists...' : 'Tìm bài hát, nghệ sĩ...';
   }
   requestAnimationFrame(updateSearchPillGlassDisplacementMap);
@@ -182,7 +185,7 @@ function setSearchMode(mode) {
   if (mode === 'qq' || mode === 'youtube') mode = 'ytmusic';
   if (mode === 'youtube-video') mode = 'ytvideo';
   if (mode === 'spotify') mode = 'netease';
-  mode = (mode === 'podcast' || mode === 'netease' || mode === 'ytmusic' || mode === 'ytvideo') ? mode : 'song';
+  mode = (mode === 'podcast' || mode === 'netease' || mode === 'soundcloud' || mode === 'ytmusic' || mode === 'ytvideo') ? mode : 'song';
   if (searchMode === mode) { updateSearchModeTabs(); return; }
   searchMode = mode;
   updateSearchModeTabs();
@@ -419,6 +422,7 @@ updateSearchModeTabs();
 function songProviderKey(song) {
   if (song && (song.type === 'local' || song.source === 'local' || song.provider === 'local' || song.localUrl)) return 'local';
   if (song && (song.provider === 'spotify' || song.source === 'spotify' || song.type === 'spotify' || song.spotifyId || song.spotifyUri)) return 'spotify';
+  if (song && (song.provider === 'soundcloud' || song.source === 'soundcloud' || song.type === 'soundcloud' || song.soundcloudId || song.soundcloudPermalink)) return 'soundcloud';
   if (song && (song.sourceType === 'video' || song.youtubeSourceType === 'video' || song.provider === 'youtube-video' || song.source === 'youtube-video')) return 'youtube-video';
   return 'youtube';
 }
@@ -426,7 +430,7 @@ function songSourceTagHtml(song, opts) {
   opts = opts || {};
   var rawKey = song && (song.resolvedPlaybackProvider || song.playbackProvider || song.audioProvider || song.providerResolved || '');
   var key = String(rawKey || '') === 'spotify' ? 'spotify' : songProviderKey(song);
-  var label = key === 'youtube' ? 'YM' : (key === 'youtube-video' ? 'MV' : (key === 'spotify' ? 'SP' : 'LC'));
+  var label = key === 'youtube' ? 'YM' : (key === 'youtube-video' ? 'MV' : (key === 'spotify' ? 'SP' : (key === 'soundcloud' ? 'SC' : 'LC')));
   if (opts.switcher) {
     return '<button type="button" class="tag-source ' + key + ' control-source-chip" title="Chuyển nguồn phát" aria-haspopup="true" onclick="toggleControlSourceSwitcher(event)">' + label + '</button>';
   }
@@ -436,6 +440,7 @@ var controlSourceSwitcherState = { open: false, loading: false, requestId: 0, an
 function controlSourceProviders() {
   return [
     { key: 'spotify', label: 'SP', title: 'Spotify' },
+    { key: 'soundcloud', label: 'SC', title: 'SoundCloud' },
     { key: 'youtube', label: 'YM', title: 'YouTube Music' },
     { key: 'youtube-video', label: 'MV', title: 'YouTube Video' },
     { key: 'local', label: 'LC', title: 'Local Music' }
@@ -447,6 +452,7 @@ function controlSourceProviderTitle(provider) {
 }
 function controlSourceSearchUrl(provider, query) {
   if (provider === 'spotify') return '/api/spotify/search?keywords=' + encodeURIComponent(query) + '&limit=8';
+  if (provider === 'soundcloud') return '/api/soundcloud/search?keywords=' + encodeURIComponent(query) + '&limit=8';
   if (provider === 'youtube-video') return '/api/youtube-video/search?keywords=' + encodeURIComponent(query) + '&limit=8';
   if (provider === 'local') return '/api/local/search?keywords=' + encodeURIComponent(query) + '&limit=8';
   return '/api/youtube-music/search?keywords=' + encodeURIComponent(query) + '&limit=8';
@@ -695,6 +701,7 @@ function searchResultMetaText(song) {
   if (song.album) bits.push(song.album);
   if (songProviderKey(song) === 'youtube' && !song.playable) bits.push('YouTube Music cần phiên đăng nhập hoặc quyền phát');
   if (songProviderKey(song) === 'spotify' && !song.playable) bits.push('Spotify cần đăng nhập Premium để phát trong ứng dụng');
+  if (songProviderKey(song) === 'soundcloud' && song.externalUrl) bits.push('SoundCloud · ' + song.artist);
   return bits.join('  ·  ') || songSourceLabel(song);
 }
 function searchResultMetaHtml(song, index) {
@@ -704,6 +711,7 @@ function searchResultMetaHtml(song, index) {
   if (song.album) bits.push(song.album);
   if (songProviderKey(song) === 'youtube' && !song.playable) bits.push('YouTube Music cần phiên đăng nhập hoặc quyền phát');
   if (songProviderKey(song) === 'spotify' && !song.playable) bits.push('Spotify cần đăng nhập Premium để phát trong ứng dụng');
+  if (songProviderKey(song) === 'soundcloud' && song.externalUrl) bits.push('SoundCloud · ' + song.artist);
   var tail = bits.length ? (' · ' + escHtml(bits.join('  ·  '))) : '';
   if (!artist) return escHtml(searchResultMetaText(song));
   return '<button class="search-artist-link" type="button" onclick="event.stopPropagation();openSearchResultArtist(' + index + ')">' + escHtml(artist) + '</button>' + tail;
@@ -717,10 +725,11 @@ function searchIntentPrefersYouTube(q) {
   q = String(q || '').toLowerCase();
   return /(^|\s)youtube($|\s)|youtube音乐|youtube音樂/.test(q);
 }
-var MUSIC_SEARCH_PROVIDER_ORDER = ['spotify', 'youtube', 'youtube-video'];
+var MUSIC_SEARCH_PROVIDER_ORDER = ['spotify', 'soundcloud', 'youtube', 'youtube-video'];
 function searchProviderStatus(provider) {
   if (provider === 'spotify') return spotifyLoginStatus || {};
   if (provider === 'local') return { loggedIn: true, searchReady: true, publicCatalog: true };
+  if (provider === 'soundcloud') return { loggedIn: false, searchReady: true, publicCatalog: true, message: 'SoundCloud web search sẵn sàng · không cần Client ID / Client Secret' };
   return youtubeLoginStatus || {};
 }
 function searchProviderIsLoggedIn(provider) {
@@ -742,6 +751,7 @@ function searchProviderCanSearch(provider) {
 }
 function searchModeProvider(mode) {
   if (mode === 'netease' || mode === 'spotify') return 'spotify';
+  if (mode === 'soundcloud') return 'soundcloud';
   if (mode === 'ytmusic' || mode === 'qq' || mode === 'youtube') return 'youtube';
   if (mode === 'ytvideo' || mode === 'youtube-video') return 'youtube-video';
   return '';
@@ -763,6 +773,7 @@ function searchProviderUrl(provider, q, limit, offset) {
   var suffix = '&limit=' + limit + '&offset=' + Math.max(0, Number(offset) || 0);
   if (provider === 'spotify') return '/api/spotify/search?keywords=' + encodeURIComponent(q) + suffix;
   if (provider === 'youtube-video') return '/api/youtube-video/search?keywords=' + encodeURIComponent(q) + suffix;
+  if (provider === 'soundcloud') return '/api/soundcloud/search?keywords=' + encodeURIComponent(q) + suffix;
   if (provider === 'local') return '/api/local/search?keywords=' + encodeURIComponent(q) + suffix;
   return '/api/youtube-music/search?keywords=' + encodeURIComponent(q) + suffix;
 }
@@ -987,6 +998,7 @@ function scoreSongSearchResult(song, q, sourceIndex) {
 }
 function searchSourceGroupForProvider(provider) {
   if (provider === 'spotify') return 'netease';
+  if (provider === 'soundcloud') return 'soundcloud';
   if (provider === 'youtube-video') return 'ytvideo';
   return 'ytmusic';
 }
@@ -1005,7 +1017,7 @@ function prepareSourceSearchResults(items, q, provider) {
       song.youtubeSurface = 'video';
       song.isYouTubeMusicResult = false;
     }
-    var id = song.mid || song.songmid || song.videoId || song.youtubeId || song.spotifyId || song.id || (song.name + '|' + song.artist);
+    var id = song.mid || song.songmid || song.videoId || song.youtubeId || song.spotifyId || song.soundcloudId || song.id || (song.name + '|' + song.artist);
     var key = provider + ':' + id;
     if (seen[key]) return;
     seen[key] = true;
@@ -1020,7 +1032,7 @@ function appendUniqueSearchGroup(target, source, count, seenIds) {
   var added = 0;
   for (var i = 0; i < source.length && added < count; i++) {
     var song = source[i];
-    var id = song.mid || song.songmid || song.videoId || song.youtubeId || song.spotifyId || song.id || (song.name + '|' + song.artist);
+    var id = song.mid || song.songmid || song.videoId || song.youtubeId || song.spotifyId || song.soundcloudId || song.id || (song.name + '|' + song.artist);
     var provider = songProviderKey(song);
     var crossSourceKey = (provider === 'youtube' || provider === 'youtube-video') ? ('youtube:' + id) : (provider + ':' + id);
     if (seenIds[crossSourceKey]) continue;
@@ -1044,6 +1056,7 @@ function mergeSongSearchResults(pools, limit, q, mode) {
   limit = Math.max(1, Number(limit) || 20);
   mode = mode || searchMode || 'song';
   var spotify = prepareSourceSearchResults(pools && pools.spotify, q, 'spotify');
+  var soundcloud = prepareSourceSearchResults(pools && pools.soundcloud, q, 'soundcloud');
   var music = prepareSourceSearchResults(pools && pools.youtube, q, 'youtube');
   var videos = prepareSourceSearchResults(pools && pools['youtube-video'], q, 'youtube-video');
   var seen = {};
@@ -1054,9 +1067,12 @@ function mergeSongSearchResults(pools, limit, q, mode) {
   }
   var out = [];
   if (mode === 'netease' || mode === 'spotify') out = select(spotify, limit, []);
+  else if (mode === 'soundcloud') out = select(soundcloud, limit, []);
   else if (mode === 'ytvideo' || mode === 'youtube-video') out = select(videos, limit, []);
   else if (mode === 'ytmusic' || mode === 'qq' || mode === 'youtube') out = select(music, limit, []);
   else {
+    var soundcloudQuota = Math.min(soundcloud.length, Math.max(4, Math.floor(limit * 0.25)));
+    select(soundcloud, soundcloudQuota, out);
     var spotifyQuota = Math.min(spotify.length, Math.max(5, Math.floor(limit * 0.35)));
     var musicQuota = Math.min(music.length, Math.max(7, Math.floor(limit * 0.45)));
     var videoQuota = Math.min(videos.length, Math.max(3, limit - spotifyQuota - musicQuota));
@@ -1085,7 +1101,7 @@ function searchProviderPagesHaveMore(providerPages) {
   });
 }
 function mergeUniqueSearchSongPools(existing, incoming) {
-  var pools = { spotify: [], youtube: [], 'youtube-video': [] };
+  var pools = { spotify: [], soundcloud: [], youtube: [], 'youtube-video': [] };
   (existing || []).concat(incoming || []).forEach(function (song) {
     var provider = songProviderKey(song);
     if (!pools[provider]) return;
@@ -1105,7 +1121,7 @@ async function fetchMusicSearchResults(q, mode, previousPages) {
   Object.keys(previousPages || {}).forEach(function (provider) {
     providerPages[provider] = Object.assign({}, previousPages[provider]);
   });
-  var pageLimitByProvider = { youtube: 18, 'youtube-video': 18, spotify: 14, local: 24 };
+  var pageLimitByProvider = { youtube: 18, 'youtube-video': 18, spotify: 14, soundcloud: 50, local: 24 };
   var fetchProviders = providers.filter(function (provider) {
     return !previousPages || !previousPages[provider] || previousPages[provider].hasMore;
   });
@@ -1117,7 +1133,7 @@ async function fetchMusicSearchResults(q, mode, previousPages) {
       return { provider: provider, offset: offset, requestedLimit: limit, value: value || {} };
     });
   }));
-  var songsByProvider = { youtube: [], 'youtube-video': [], spotify: [], local: [] };
+  var songsByProvider = { youtube: [], 'youtube-video': [], spotify: [], soundcloud: [], local: [] };
   fetchProviders.forEach(function (provider, index) {
     var entry = result[index];
     if (!entry || entry.status !== 'fulfilled') {

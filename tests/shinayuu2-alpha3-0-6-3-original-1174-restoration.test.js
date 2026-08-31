@@ -55,7 +55,7 @@ test('playback-source tabs and result sections follow 1.1.7.4 order', () => {
   ];
   assert.ok(order.every((value) => value >= 0));
   assert.deepEqual(order, [...order].sort((a, b) => a - b));
-  assert.match(search, /var MUSIC_SEARCH_PROVIDER_ORDER = \['spotify', 'youtube', 'youtube-video'\]/);
+  assert.match(search, /var MUSIC_SEARCH_PROVIDER_ORDER = \['spotify', 'soundcloud', 'youtube', 'youtube-video'\]/);
   assert.match(search, /out = spotifySelected\.concat\(musicSelected, videoSelected\)/);
   assert.match(search, /search-source-section/);
   assert.match(search, /mode === 'podcast'/);

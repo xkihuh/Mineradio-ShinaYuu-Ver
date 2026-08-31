@@ -38,12 +38,12 @@ test('2.1.5 package and bundled assets use the synchronized release identity', (
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
   const html = read('public/index.html');
-  assert.equal(pkg.version, '2.1.10');
-  assert.equal(pkg.displayVersion, '2.1.10');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.10');
-  assert.equal(pkg.build.buildVersion, '2.1.10.0');
-  assert.equal(lock.version, '2.1.10');
-  assert.equal(lock.packages[''].version, '2.1.10');
+  assert.equal(pkg.version, '2.2.0');
+  assert.equal(pkg.displayVersion, '2.2.0');
+  assert.equal(pkg.shinayuu.displayVersion, '2.2.0');
+  assert.equal(pkg.build.buildVersion, '2.2.0.0');
+  assert.equal(lock.version, '2.2.0');
+  assert.equal(lock.packages[''].version, '2.2.0');
   assert.match(html, /spotify-direct-player\.js\?v=2\.1\.10/);
   assert.match(html, /shinayuu-index-bundle\.js\?v=2\.1\.10/);
 });

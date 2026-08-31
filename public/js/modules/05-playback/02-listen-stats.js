@@ -73,7 +73,7 @@ function listenReportProvider(snapshot) {
     (snapshot && (snapshot.provider || snapshot.sourceKey || snapshot.resolvedPlaybackProvider)) || ''
   ).trim().toLowerCase();
   if (provider === 'song' || provider === 'music' || !provider) provider = 'youtube';
-  if (/^(youtube|spotify)$/.test(provider) && typeof normalizePlaybackProvider === 'function') {
+  if (/^(youtube|spotify|soundcloud)$/.test(provider) && typeof normalizePlaybackProvider === 'function') {
     provider = normalizePlaybackProvider(provider);
   }
   return provider;

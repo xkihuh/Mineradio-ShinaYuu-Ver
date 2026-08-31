@@ -59,11 +59,11 @@ test('2.1.5 AutoMix has a bounded transition transaction and preserves the outgo
 test('2.1.5 release identity is synchronized', () => {
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
-  assert.equal(pkg.version, '2.1.10');
-  assert.equal(pkg.displayVersion, '2.1.10');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.10');
-  assert.equal(pkg.build.buildVersion, '2.1.10.0');
-  assert.equal(pkg.shinayuu.buildVersion, '2.1.10.0');
-  assert.equal(lock.version, '2.1.10');
-  assert.equal(lock.packages[''].version, '2.1.10');
+  assert.equal(pkg.version, '2.2.0');
+  assert.equal(pkg.displayVersion, '2.2.0');
+  assert.equal(pkg.shinayuu.displayVersion, '2.2.0');
+  assert.equal(pkg.build.buildVersion, '2.2.0.0');
+  assert.equal(pkg.shinayuu.buildVersion, '2.2.0.0');
+  assert.equal(lock.version, '2.2.0');
+  assert.equal(lock.packages[''].version, '2.2.0');
 });

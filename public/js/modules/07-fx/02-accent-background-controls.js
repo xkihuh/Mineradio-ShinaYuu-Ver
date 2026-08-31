@@ -141,6 +141,7 @@ function applyCustomBackground() {
   var override = albumMode || !!media || customColor || opacity < 1 || windowOpacity < 0.999 || glassActive;
   var root = document.documentElement;
   var layer = document.getElementById('custom-bg');
+  var coverImage = document.getElementById('custom-bg-image');
   var video = document.getElementById('custom-bg-video');
   root.style.setProperty('--custom-bg-color', color);
   root.style.setProperty('--custom-bg-color-rgb', rgb.r + ', ' + rgb.g + ', ' + rgb.b);
@@ -150,12 +151,22 @@ function applyCustomBackground() {
   document.body.classList.toggle('custom-background-flat', override && !media);
   document.body.classList.toggle('custom-background-album-cover', albumMode);
   document.body.classList.toggle('custom-background-video', hasVideo);
+  document.body.classList.toggle('custom-background-image-cover', albumMode && !!image);
   document.body.classList.toggle('custom-window-transparent', windowOpacity < 0.999);
   document.body.classList.toggle('custom-bg-glass-active', glassActive);
   if (layer) {
     layer.style.setProperty('--custom-bg-image', image ? 'url("' + cssImageUrl(image) + '")' : 'none');
     layer.style.setProperty('--custom-bg-image-opacity', image ? opacity.toFixed(3) : '0');
     layer.style.setProperty('--custom-bg-video-opacity', hasVideo ? opacity.toFixed(3) : '0');
+    if (coverImage) {
+      var coverSrc = albumMode ? image : '';
+      if (coverImage.getAttribute('src') !== coverSrc) coverImage.setAttribute('src', coverSrc);
+      coverImage.alt = albumMode ? 'Album cover' : '';
+      coverImage.style.setProperty('--custom-bg-cover-opacity', albumMode && image ? opacity.toFixed(3) : '0');
+      coverImage.style.setProperty('--custom-bg-cover-position-x', customBackgroundCropNumber('backgroundMediaCropX', fxDefaults.backgroundMediaCropX == null ? 50 : fxDefaults.backgroundMediaCropX, 0, 100).toFixed(1) + '%');
+      coverImage.style.setProperty('--custom-bg-cover-position-y', customBackgroundCropNumber('backgroundMediaCropY', fxDefaults.backgroundMediaCropY == null ? 50 : fxDefaults.backgroundMediaCropY, 0, 100).toFixed(1) + '%');
+      coverImage.style.setProperty('--custom-bg-cover-zoom', customBackgroundCropNumber('backgroundMediaZoom', fxDefaults.backgroundMediaZoom == null ? 1 : fxDefaults.backgroundMediaZoom, 1, 2.8).toFixed(3));
+    }
     layer.style.setProperty('--custom-bg-base-opacity', windowOpacity.toFixed(3));
     layer.style.setProperty('--custom-bg-overlay-opacity', overlayOpacity.toFixed(3));
     layer.style.setProperty('--custom-bg-glass-opacity', glassOpacity.toFixed(3));

@@ -53,6 +53,8 @@ const fs   = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const tls = require('tls');
+const { spawn } = require('child_process');
+const ffmpegPath = require('ffmpeg-static');
 const { once } = require('events');
 const { fileURLToPath } = require('url');
 const { analyzePodcastDjStream, analyzePodcastDjIntro } = require('./dj-analyzer');
@@ -4056,6 +4058,39 @@ async function handleModernMusicRoute(req, res, url, pn) {
     return true;
   }
 
+  if (pn === '/api/soundcloud/status') {
+    try { sendJSON(res, musicProviders.soundcloudStatus()); }
+    catch (error) { modernProviderError(res, error); }
+    return true;
+  }
+
+  if (pn === '/api/soundcloud/search') {
+    try {
+      const keywords = url.searchParams.get('keywords') || '';
+      const limit = Math.max(1, Math.min(50, parseInt(url.searchParams.get('limit') || '30', 10) || 30));
+      const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0);
+      const songs = keywords ? await musicProviders.soundcloudSearch(keywords, limit, offset) : [];
+      sendJSON(res, { provider: 'soundcloud', sourceType: 'music', songs, result: songs, total: songs.length, nextOffset: offset + songs.length, hasMore: songs.length >= limit });
+    } catch (error) {
+      console.error('[SoundCloudSearch]', error);
+      sendJSON(res, { provider: 'soundcloud', error: error.message, songs: [], result: [] }, Number(error.status) || 500);
+    }
+    return true;
+  }
+
+  if (pn === '/api/soundcloud/song/url') {
+    try {
+      const trackUrl = url.searchParams.get('url') || url.searchParams.get('id') || '';
+      const quality = url.searchParams.get('quality') || 'standard';
+      const data = await musicProviders.resolveSoundCloudPlayback(trackUrl, quality);
+      sendJSON(res, { ...data, source: 'soundcloud', mediaKind: 'audio' });
+    } catch (error) {
+      console.error('[SoundCloudPlayback]', error);
+      sendJSON(res, { provider: 'soundcloud', playbackProvider: 'soundcloud', url: null, playable: false, reason: 'soundcloud_playback_unavailable', message: error.message || 'SoundCloud playback is unavailable.' }, Number(error.status) || 500);
+    }
+    return true;
+  }
+
   if (pn === '/api/spotify/track/visual') {
     try {
       const id = url.searchParams.get('id') || '';
@@ -4111,11 +4146,12 @@ async function handleModernMusicRoute(req, res, url, pn) {
     return true;
   }
 
-  if (pn === '/api/lyric' || pn === '/api/spotify/lyric' || pn === '/api/qq/lyric' || pn === '/api/youtube-music/lyric' || pn === '/api/youtube-video/lyric') {
+  if (pn === '/api/lyric' || pn === '/api/spotify/lyric' || pn === '/api/qq/lyric' || pn === '/api/youtube-music/lyric' || pn === '/api/youtube-video/lyric' || pn === '/api/soundcloud/lyric') {
     try {
       const youtube = pn.includes('/qq/') || pn.includes('/youtube-music/') || pn.includes('/youtube-video/');
+      const soundcloud = pn === '/api/soundcloud/lyric';
       const id = youtube ? (url.searchParams.get('mid') || url.searchParams.get('id') || '') : (url.searchParams.get('id') || '');
-      const hostState = youtube ? null : publicSpotifyHostState();
+      const hostState = youtube || soundcloud ? null : publicSpotifyHostState();
       const requestedDuration = Math.max(0, Number(url.searchParams.get('duration') || 0));
       const requestedDurationMs = requestedDuration > 10000 ? requestedDuration : requestedDuration * 1000;
       const hostDurationMatches = !requestedDurationMs || !hostState || !hostState.durationMs
@@ -4124,7 +4160,7 @@ async function handleModernMusicRoute(req, res, url, pn) {
       const currentTrackId = rendererCurrentTrackId || (hostState && hostState.alive && hostDurationMatches
         ? hostState.currentTrackId
         : '');
-      const data = await musicProviders.lyricsFor(id, youtube ? 'youtube' : 'spotify', {
+      const data = await musicProviders.lyricsFor(id, soundcloud ? 'soundcloud' : (youtube ? 'youtube' : 'spotify'), {
         track: url.searchParams.get('track') || '',
         artist: url.searchParams.get('artist') || '',
         album: url.searchParams.get('album') || '',
@@ -5268,6 +5304,55 @@ const server = http.createServer(async (req, res) => {
       while (true) { const c = await reader.read(); if (c.done) break; res.write(c.value); }
       res.end();
     } catch (err) { console.error('[Cover]', err); res.writeHead(500); res.end(); }
+    return;
+  }
+
+  // ---------- SoundCloud -> ShinaYuu playback proxy ----------
+  // SoundCloud's current public API serves AAC HLS playlists. Desktop Chromium
+  // does not provide dependable native HLS playback, so the alpha provider
+  // transcodes the HLS source to a browser-safe MP3 byte stream. This is kept
+  // behind a provider-specific route so future native HLS playback can replace
+  // it without touching playback-core state.
+  if (pn === '/api/soundcloud/media') {
+    let child = null;
+    try {
+      const trackUrl = String(url.searchParams.get('url') || url.searchParams.get('id') || '').trim();
+      const quality = String(url.searchParams.get('quality') || 'standard').trim();
+      if (!trackUrl) { res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Missing SoundCloud track URL'); return; }
+      const streamUrl = await musicProviders.resolveSoundCloudPlayback(trackUrl, quality);
+      const upstream = String(streamUrl && streamUrl.upstreamUrl || '').trim();
+      if (!upstream) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('SoundCloud stream unavailable'); return; }
+      child = spawn(ffmpegPath, [
+        '-hide_banner', '-loglevel', 'error',
+        '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5',
+        '-i', upstream,
+        '-vn', '-map', '0:a:0',
+        '-c:a', 'libmp3lame', '-b:a', '160k', '-ar', '48000', '-ac', '2',
+        '-f', 'mp3', 'pipe:1'
+      ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+      res.writeHead(200, {
+        'Content-Type': 'audio/mpeg',
+        'Cache-Control': 'no-store',
+        'Access-Control-Allow-Origin': '*',
+        'Cross-Origin-Resource-Policy': 'cross-origin',
+        'Accept-Ranges': 'none',
+        'X-ShinaYuu-Provider': 'soundcloud',
+        'X-ShinaYuu-Attribution': 'SoundCloud',
+      });
+      child.stdout.pipe(res);
+      child.stderr.on('data', (buf) => console.warn('[SoundCloudFFmpeg]', String(buf).trim().slice(0, 500)));
+      const stop = () => { try { if (child && !child.killed) child.kill(); } catch (_) {} };
+      req.on('aborted', stop);
+      req.on('close', stop);
+      res.on('close', stop);
+      child.on('error', (error) => { console.error('[SoundCloudFFmpeg]', error.message); try { if (!res.headersSent) res.writeHead(500); res.end(); } catch (_) {} });
+      child.on('close', (code) => { if (!res.writableEnded) res.end(); if (code && code !== 255) console.warn('[SoundCloudFFmpeg] exited', code); });
+    } catch (error) {
+      console.error('[SoundCloudMedia]', error);
+      try { if (child && !child.killed) child.kill(); } catch (_) {}
+      if (!res.headersSent) res.writeHead(Number(error.status) || 500, { 'Content-Type': 'text/plain; charset=utf-8' });
+      if (!res.writableEnded) res.end(error.message || 'SoundCloud media unavailable');
+    }
     return;
   }
 

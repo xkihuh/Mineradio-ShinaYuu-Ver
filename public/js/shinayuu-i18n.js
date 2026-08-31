@@ -83,6 +83,34 @@ var SHINAYUU_LYRIC_TIMING_TEXT={
 "s trước khi hiện tên bài":["s trước khi hiện tên bài","s before the song title appears"]
 };
 Object.keys(SHINAYUU_LYRIC_TIMING_TEXT).forEach(function(key){SOURCE[key]=SHINAYUU_LYRIC_TIMING_TEXT[key];});
+var SHINAYUU_2_2_0_SOUNDCLOUD_TEXT={
+"AAC HLS · ưu tiên chất lượng":["AAC HLS · ưu tiên chất lượng","AAC HLS · preferred quality"],
+"AAC HLS · tiết kiệm băng thông":["AAC HLS · tiết kiệm băng thông","AAC HLS · bandwidth saving"],
+"Tìm trên SoundCloud...":["Tìm trên SoundCloud...","Search SoundCloud..."],
+"Dùng SoundCloud Client ID + Client Secret để tìm kiếm và phát nhạc công khai.":["Dùng SoundCloud Client ID + Client Secret để tìm kiếm và phát nhạc công khai.","Use SoundCloud Client ID + Client Secret for public search and playback."],
+"Đã cấu hình · Sẵn sàng":["Đã cấu hình · Sẵn sàng","Configured · Ready"],
+"SoundCloud đã sẵn sàng để tìm kiếm và phát nhạc công khai.":["SoundCloud đã sẵn sàng để tìm kiếm và phát nhạc công khai.","SoundCloud is ready for public search and playback."],
+"Cấu hình SoundCloud Client ID và Client Secret để bật nguồn này.":["Cấu hình SoundCloud Client ID và Client Secret để bật nguồn này.","Configure a SoundCloud Client ID and Client Secret to enable this source."],
+"Hãy nhập đầy đủ SoundCloud Client ID và Client Secret.":["Hãy nhập đầy đủ SoundCloud Client ID và Client Secret.","Enter both the SoundCloud Client ID and Client Secret."],
+"Đã lưu cấu hình SoundCloud. Nguồn đã sẵn sàng để kiểm tra.":["Đã lưu cấu hình SoundCloud. Nguồn đã sẵn sàng để kiểm tra.","SoundCloud configuration saved. The source is ready to test."],
+"Cấu hình SoundCloud":["Cấu hình SoundCloud","Configure SoundCloud"],
+"SoundCloud dùng Client ID + Client Secret để tìm kiếm và phát các track công khai. Không cần đăng nhập tài khoản SoundCloud.":["SoundCloud dùng Client ID + Client Secret để tìm kiếm và phát các track công khai. Không cần đăng nhập tài khoản SoundCloud.","SoundCloud uses a Client ID + Client Secret for public track search and playback. No SoundCloud account login is required."],
+"Kiểm tra SoundCloud":["Kiểm tra SoundCloud","Test SoundCloud"],
+"Hãy nhập và lưu SoundCloud Client ID + Client Secret trước khi kiểm tra.":["Hãy nhập và lưu SoundCloud Client ID + Client Secret trước khi kiểm tra.","Enter and save the SoundCloud Client ID + Client Secret before testing."],
+"Đang kiểm tra kết nối SoundCloud…":["Đang kiểm tra kết nối SoundCloud…","Testing SoundCloud connection…"],
+"SoundCloud API đã sẵn sàng.":["SoundCloud API đã sẵn sàng.","SoundCloud API is ready."],
+"Không thể kết nối SoundCloud: ":["Không thể kết nối SoundCloud: ","Could not connect to SoundCloud: "],
+"Không thể kết nối SoundCloud:":["Không thể kết nối SoundCloud:","Could not connect to SoundCloud:"],
+"SoundCloud là nguồn API công khai; hãy sửa Client ID/Secret trong phần cấu hình.":["SoundCloud là nguồn API công khai; hãy sửa Client ID/Secret trong phần cấu hình.","SoundCloud is a public API source; edit the Client ID/Secret in configuration."],
+"Chưa cấu hình":["Chưa cấu hình","Not configured"],
+"SoundCloud web search sẵn sàng · không cần Client ID / Client Secret":["SoundCloud web search sẵn sàng · không cần Client ID / Client Secret","SoundCloud web search is ready · no Client ID / Client Secret required"],
+"Tìm kiếm SoundCloud công khai; ShinaYuu tự resolve đúng URL track khi phát.":["Tìm kiếm SoundCloud công khai; ShinaYuu tự resolve đúng URL track khi phát.","Public SoundCloud search; ShinaYuu resolves the exact track URL for playback."],
+"Sẵn sàng · Không cần Client ID":["Sẵn sàng · Không cần Client ID","Ready · No Client ID required"],
+"SoundCloud đã sẵn sàng · không cần Client ID / Client Secret.":["SoundCloud đã sẵn sàng · không cần Client ID / Client Secret.","SoundCloud is ready · no Client ID / Client Secret required."],
+"SoundCloud không cần cấu hình Client ID / Client Secret.":["SoundCloud không cần cấu hình Client ID / Client Secret.","SoundCloud does not require Client ID / Client Secret configuration."]
+};
+Object.keys(SHINAYUU_2_2_0_SOUNDCLOUD_TEXT).forEach(function(key){SOURCE[key]=SHINAYUU_2_2_0_SOUNDCLOUD_TEXT[key];});
+
 var SHINAYUU_V6_ADVANCED_TEXT={
 "Ma trận định tuyến":["Ma trận định tuyến","Routing matrix"],
 "Đầu ra chính":["Đầu ra chính","Primary output"],

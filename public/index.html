@@ -42,7 +42,7 @@
 <link href="css/shinayuu-alpha3.0.2-focused.css?v=2.0.0-alpha.3.0.3" rel="stylesheet"/>
 <link href="css/shinayuu-alpha3.0.3-focused.css?v=2.0.0-alpha.3.0.3" rel="stylesheet"/>
 <link href="css/shinayuu-alpha3.0.4-focused.css?v=2.0.0-alpha.3.0.4" rel="stylesheet"/>
-<link rel="stylesheet" href="css/shinayuu-alpha3.0.5-fixes.css?v=2.1.10">
+<link rel="stylesheet" href="css/shinayuu-alpha3.0.5-fixes.css?v=2.2.0">
 
 
 
@@ -83,7 +83,7 @@
 <div aria-hidden="true" id="fullscreen-diy-zone">
 <button aria-label="DIY" aria-pressed="false" class="desktop-mode-btn" id="fullscreen-diy-btn" onclick="toggleDiyMode()" title="DIY" type="button">DIY</button>
 </div>
-<div id="custom-bg"><video id="custom-bg-video" loop="" muted="" playsinline="" preload="metadata"></video></div>
+<div id="custom-bg"><img id="custom-bg-image" alt="" aria-hidden="true"/><video id="custom-bg-video" loop="" muted="" playsinline="" preload="metadata"></video></div>
 <div aria-hidden="true" id="wallpaper-engine-layer">
 <img alt="" id="wallpaper-engine-image"/>
 <canvas aria-hidden="true" id="wallpaper-engine-freeze"></canvas>
@@ -125,6 +125,7 @@
 <div aria-label="Search mode" class="search-mode-tabs" id="search-mode-tabs" role="tablist">
 <button aria-selected="true" class="active" id="search-mode-song" onclick="setSearchMode('song')" type="button">Tất cả</button>
 <button aria-selected="false" id="search-mode-netease" onclick="setSearchMode('netease')" type="button">Spotify</button>
+<button aria-selected="false" id="search-mode-soundcloud" onclick="setSearchMode('soundcloud')" type="button">SoundCloud</button>
 <button aria-selected="false" id="search-mode-ytmusic" onclick="setSearchMode('ytmusic')" type="button">YouTube Music</button>
 <button aria-selected="false" id="search-mode-ytvideo" onclick="setSearchMode('ytvideo')" type="button">YouTube Video</button>
 <button aria-selected="false" id="search-mode-podcast" onclick="setSearchMode('podcast')" type="button">Podcast</button>
@@ -458,10 +459,10 @@
 </div>
 </div>
 <div class="fx-section-label sy-interface-section-label" id="sy-liquid-glass-section-label">Liquid Glass</div>
-<div class="fx-slider sy-panel-opacity-control" id="sy-panel-opacity-control"><label id="sy-panel-opacity-label">Bảng điều khiển hình ảnh</label><input id="fx-ui-panel-opacity" max="0.96" min="0.25" step="0.01" type="range" value="0.90"/><output id="fx-ui-panel-opacity-output">90%</output></div>
-<div class="fx-slider sy-panel-opacity-control" id="sy-left-shelf-opacity-control"><label id="sy-left-shelf-opacity-label">Kệ playlist bên trái</label><input id="fx-ui-left-shelf-opacity" max="0.96" min="0.25" step="0.01" type="range" value="0.90"/><output id="fx-ui-left-shelf-opacity-output">90%</output></div>
-<div class="fx-slider sy-panel-opacity-control" id="sy-right-shelf-opacity-control"><label id="sy-right-shelf-opacity-label">Kệ playlist bên phải</label><input id="fx-ui-right-shelf-opacity" max="1" min="0.25" step="0.01" type="range" value="1.00"/><output id="fx-ui-right-shelf-opacity-output">100%</output></div>
-<div class="fx-slider sy-panel-opacity-control" id="sy-right-shelf-bg-opacity-control"><label id="sy-right-shelf-bg-opacity-label">Nền thẻ kệ playlist bên phải</label><input id="fx-ui-right-shelf-bg-opacity" max="0.98" min="0.25" step="0.01" type="range" value="0.79"/><output id="fx-ui-right-shelf-bg-opacity-output">79%</output></div>
+<div class="fx-slider sy-panel-opacity-control" id="sy-panel-opacity-control"><label id="sy-panel-opacity-label">Bảng điều khiển hình ảnh</label><input id="fx-ui-panel-opacity" max="0.96" min="0" step="0.01" type="range" value="0.90"/><output id="fx-ui-panel-opacity-output">90%</output></div>
+<div class="fx-slider sy-panel-opacity-control" id="sy-left-shelf-opacity-control"><label id="sy-left-shelf-opacity-label">Kệ playlist bên trái</label><input id="fx-ui-left-shelf-opacity" max="0.96" min="0" step="0.01" type="range" value="0.90"/><output id="fx-ui-left-shelf-opacity-output">90%</output></div>
+<div class="fx-slider sy-panel-opacity-control" id="sy-right-shelf-opacity-control"><label id="sy-right-shelf-opacity-label">Kệ playlist bên phải</label><input id="fx-ui-right-shelf-opacity" max="1" min="0" step="0.01" type="range" value="1.00"/><output id="fx-ui-right-shelf-opacity-output">100%</output></div>
+<div class="fx-slider sy-panel-opacity-control" id="sy-right-shelf-bg-opacity-control"><label id="sy-right-shelf-bg-opacity-label">Nền thẻ kệ playlist bên phải</label><input id="fx-ui-right-shelf-bg-opacity" max="0.98" min="0" step="0.01" type="range" value="0.79"/><output id="fx-ui-right-shelf-bg-opacity-output">79%</output></div>
 <div class="fx-section-label">Giao diện</div>
 <div class="fx-slider"><label>Độ trong suốt nền</label><input id="fx-bgopacity" max="1" min="0" step="0.01" type="range"/><output></output></div>
 <div class="fx-slider"><label>Cắt ngang</label><input id="fx-bgcropx" max="100" min="0" step="1" type="range"/><output></output></div>
@@ -750,8 +751,8 @@
 <div class="fx-slider"><label>Vị trí trên–dưới</label><input id="fx-shelfy" max="0.9" min="-0.9" step="0.01" type="range"/><output></output></div>
 <div class="fx-slider"><label>Độ sâu trước–sau</label><input id="fx-shelfz" max="0.9" min="-0.9" step="0.01" type="range"/><output></output></div>
 <div class="fx-slider"><label>Góc nghiêng ngang</label><input id="fx-shelfangle" max="30" min="-30" step="1" type="range"/><output></output></div>
-<div class="fx-slider"><label>Độ trong suốt tổng thể</label><input id="fx-shelfopacity" max="1" min="0.25" step="0.01" type="range"/><output></output></div>
-<div class="fx-slider"><label>Độ trong suốt nền</label><input id="fx-shelfbgalpha" max="0.98" min="0.25" step="0.01" type="range"/><output></output></div>
+<div class="fx-slider"><label>Độ trong suốt tổng thể</label><input id="fx-shelfopacity" max="1" min="0" step="0.01" type="range"/><output></output></div>
+<div class="fx-slider"><label>Độ trong suốt nền</label><input id="fx-shelfbgalpha" max="0.98" min="0" step="0.01" type="range"/><output></output></div>
 <div class="fx-section-label">Vị trí trang chi tiết playlist</div>
 <div class="fx-slider"><label>Chi tiết trái/phải</label><input id="fx-shelfdetailx" max="4.8" min="-4.8" step="0.01" type="range"/><output></output></div>
 <div class="fx-slider"><label>Chi tiết lên/xuống</label><input id="fx-shelfdetaily" max="3.6" min="-3.6" step="0.01" type="range"/><output></output></div>
@@ -1247,6 +1248,11 @@
 <span class="provider-login-copy"><b>Spotify</b><small>OAuth chính thức · Yêu cầu Premium để phát trực tiếp</small></span>
 <span class="provider-login-state" id="login-provider-spotify-state">Chưa kết nối</span>
 </button>
+<button class="provider-login-card soundcloud" data-login-provider="soundcloud" id="login-provider-soundcloud" onclick="selectLoginProviderNode('soundcloud')" type="button">
+<span class="provider-login-logo">SC</span>
+<span class="provider-login-copy"><b>SoundCloud</b><small>Tìm kiếm công khai · ShinaYuu tự xử lý phát từ URL SoundCloud</small></span>
+<span class="provider-login-state" id="login-provider-soundcloud-state">Sẵn sàng</span>
+</button>
 </div>
 
 <div class="provider-login-workspace" id="provider-login-workspace-panel">
@@ -1293,7 +1299,7 @@
 
 <div class="provider-login-footer">
 <div class="provider-login-footer-actions"><button class="modal-btn" onclick="skipLoginAndFocusSearch()" type="button">Tìm nhạc mà không đăng nhập</button><button class="modal-btn" id="use-both-sources-btn" onclick="enableBothMusicSources()" type="button">Dùng cả hai nguồn</button></div>
-<span>Dữ liệu đăng nhập và Client ID chỉ được lưu cục bộ trên máy.</span>
+<span>SoundCloud không yêu cầu Client ID / Client Secret; ShinaYuu chỉ lưu URL track để xử lý phát.</span>
 </div>
 
 </div>
@@ -1618,12 +1624,12 @@ Có thể không dùng mốc thời gian; mỗi dòng sẽ tự dàn theo thời
 <script src="js/shinayuu-index-bundle.js?v=2.1.10"></script>
 <script src="js/shinayuu-home-smart-queue.js?v=2.1.10"></script>
 <script src="js/shinayuu-v2-native.js?v=2.1.10"></script>
-<script src="js/shinayuu-background-media-library.js?v=2.1.10"></script>
-<script src="js/shinayuu-alpha2-features.js?v=2.1.10"></script>
+<script src="js/shinayuu-background-media-library.js?v=2.2.0"></script>
+<script src="js/shinayuu-alpha2-features.js?v=2.2.0"></script>
 <script src="js/shinayuu-ui-v6.js"></script>
 <script src="spotify-direct-player.js?v=2.1.10"></script>
 <script src="js/shinayuu-2.0.15-foreground-prewarm.js?v=2.1.10"></script>
-<script src="js/shinayuu-alpha3.0.4-ui.js?v=2.1.10"></script>
-<script src="js/shinayuu-alpha3.0.5-fixes.js?v=2.1.10"></script>
+<script src="js/shinayuu-alpha3.0.4-ui.js?v=2.2.0"></script>
+<script src="js/shinayuu-alpha3.0.5-fixes.js?v=2.2.0"></script>
 </body>
 </html>

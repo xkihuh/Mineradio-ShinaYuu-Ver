@@ -108,7 +108,6 @@ namespace ShinaYuu.AudioRouting {
 
   public static class Router {
     static readonly PROPERTYKEY FriendlyNameKey = new PROPERTYKEY { fmtid = new Guid("A45C254E-DF1C-4EFD-8020-67D146A850E0"), pid = 14 };
-    static readonly uint CLSCTX_ALL = 23;
 
     static string ReadFriendlyName(IMMDevice device) {
       IPropertyStore store = null;
@@ -116,7 +115,8 @@ namespace ShinaYuu.AudioRouting {
         int hr = device.OpenPropertyStore(0, out store);
         if (hr != 0 || store == null) return "";
         PROPVARIANT pv;
-        hr = store.GetValue(ref FriendlyNameKey, out pv);
+        PROPERTYKEY friendlyNameKey = FriendlyNameKey;
+        hr = store.GetValue(ref friendlyNameKey, out pv);
         if (hr != 0) return "";
         try {
           // VT_LPWSTR = 31, VT_LPSTR = 30, VT_BSTR = 8
@@ -174,7 +174,7 @@ namespace ShinaYuu.AudioRouting {
         foreach (var candidate in candidates) {
           var label = Normalize(candidate.Label);
           if (label == wanted) { best = candidate; break; }
-          if (label.Contains(wanted) || wanted.Contains(label)) best ??= candidate;
+          if (label.Contains(wanted) || wanted.Contains(label)) { if (best == null) best = candidate; }
         }
         if (best == null) throw new InvalidOperationException("Native render endpoint not found for label: " + deviceLabel);
         endpointId = best.Id;

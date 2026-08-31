@@ -17,6 +17,13 @@ function lyricEndpointForSong(songOrId) {
   if (provider === 'local') {
     return '/api/local/lyrics?id=' + encodeURIComponent(song.localKey || song.id || song.providerSongId || '');
   }
+  if (provider === 'soundcloud') {
+    var soundcloudId = song.soundcloudId || song.id || song.providerSongId || '';
+    return '/api/soundcloud/lyric?id=' + encodeURIComponent(soundcloudId) +
+      '&track=' + encodeURIComponent(song.name || song.title || '') + '&artist=' + encodeURIComponent(song.artist || '') +
+      '&album=' + encodeURIComponent(song.album || '') + '&duration=' + encodeURIComponent(playbackDurationFromSong(song) || '') +
+      '&language=' + encodeURIComponent(window.appLanguage || 'vi');
+  }
   if (provider === 'spotify') {
     var exactSpotifyId = song.currentTrackId || song.actualSpotifyId || song.spotifyId || song.providerSongId || song.id || '';
     return '/api/spotify/lyric?id=' + encodeURIComponent(exactSpotifyId) +
@@ -39,7 +46,7 @@ function persistentLyricCacheKey(song) {
   var provider = typeof songProviderKey === 'function' ? songProviderKey(song) : (song.source || song.provider || 'youtube');
   var id = provider === 'spotify'
     ? (song.currentTrackId || song.actualSpotifyId || song.spotifyId || song.providerSongId || song.id || '')
-    : (song.id || song.mid || song.songmid || song.hash || '');
+    : (provider === 'soundcloud' ? (song.soundcloudId || song.providerSongId || song.id || '') : (song.id || song.mid || song.songmid || song.hash || ''));
   var artist = song.artist || song.singer || song.artists || '';
   return ['lyrics-v1', provider, id, song.name || song.title || '', artist].join('|');
 }

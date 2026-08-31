@@ -37,6 +37,12 @@ function coverProxySrc(url, cacheBust) {
 function coverUrlWithSize(url, size) {
   if (!url || isInlineCoverSrc(url) || !/^https?:\/\//i.test(url)) return url || '';
   if (!size) return url;
+  // SoundCloud CDN artwork uses filename size variants (t300x300, t500x500,
+  // etc.), not the QQ-style ?param=WxH query used by other providers.
+  if (/sndcdn\.com\//i.test(url)) {
+    var scToken = size >= 500 ? 't500x500' : size >= 400 ? 'crop' : size >= 300 ? 't300x300' : size >= 100 ? 'large' : 'small';
+    return url.replace(/-(?:mini|tiny|small|badge|t67x67|large|t300x300|crop|t500x500|original)\.(jpg|png)(?:\?.*)?$/i, '-' + scToken + '.$1');
+  }
   var param = 'param=' + size + 'y' + size;
   if (/[?&]param=\d+y\d+/i.test(url)) return url.replace(/([?&])param=\d+y\d+/i, '$1' + param);
   return url + (url.indexOf('?') >= 0 ? '&' : '?') + param;

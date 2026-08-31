@@ -42,6 +42,7 @@ function normalizePlaybackQuality(value) {
 }
 function normalizePlaybackProvider(provider) {
   if (provider === 'spotify') return 'spotify';
+  if (provider === 'soundcloud') return 'soundcloud';
   if (provider === 'local') return 'local';
   return 'youtube';
 }
@@ -49,6 +50,7 @@ function normalizePlaybackQualityForProvider(value, provider) {
   provider = normalizePlaybackProvider(provider);
   var q = normalizePlaybackQuality(value);
   if (provider === 'youtube' && q === 'jymaster') return 'hires';
+  if (provider === 'soundcloud' && q !== 'low') return 'standard';
   return q;
 }
 function playbackQualityOptions(provider) {
@@ -168,7 +170,7 @@ function playbackResolvedQualityText(data, provider) {
   return br ? (label + ' · ' + br) : label;
 }
 function readPlaybackQualityPreference() {
-  var fallback = { youtube: PLAYBACK_QUALITY_DEFAULTS.youtube, spotify: PLAYBACK_QUALITY_DEFAULTS.spotify };
+  var fallback = { youtube: PLAYBACK_QUALITY_DEFAULTS.youtube, spotify: PLAYBACK_QUALITY_DEFAULTS.spotify, soundcloud: PLAYBACK_QUALITY_DEFAULTS.soundcloud };
   try {
     var raw = localStorage.getItem(PLAYBACK_QUALITY_STORE_KEY) || '';
     if (!raw) return fallback;

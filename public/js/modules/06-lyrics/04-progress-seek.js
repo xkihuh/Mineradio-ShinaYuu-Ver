@@ -144,13 +144,20 @@ function activeAutoMixHandoffClock() {
   return clock;
 }
 function getPlaybackDurationSeconds() {
+  var currentSong = currentCoverSong();
+  var currentProvider = currentSong && String(currentSong.provider || currentSong.source || currentSong.type || '').toLowerCase();
+  var declaredDuration = playbackDurationFromSong(currentSong);
+  // SoundCloud is delivered through a live/transcoded proxy. Chromium and an
+  // AutoMix handoff media element can expose a bogus multi-hour duration for
+  // this kind of stream. The catalog duration is authoritative.
+  if (currentProvider === 'soundcloud' && declaredDuration > 0) return declaredDuration;
   var handoff = activeAutoMixHandoffClock();
   if (handoff) {
     var liveDuration = Number(handoff.media.duration) || Number(handoff.duration) || 0;
     if (liveDuration > 0) return liveDuration;
   }
-  if (audio && isFinite(audio.duration) && audio.duration > 0) return audio.duration;
-  return playbackDurationFromSong(currentCoverSong());
+  if (audio && isFinite(audio.duration) && audio.duration > 0 && audio.duration < 24 * 60 * 60) return audio.duration;
+  return declaredDuration;
 }
 function getPlaybackCurrentSeconds() {
   var handoff = activeAutoMixHandoffClock();

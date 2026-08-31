@@ -26,6 +26,7 @@ var youtubeLoginStatus = { provider: 'youtube', loggedIn: false, preview: false,
 var youtubeLoginAutoRefreshTimer = null;
 var youtubeLoginStatusLastForcedAt = 0;
 var spotifyLoginStatus = { provider: 'spotify', loggedIn: false, configured: false, oauthConfigured: false, oauthMissing: [], preview: false, nickname: 'Spotify', userId: '', avatar: '', product: '', vipType: 0, vipLevel: 'none', isVip: false, isSvip: false, playbackKeyReady: false, playbackMode: 'recommend-match' };
+var soundcloudLoginStatus = { provider: 'soundcloud', loggedIn: false, configured: false, searchReady: false, publicCatalog: false, nickname: 'SoundCloud', userId: '', avatar: '', vipType: 0, vipLevel: 'none', isVip: false, isSvip: false, playbackKeyReady: false, playbackMode: 'direct' };
 var spotifyLoginAutoRefreshTimer = null;
 var youtubeLoginWasLoggedIn = false;
 var spotifyLoginWasLoggedIn = false;
@@ -121,7 +122,7 @@ var AUDIO_INPUT_BRIDGE_STORE_KEY = 'mineradio-audio-input-bridge-v1';
 var PROVIDER_VIP_AUDIT_STORE_KEY = 'mineradio-provider-vip-audit-v1';
 var YouTube_PLAYBACK_VIP_EVIDENCE_STORE_KEY = 'mineradio-youtube-playback-vip-evidence-v1';
 var LOGIN_COOKIE_EXPORT_STORE_KEY = 'mineradio-login-cookie-export-v1';
-var PLAYBACK_QUALITY_DEFAULTS = { youtube: 'hires', spotify: 'standard' };
+var PLAYBACK_QUALITY_DEFAULTS = { youtube: 'hires', spotify: 'standard', soundcloud: 'standard' };
 var PLAYBACK_QUALITY_OPTIONS = {
   youtube: [
     { key: 'hires', title: 'Chất lượng cao', sub: 'YouTube Music · ưu tiên chất lượng' },
@@ -131,6 +132,10 @@ var PLAYBACK_QUALITY_OPTIONS = {
   ],
   spotify: [
     { key: 'standard', title: 'Spotify Premium', sub: 'Phát trực tiếp qua Spotify' }
+  ],
+  soundcloud: [
+    { key: 'standard', title: 'SoundCloud 160 kbps', sub: 'AAC HLS · ưu tiên chất lượng' },
+    { key: 'low', title: 'SoundCloud 96 kbps', sub: 'AAC HLS · tiết kiệm băng thông' }
   ]
 };
 var UPLOAD_TIP_STORE_KEY = 'mineradio-upload-tip-seen';

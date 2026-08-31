@@ -72,7 +72,7 @@ function shinayuuPlaybackDescriptorKey(song, quality) {
   var provider = normalizePlaybackProvider(sourceProvider);
   var id = provider === 'spotify'
     ? (song.spotifyId || song.id || song.providerSongId || '')
-    : (song.youtubeId || song.id || song.mid || song.songmid || '');
+    : (provider === 'soundcloud' ? (song.externalUrl || song.soundcloudPermalink || song.soundcloudUrl || song.soundcloudId || song.id || song.providerSongId || '') : (song.youtubeId || song.id || song.mid || song.songmid || ''));
   var sourceType = sourceProvider === 'youtube-video' ? 'video' : 'music';
   return [provider, sourceType, String(id), String(quality || '')].join('|');
 }
@@ -86,13 +86,15 @@ async function resolvePlaybackDescriptor(song, quality, options) {
   var key = shinayuuPlaybackDescriptorKey(song, requestedQuality);
   var now = Date.now();
   var cached = shinayuuPlaybackDescriptorCache.get(key);
-  var ttl = provider === 'spotify' ? SHINAYUU_SPOTIFY_DESCRIPTOR_TTL_MS : SHINAYUU_YOUTUBE_DESCRIPTOR_TTL_MS;
+  var ttl = provider === 'spotify' ? SHINAYUU_SPOTIFY_DESCRIPTOR_TTL_MS : (provider === 'soundcloud' ? 90 * 1000 : SHINAYUU_YOUTUBE_DESCRIPTOR_TTL_MS);
   if (!options.refresh && cached && now - cached.at < ttl && cached.data && shinayuuDescriptorHasPlayback(cached.data)) return cached.data;
   if (!options.refresh && shinayuuPlaybackDescriptorInflight.has(key)) return shinayuuPlaybackDescriptorInflight.get(key);
   var qualityParam = '&quality=' + encodeURIComponent(requestedQuality);
   var promise;
   if (provider === 'spotify') {
     promise = apiJson('/api/spotify/song/url?id=' + encodeURIComponent(song.spotifyId || song.id || song.providerSongId || '') + qualityParam, { timeoutMs: options.prefetch ? 7000 : 9000 });
+  } else if (provider === 'soundcloud') {
+    promise = apiJson('/api/soundcloud/song/url?id=' + encodeURIComponent(song.externalUrl || song.soundcloudPermalink || song.soundcloudUrl || song.soundcloudId || song.id || song.providerSongId || '') + qualityParam, { timeoutMs: options.prefetch ? 9000 : 12000 });
   } else {
     promise = apiJson(youtubePlaybackUrlRoute(song) + '?id=' + encodeURIComponent(song.youtubeId || song.id || song.mid || song.songmid || '') + qualityParam + '&sourceType=' + encodeURIComponent(sourceProvider === 'youtube-video' ? 'video' : 'music'), { timeoutMs: options.prefetch ? 11000 : 15000 });
   }
@@ -112,7 +114,7 @@ function invalidatePlaybackDescriptorForSong(song) {
   var sourceProvider = songProviderKey(song);
   var id = provider === 'spotify'
     ? (song.spotifyId || song.id || song.providerSongId || '')
-    : (song.youtubeId || song.id || song.mid || song.songmid || '');
+    : (provider === 'soundcloud' ? (song.externalUrl || song.soundcloudPermalink || song.soundcloudUrl || song.soundcloudId || song.id || song.providerSongId || '') : (song.youtubeId || song.id || song.mid || song.songmid || ''));
   var sourceType = sourceProvider === 'youtube-video' ? 'video' : 'music';
   var prefix = [provider, sourceType, String(id), ''].join('|');
   Array.from(shinayuuPlaybackDescriptorCache.keys()).forEach(function (key) {
@@ -546,6 +548,9 @@ async function resolveAlbumGaplessPlaybackData(song) {
   }
   if (playbackProvider === 'spotify') {
     return apiJson('/api/spotify/song/url?id=' + encodeURIComponent(song.spotifyId || song.id || song.providerSongId || '') + qualityParam, { timeoutMs: 9000 });
+  }
+  if (playbackProvider === 'soundcloud') {
+    return apiJson('/api/soundcloud/song/url?id=' + encodeURIComponent(song.externalUrl || song.soundcloudPermalink || song.soundcloudUrl || song.soundcloudId || song.id || song.providerSongId || '') + qualityParam, { timeoutMs: 12000 });
   }
   return apiJson(youtubePlaybackUrlRoute(song) + '?id=' + encodeURIComponent(song.youtubeId || song.id || song.mid || song.songmid || '') + qualityParam + '&sourceType=' + encodeURIComponent(sourceProvider === 'youtube-video' ? 'video' : 'music'), { timeoutMs: 15000 });
 }
@@ -1196,6 +1201,14 @@ async function playQueueAt(idx, opts) {
         return settleExpiredSourceFallbackPlayback(idx, token, opts);
       }
       if (data) {
+        if (playbackProvider === 'soundcloud' && Number(data.duration) > 0) {
+          var soundcloudDurationMs = Number(data.duration);
+          // Backend duration is milliseconds; keep the queue item's duration in
+          // the same unit when it is declared that way, otherwise normalize from
+          // seconds. This value is authoritative for the progress clock.
+          song.duration = soundcloudDurationMs > 1000 ? Math.round(soundcloudDurationMs) : Math.round(soundcloudDurationMs * 1000);
+          song.durationMs = song.duration;
+        }
         song.resolvedPlaybackProvider = playbackProvider;
         song.playbackLevel = data.level || song.playbackLevel || '';
         if (!data.sourceMatch) song.playbackSource = data.source || data.provider || song.playbackSource || '';

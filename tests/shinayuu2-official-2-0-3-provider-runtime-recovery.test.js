@@ -10,7 +10,7 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
 test('2.1.5 treats Spotify, YouTube Music and YouTube Video as separate fallback platforms', () => {
   const fallback = read('public/js/modules/05-playback/11-provider-fallback.js');
-  assert.match(fallback, /SOURCE_FALLBACK_DIRECT_PROVIDERS = \['youtube-music', 'youtube-video', 'spotify'\]/);
+  assert.ok(fallback.includes("SOURCE_FALLBACK_DIRECT_PROVIDERS = ['youtube-music', 'youtube-video', 'spotify', 'soundcloud']"));
   assert.match(fallback, /function playbackPlatformKey\(song\)/);
   assert.match(fallback, /\/api\/youtube-video\/search\?keywords=/);
   assert.match(fallback, /\/api\/youtube-music\/search\?keywords=/);

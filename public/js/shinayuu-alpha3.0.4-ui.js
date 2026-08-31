@@ -26,9 +26,9 @@
   }
 
   function applyControlPanelOpacity(value, persist, custom) {
-    value = clamp(value, 0.90, 0.25, 0.96);
-    var sticky = clamp(value - 0.04, 0.86, 0.20, 0.92);
-    var card = clamp(value - 0.18, 0.72, 0.16, 0.82);
+    value = clamp(value, 0.90, 0, 0.96);
+    var sticky = clamp(value * 0.88, 0, 0, 0.86);
+    var card = clamp(value * 0.68, 0, 0, 0.78);
     document.documentElement.classList.toggle('sy-control-panel-opacity-custom', !!custom);
     document.documentElement.style.setProperty('--sy-control-panel-alpha', value.toFixed(2));
     document.documentElement.style.setProperty('--sy-control-panel-sticky-alpha', sticky.toFixed(2));
@@ -40,9 +40,9 @@
   }
 
   function applyLeftShelfOpacity(value, persist, custom) {
-    value = clamp(value, 0.90, 0.25, 0.96);
-    var sticky = clamp(value - 0.04, 0.86, 0.20, 0.92);
-    var card = clamp(value - 0.18, 0.72, 0.16, 0.82);
+    value = clamp(value, 0.90, 0, 0.96);
+    var sticky = clamp(value * 0.88, 0, 0, 0.86);
+    var card = clamp(value * 0.68, 0, 0, 0.78);
     document.documentElement.classList.toggle('sy-left-shelf-opacity-custom', !!custom);
     document.documentElement.style.setProperty('--sy-left-shelf-alpha', value.toFixed(2));
     document.documentElement.style.setProperty('--sy-left-shelf-sticky-alpha', sticky.toFixed(2));
@@ -58,7 +58,7 @@
     try { if (window.shelfManager && typeof window.shelfManager.refreshTheme === 'function') window.shelfManager.refreshTheme(); } catch (_) {}
   }
   function applyRightShelfOpacity(value, persist) {
-    value = clamp(value, 1, 0.25, 1);
+    value = clamp(value, 1, 0, 1);
     if (window.fx) window.fx.shelfOpacity = value;
     var input = document.getElementById('fx-ui-right-shelf-opacity');
     if (input && Math.abs(Number(input.value) - value) > 0.001) input.value = value.toFixed(2);
@@ -74,7 +74,7 @@
   }
 
   function applyRightShelfBackgroundOpacity(value, persist) {
-    value = clamp(value, 0.79, 0.25, 0.98);
+    value = clamp(value, 0.79, 0, 0.98);
     if (window.fx) window.fx.shelfBgOpacity = value;
     var input = document.getElementById('fx-ui-right-shelf-bg-opacity');
     if (input && Math.abs(Number(input.value) - value) > 0.001) input.value = value.toFixed(2);
@@ -97,14 +97,14 @@
     input.addEventListener('change', function () { apply(input.value, true, true); });
   }
   function bindLiquidGlass() {
-    var panel = readStored(CONTROL_PANEL_KEY, 0.90, 0.25, 0.96);
-    var left = readStored(LEFT_SHELF_KEY, 0.90, 0.25, 0.96);
+    var panel = readStored(CONTROL_PANEL_KEY, 0.90, 0, 0.96);
+    var left = readStored(LEFT_SHELF_KEY, 0.90, 0, 0.96);
     var fxRight = window.fx && Number(window.fx.shelfOpacity);
-    var rightDefault = Number.isFinite(fxRight) ? clamp(fxRight, 1, 0.25, 1) : 1;
-    var right = readStored(RIGHT_SHELF_KEY, rightDefault, 0.25, 1);
+    var rightDefault = Number.isFinite(fxRight) ? clamp(fxRight, 1, 0, 1) : 1;
+    var right = readStored(RIGHT_SHELF_KEY, rightDefault, 0, 1);
     var fxRightBg = window.fx && Number(window.fx.shelfBgOpacity);
-    var rightBgDefault = Number.isFinite(fxRightBg) ? clamp(fxRightBg, 0.79, 0.25, 0.98) : 0.79;
-    var rightBg = readStored(RIGHT_SHELF_BG_KEY, rightBgDefault, 0.25, 0.98);
+    var rightBgDefault = Number.isFinite(fxRightBg) ? clamp(fxRightBg, 0.79, 0, 0.98) : 0.79;
+    var rightBg = readStored(RIGHT_SHELF_BG_KEY, rightBgDefault, 0, 0.98);
     applyControlPanelOpacity(panel.value, false, panel.custom);
     applyLeftShelfOpacity(left.value, false, left.custom);
     applyRightShelfOpacity(right.value, false);
@@ -117,7 +117,7 @@
     if (original && original.dataset.syLiquidGlassMirror !== '1') {
       original.dataset.syLiquidGlassMirror = '1';
       var mirror = function () {
-        var value = clamp(original.value, 1, 0.25, 1);
+        var value = clamp(original.value, 1, 0, 1);
         writeStored(RIGHT_SHELF_KEY, value);
         var control = document.getElementById('fx-ui-right-shelf-opacity');
         if (control) control.value = value.toFixed(2);
@@ -130,7 +130,7 @@
     if (originalBg && originalBg.dataset.syLiquidGlassMirror !== '1') {
       originalBg.dataset.syLiquidGlassMirror = '1';
       var mirrorBg = function () {
-        var value = clamp(originalBg.value, 0.79, 0.25, 0.98);
+        var value = clamp(originalBg.value, 0.79, 0, 0.98);
         writeStored(RIGHT_SHELF_BG_KEY, value);
         var control = document.getElementById('fx-ui-right-shelf-bg-opacity');
         if (control) control.value = value.toFixed(2);

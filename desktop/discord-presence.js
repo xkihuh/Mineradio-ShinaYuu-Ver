@@ -445,11 +445,18 @@ class DiscordPresenceManager extends EventEmitter {
     const dynamicCover = !options.forceAppAsset && this.config.preferTrackCover && /^https?:\/\//i.test(p.cover || '')
       ? p.cover
       : undefined;
+    const rawState = this.config.showTrack && hasTrack
+      ? safeText(visibleLyric || `${pausedPrefix}${artistText}${sourceText && artistText !== sourceText ? ` · ${sourceText}` : ''}`, 128)
+      : 'Visual Music Experience';
+    // Discord rejects activity.state values shorter than 2 characters. Keep
+    // one-character lyric lines visible instead of dropping the whole activity
+    // update; only prefix the shortest lines that would otherwise be invalid.
+    const state = rawState.length >= 2
+      ? rawState
+      : (visibleLyric ? safeText(`·${visibleLyric}`, 128) : (safeText(artistText, 128).length >= 2 ? safeText(artistText, 128) : '♪ Music'));
     const activity = {
       details: this.config.showTrack && hasTrack ? safeText(p.title, 128) : 'ShinaYuu Music',
-      state: this.config.showTrack && hasTrack
-        ? safeText(visibleLyric || `${pausedPrefix}${artistText}${sourceText && artistText !== sourceText ? ` · ${sourceText}` : ''}`, 128)
-        : 'Visual Music Experience',
+      state,
       largeImageKey: dynamicCover || fallbackImage,
       largeImageText: hasTrack
         ? safeText([p.title, p.artist].filter(Boolean).join(' — ') || this.config.largeImageText || 'ShinaYuu Music', 128)

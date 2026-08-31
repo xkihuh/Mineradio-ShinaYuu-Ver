@@ -15,6 +15,7 @@ function playbackPlatformKey(song) {
 function playbackProviderLabel(song) {
   var platform = playbackPlatformKey(song);
   if (platform === 'spotify') return 'Spotify';
+  if (platform === 'soundcloud') return 'SoundCloud';
   if (platform === 'youtube-video') return 'YouTube Video';
   return 'YouTube Music';
 }
@@ -310,7 +311,7 @@ function isSameTitleArtist(source, candidate) {
   return a.some(function (name) { return b.indexOf(name) >= 0; });
 }
 var SOURCE_FALLBACK_SEARCH_TIMEOUT_MS = 6500;
-var SOURCE_FALLBACK_DIRECT_PROVIDERS = ['youtube-music', 'youtube-video', 'spotify'];
+var SOURCE_FALLBACK_DIRECT_PROVIDERS = ['youtube-music', 'youtube-video', 'spotify', 'soundcloud'];
 var SOURCE_FALLBACK_RECOVERY_TIMEOUT_MS = 20000;
 var SOURCE_FALLBACK_MAX_QUEUE_ADVANCES = 2;
 var SOURCE_FALLBACK_MAX_PROVIDER_ATTEMPTS = 4;
@@ -601,6 +602,7 @@ function awaitSourceFallbackBudget(promise, recovery) {
 function sourceFallbackProviderTitle(provider) {
   provider = sourceFallbackLogicalProviderKey(provider);
   if (provider === 'spotify') return 'Spotify';
+  if (provider === 'soundcloud') return 'SoundCloud';
   if (provider === 'youtube-video') return 'YouTube Video';
   return 'YouTube Music';
 }
@@ -608,16 +610,22 @@ function sourceFallbackProviderReady(provider) {
   provider = sourceFallbackLogicalProviderKey(provider);
   if (SOURCE_FALLBACK_DIRECT_PROVIDERS.indexOf(provider) < 0) return false;
   if (provider === 'youtube-music' || provider === 'youtube-video') return true;
+  if (provider === 'soundcloud') {
+    var sc = typeof platformStatus === 'function' ? platformStatus('soundcloud') : null;
+    return !!(sc && sc.configured && sc.searchReady);
+  }
   var status = typeof platformStatus === 'function' ? platformStatus('spotify') : null;
   return !!(status && status.loggedIn);
 }
 function alternatePlaybackProviders(song) {
   var currentProvider = playbackPlatformKey(song);
   var preferred = currentProvider === 'spotify'
-    ? ['youtube-music', 'youtube-video']
+    ? ['youtube-music', 'youtube-video', 'soundcloud']
     : (currentProvider === 'youtube-video'
-      ? ['youtube-music', 'spotify']
-      : ['youtube-video', 'spotify']);
+      ? ['youtube-music', 'spotify', 'soundcloud']
+      : (currentProvider === 'soundcloud'
+        ? ['youtube-music', 'youtube-video', 'spotify']
+        : ['youtube-video', 'spotify', 'soundcloud']));
   var accountOrder = typeof accountProviderOrder === 'function' ? accountProviderOrder() : [];
   accountOrder.forEach(function (provider) {
     provider = sourceFallbackLogicalProviderKey(provider);
@@ -843,6 +851,10 @@ async function skipFailedQueueItem(idx, token, message, opts) {
 }
 async function tryAutoPlaybackFallback(song, data, idx, token, opts) {
   opts = opts || {};
+  // A SoundCloud search result is an exact user-selected track. Never silently
+  // replace it with a YouTube/Spotify match: that can change the remix/version.
+  // Let the SoundCloud resolver report the real playback failure instead.
+  if (song && typeof songProviderKey === 'function' && songProviderKey(song) === 'soundcloud') return null;
   if (opts.fallbackDepth > 0) {
     if (opts.fallbackOriginalSong && opts.fallbackCandidateSong) {
       restoreSourceFallbackQueueItem(idx, opts.fallbackOriginalSong, opts.fallbackCandidateSong, token);
