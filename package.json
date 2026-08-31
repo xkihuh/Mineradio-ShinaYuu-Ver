@@ -2,7 +2,7 @@
   "name": "shinayuu-music",
   "productName": "ShinaYuu Music",
   "version": "2.2.0",
-  "description": "ShinaYuu Music 2.2.0: SoundCloud search and exact-track URL playback with transparent Liquid Glass UI, while preserving the 2.1.10 playback, lyrics, Discord and visual core.",
+  "description": "ShinaYuu Music 2.2.0: adds credential-free SoundCloud public search and exact-track URL playback while preserving the 2.1.10 playback, lyrics, Discord and visual core.",
   "author": "ShinaYuu",
   "license": "GPL-3.0-only",
   "main": "desktop/main.js",
@@ -137,7 +137,7 @@
   },
   "shinayuu": {
     "displayVersion": "2.2.0",
-    "edition": "ShinaYuu Music 2.2.0",
+    "edition": "ShinaYuu Music 2.2.0 SoundCloud Integration Alpha",
     "lineage": {
       "productCore": "ShinaYuu Music 1.1.8.7",
       "visualUiAndLyricsStage": "Mineradio 2.1.0 selective stability/layer ports on ShinaYuu 2.0.17",

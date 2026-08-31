@@ -1,60 +1,18 @@
-### 2.1.10 Discord UI / Visible Lyrics follow-up
+# ShinaYuu Music 2.2.0 — Stable Release
 
-The 2.1.10 release retains the signed release pipeline and adds a native Liquid Glass Discord configuration dialog. Visible Lyrics is driven by the Stage transition event and immediate Discord activity updates are serialized to preserve short lyric lines.
+## Overview
 
-# ShinaYuu Music 2.1.10
+ShinaYuu Music 2.2.0 is the Desktop 2.2.x stable baseline. It retains the stable playback foundation from 2.1.10 and adds SoundCloud exact-track playback, YouTube/YouTube Music lyric fallback and alignment improvements, Discord Visible Lyrics robustness, and smoother media-library/Liquid Glass behavior.
 
-## Playback Startup + Fast MV Background
+## 2.2.0 highlights
 
-- Spotify and YouTube provider handoff no longer waits on unnecessary same-provider stop barriers.
-- External provider stop waits are bounded so audible playback can start sooner after a manual selection.
-- YouTube MV background startup uses a fast FHD-class stream first, then upgrades quality after the video is already running.
-- MV background quality upgrades are kept off the critical audio playback path.
-- Retains Spotify VMP/Widevine playback, Windows audio routing, restore-clock protection and shared lyrics clock stabilization from 2.1.9.
-- Package/display/build identity is synchronized to 2.1.10 / 2.1.10.0.
+- SoundCloud is a search/discovery provider; playback resolves the exact SoundCloud track URL through the ShinaYuu resolver/yt-dlp path without requiring user-supplied SoundCloud Client ID or Client Secret.
+- YouTube lyrics can use YouTube Music as a lyric-content fallback while timing is aligned to the audio/video that is actually playing.
+- Discord Visible Lyrics rejects no lyric update because of one-character state strings; short lines are normalized before activity updates.
+- Media-library image loading is throttled and viewport-aware to keep scrolling responsive.
+- Media-library video previews are loaded on hover rather than all at once.
+- Liquid Glass surfaces support near-clear/transparent interiors while retaining visible borders and glass highlights.
 
-# ShinaYuu Music 2.1.9
+## Historical compatibility
 
-## Spotify Audio Routing + Lyrics Clock Fix
-
-- Spotify output routing now follows the ShinaYuu-selected Windows per-process render endpoint.
-- Re-applies native routing when the Windows audio-device list refreshes.
-- Keeps Spotify playback on the existing Widevine/VMP-protected playback path; no secondary protected-audio clone is created.
-- Retains the Spotify restore-clock and start-loop protections introduced in 2.1.8.
-- Retains shared lyrics clock stabilization for Spotify, YouTube and local playback.
-- Package/display/build identity is synchronized to 2.1.9 / 2.1.9.0.
-
-## Release / VMP signing
-
-The Windows release pipeline performs the production VMP signing and verification automatically before producing the final installer. A separate manual `vmp:sign` step is not required when using `npm run release:win`.
-
-Expected release flow:
-
-```powershell
-npm run evs:refresh
-npm run release:preflight
-npm run release:win
-```
-
-The patch form uses the same signed release pipeline before creating the update patch:
-
-```powershell
-npm run release:win -- --patch-from "D:\ShinaYuu\Release-Base\<BASE-SOURCE>.zip"
-```
-
-## Spotify Restore Clock and Loop Fix — 2.1.8
-
-- Preserves the last playback position for Spotify as well as HTML audio sources.
-- Consumes the old restore placeholder when a real Spotify selection starts.
-- Prevents the previous session progress bar from repainting over Spotify every 200 ms.
-- Resumes the same restored Spotify track from its saved position, while a different selected track starts at zero.
-- Sends at most one accepted exact-track play command for the same selection; confirmation recovery uses local SDK resume instead of replaying the URI.
-- Suppresses global replay when only the Spotify SDK clock observation is temporarily unavailable.
-- Keeps the working Castlabs/Widevine and high-FPS lyrics fixes from 2.1.6–2.1.7.
-
-## YouTube current compatibility follow-up — 2026-08-20
-
-- The bundled 2026.07.04 yt-dlp baseline was stale for current YouTube and produced `The page needs to be reloaded` / no stream results.
-- YouTube playback now rejects yt-dlp builds older than the 2026-08-18 compatibility baseline and downloads the official latest yt-dlp master Windows build when needed.
-- Existing Spotify 2.1.8 playback/restore-clock logic was retained in the 2.1.9 source.
-- YouTube extraction continues to use official yt-dlp EJS remote components and Electron's Node runtime.
+The 2.1.x documentation remains in the repository as historical notes. It is not the current release documentation.

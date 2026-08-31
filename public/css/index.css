@@ -18836,7 +18836,3 @@ body.home-review-modal-open {
   border-radius: 999px;
   background: rgba(255, 255, 255, .24);
 }
-
-
-/* 2.2.0 stable: keep Liquid Glass edges readable at zero surface fill. */
-#playlist-panel { border-color: rgba(255,255,255,.20); }

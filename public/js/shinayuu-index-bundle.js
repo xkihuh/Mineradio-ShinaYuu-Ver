@@ -7410,8 +7410,8 @@ function readSavedLyricLayout() {
       shelfOffsetZ: clampRange(raw.shelfOffsetZ == null ? fxDefaults.shelfOffsetZ : Number(raw.shelfOffsetZ), -0.9, 0.9),
       shelfAngleY: savedShelfAngle,
       shelfAngleYManual: savedShelfAngleManual,
-      shelfOpacity: clampRange(raw.shelfOpacity == null ? fxDefaults.shelfOpacity : Number(raw.shelfOpacity), 0, 1),
-      shelfBgOpacity: clampRange(raw.shelfBgOpacity == null ? fxDefaults.shelfBgOpacity : Number(raw.shelfBgOpacity), 0, 0.98),
+      shelfOpacity: clampRange(raw.shelfOpacity == null ? fxDefaults.shelfOpacity : Number(raw.shelfOpacity), 0.25, 1),
+      shelfBgOpacity: clampRange(raw.shelfBgOpacity == null ? fxDefaults.shelfBgOpacity : Number(raw.shelfBgOpacity), 0.25, 0.98),
       shelfAccentColor: normalizeHexColor(raw.shelfAccentColor || fxDefaults.shelfAccentColor, fxDefaults.shelfAccentColor),
       shelfDetailOffsetX: clampRange(raw.shelfDetailOffsetX == null ? fxDefaults.shelfDetailOffsetX : Number(raw.shelfDetailOffsetX), -4.8, 4.8),
       shelfDetailOffsetY: clampRange(raw.shelfDetailOffsetY == null ? fxDefaults.shelfDetailOffsetY : Number(raw.shelfDetailOffsetY), -3.6, 3.6),
@@ -7698,8 +7698,8 @@ function currentFxAutosaveCriticalPatch() {
     shelfOffsetZ: clampRange(fx.shelfOffsetZ == null ? fxDefaults.shelfOffsetZ : Number(fx.shelfOffsetZ), -0.9, 0.9),
     shelfAngleY: clampRange(fx.shelfAngleY == null ? fxDefaults.shelfAngleY : Number(fx.shelfAngleY), -30, 30),
     shelfAngleYManual: fx.shelfAngleYManual === true,
-    shelfOpacity: clampRange(fx.shelfOpacity == null ? fxDefaults.shelfOpacity : Number(fx.shelfOpacity), 0, 1),
-    shelfBgOpacity: clampRange(fx.shelfBgOpacity == null ? fxDefaults.shelfBgOpacity : Number(fx.shelfBgOpacity), 0, 0.98),
+    shelfOpacity: clampRange(fx.shelfOpacity == null ? fxDefaults.shelfOpacity : Number(fx.shelfOpacity), 0.25, 1),
+    shelfBgOpacity: clampRange(fx.shelfBgOpacity == null ? fxDefaults.shelfBgOpacity : Number(fx.shelfBgOpacity), 0.25, 0.98),
     shelfAccentColor: normalizeHexColor(fx.shelfAccentColor || fxDefaults.shelfAccentColor, fxDefaults.shelfAccentColor)
   };
 }
@@ -7896,8 +7896,8 @@ function saveLyricLayout(opts) {
       shelfOffsetZ: clampRange(fx.shelfOffsetZ == null ? fxDefaults.shelfOffsetZ : Number(fx.shelfOffsetZ), -0.9, 0.9),
       shelfAngleY: clampRange(fx.shelfAngleY == null ? fxDefaults.shelfAngleY : Number(fx.shelfAngleY), -30, 30),
       shelfAngleYManual: fx.shelfAngleYManual === true,
-      shelfOpacity: clampRange(fx.shelfOpacity == null ? fxDefaults.shelfOpacity : Number(fx.shelfOpacity), 0, 1),
-      shelfBgOpacity: clampRange(fx.shelfBgOpacity == null ? fxDefaults.shelfBgOpacity : Number(fx.shelfBgOpacity), 0, 0.98),
+      shelfOpacity: clampRange(fx.shelfOpacity == null ? fxDefaults.shelfOpacity : Number(fx.shelfOpacity), 0.25, 1),
+      shelfBgOpacity: clampRange(fx.shelfBgOpacity == null ? fxDefaults.shelfBgOpacity : Number(fx.shelfBgOpacity), 0.25, 0.98),
       shelfAccentColor: normalizeHexColor(fx.shelfAccentColor || fxDefaults.shelfAccentColor, fxDefaults.shelfAccentColor),
       shelfDetailOffsetX: clampRange(fx.shelfDetailOffsetX == null ? fxDefaults.shelfDetailOffsetX : Number(fx.shelfDetailOffsetX), -4.8, 4.8),
       shelfDetailOffsetY: clampRange(fx.shelfDetailOffsetY == null ? fxDefaults.shelfDetailOffsetY : Number(fx.shelfDetailOffsetY), -3.6, 3.6),
@@ -8044,8 +8044,8 @@ function shelfSettings() {
     y: normalizedShelfNumber('shelfOffsetY', fxDefaults.shelfOffsetY, -0.9, 0.9),
     z: normalizedShelfNumber('shelfOffsetZ', fxDefaults.shelfOffsetZ, -0.9, 0.9),
     angle: angleDeg * Math.PI / 180,
-    opacity: normalizedShelfNumber('shelfOpacity', fxDefaults.shelfOpacity, 0, 1),
-    bgOpacity: normalizedShelfNumber('shelfBgOpacity', fxDefaults.shelfBgOpacity, 0, 0.98),
+    opacity: normalizedShelfNumber('shelfOpacity', fxDefaults.shelfOpacity, 0.25, 1),
+    bgOpacity: normalizedShelfNumber('shelfBgOpacity', fxDefaults.shelfBgOpacity, 0.25, 0.98),
     accent: normalizeHexColor((fx && fx.shelfAccentColor) || fxDefaults.shelfAccentColor, fxDefaults.shelfAccentColor)
   };
 }
@@ -23089,9 +23089,9 @@ function makeContentListManager() {
     makeRoundRect(ctx, 24, 28, W - 48, H - 56, 34);
     var bg = ctx.createLinearGradient(0, 0, W, H);
     var panelBgAlpha = shelfSettings().bgOpacity;
-    bg.addColorStop(0, 'rgba(0,0,0,' + Math.min(0.98, Math.max(0, panelBgAlpha + (panelBgAlpha > 0 ? 0.02 : 0))).toFixed(3) + ')');
-    bg.addColorStop(0.42, 'rgba(0,0,0,' + Math.max(0, panelBgAlpha).toFixed(3) + ')');
-    bg.addColorStop(1, 'rgba(0,0,0,' + Math.max(0, panelBgAlpha - 0.04).toFixed(3) + ')');
+    bg.addColorStop(0, 'rgba(0,0,0,' + Math.min(0.98, panelBgAlpha + 0.02).toFixed(3) + ')');
+    bg.addColorStop(0.42, 'rgba(0,0,0,' + panelBgAlpha.toFixed(3) + ')');
+    bg.addColorStop(1, 'rgba(0,0,0,' + Math.max(0.20, panelBgAlpha - 0.04).toFixed(3) + ')');
     ctx.fillStyle = bg; ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.16)';
     ctx.lineWidth = 1.4;
@@ -23175,14 +23175,14 @@ function makeContentListManager() {
     makeRoundRect(ctx, 14, 10, W - 28, H - 20, 22);
     var rowGrad = ctx.createLinearGradient(0, 0, W, H);
     var rowBgAlpha = shelfSettings().bgOpacity;
-    var centerRowBgAlpha = isCenter ? Math.max(rowBgAlpha, 0) : rowBgAlpha;
+    var centerRowBgAlpha = isCenter ? Math.max(rowBgAlpha, 0.92) : rowBgAlpha;
     if (isCenter) {
       rowGrad.addColorStop(0, 'rgba(8,14,24,' + Math.min(0.985, centerRowBgAlpha + 0.040).toFixed(3) + ')');
       rowGrad.addColorStop(0.48, 'rgba(0,0,0,' + Math.min(0.985, centerRowBgAlpha + 0.030).toFixed(3) + ')');
       rowGrad.addColorStop(1, 'rgba(0,0,0,' + Math.min(0.98, centerRowBgAlpha + 0.015).toFixed(3) + ')');
     } else {
-      rowGrad.addColorStop(0, 'rgba(16,16,20,' + Math.max(0, rowBgAlpha - 0.02).toFixed(3) + ')');
-      rowGrad.addColorStop(1, 'rgba(0,0,0,' + Math.max(0, rowBgAlpha - 0.04).toFixed(3) + ')');
+      rowGrad.addColorStop(0, 'rgba(16,16,20,' + Math.max(0.20, rowBgAlpha - 0.02).toFixed(3) + ')');
+      rowGrad.addColorStop(1, 'rgba(0,0,0,' + Math.max(0.20, rowBgAlpha - 0.04).toFixed(3) + ')');
     }
     if (isCenter) {
       ctx.shadowColor = canvasAccent(0.20);
@@ -43570,8 +43570,8 @@ function normalizeFxArchiveSnapshot(raw) {
     shelfOffsetZ: archiveNumber(raw, 'shelfOffsetZ', fxDefaults.shelfOffsetZ, -0.9, 0.9),
     shelfAngleY: archiveNumber(raw, 'shelfAngleY', fxDefaults.shelfAngleY, -30, 30),
     shelfAngleYManual: raw.shelfAngleYManual === true,
-    shelfOpacity: archiveNumber(raw, 'shelfOpacity', fxDefaults.shelfOpacity, 0, 1),
-    shelfBgOpacity: archiveNumber(raw, 'shelfBgOpacity', fxDefaults.shelfBgOpacity, 0, 0.98),
+    shelfOpacity: archiveNumber(raw, 'shelfOpacity', fxDefaults.shelfOpacity, 0.25, 1),
+    shelfBgOpacity: archiveNumber(raw, 'shelfBgOpacity', fxDefaults.shelfBgOpacity, 0.25, 0.98),
     shelfAccentColor: normalizeHexColor(raw.shelfAccentColor || fxDefaults.shelfAccentColor, fxDefaults.shelfAccentColor),
     shelfDetailOffsetX: archiveNumber(raw, 'shelfDetailOffsetX', fxDefaults.shelfDetailOffsetX, -4.8, 4.8),
     shelfDetailOffsetY: archiveNumber(raw, 'shelfDetailOffsetY', fxDefaults.shelfDetailOffsetY, -3.6, 3.6),
@@ -49836,8 +49836,8 @@ function bindFxPanel() {
         fx.shelfAngleYManual = true;
         fx.shelfAngleY = Math.round(clampRange(fx.shelfAngleY, -30, 30));
       }
-      if (pair[1] === 'shelfOpacity') fx.shelfOpacity = clampRange(fx.shelfOpacity, 0, 1);
-      if (pair[1] === 'shelfBgOpacity') fx.shelfBgOpacity = clampRange(fx.shelfBgOpacity, 0, 0.98);
+      if (pair[1] === 'shelfOpacity') fx.shelfOpacity = clampRange(fx.shelfOpacity, 0.25, 1);
+      if (pair[1] === 'shelfBgOpacity') fx.shelfBgOpacity = clampRange(fx.shelfBgOpacity, 0.25, 0.98);
       if (pair[1] === 'shelfDetailOffsetX') fx.shelfDetailOffsetX = clampRange(fx.shelfDetailOffsetX, -4.8, 4.8);
       if (pair[1] === 'shelfDetailOffsetY') fx.shelfDetailOffsetY = clampRange(fx.shelfDetailOffsetY, -3.6, 3.6);
       if (pair[1] === 'shelfDetailOffsetZ') fx.shelfDetailOffsetZ = clampRange(fx.shelfDetailOffsetZ, -3.6, 3.6);

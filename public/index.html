@@ -42,7 +42,7 @@
 <link href="css/shinayuu-alpha3.0.2-focused.css?v=2.0.0-alpha.3.0.3" rel="stylesheet"/>
 <link href="css/shinayuu-alpha3.0.3-focused.css?v=2.0.0-alpha.3.0.3" rel="stylesheet"/>
 <link href="css/shinayuu-alpha3.0.4-focused.css?v=2.0.0-alpha.3.0.4" rel="stylesheet"/>
-<link rel="stylesheet" href="css/shinayuu-alpha3.0.5-fixes.css?v=2.2.0">
+<link rel="stylesheet" href="css/shinayuu-alpha3.0.5-fixes.css?v=2.1.10">
 
 
 
@@ -459,10 +459,10 @@
 </div>
 </div>
 <div class="fx-section-label sy-interface-section-label" id="sy-liquid-glass-section-label">Liquid Glass</div>
-<div class="fx-slider sy-panel-opacity-control" id="sy-panel-opacity-control"><label id="sy-panel-opacity-label">Bảng điều khiển hình ảnh</label><input id="fx-ui-panel-opacity" max="0.96" min="0" step="0.01" type="range" value="0.90"/><output id="fx-ui-panel-opacity-output">90%</output></div>
-<div class="fx-slider sy-panel-opacity-control" id="sy-left-shelf-opacity-control"><label id="sy-left-shelf-opacity-label">Kệ playlist bên trái</label><input id="fx-ui-left-shelf-opacity" max="0.96" min="0" step="0.01" type="range" value="0.90"/><output id="fx-ui-left-shelf-opacity-output">90%</output></div>
-<div class="fx-slider sy-panel-opacity-control" id="sy-right-shelf-opacity-control"><label id="sy-right-shelf-opacity-label">Kệ playlist bên phải</label><input id="fx-ui-right-shelf-opacity" max="1" min="0" step="0.01" type="range" value="1.00"/><output id="fx-ui-right-shelf-opacity-output">100%</output></div>
-<div class="fx-slider sy-panel-opacity-control" id="sy-right-shelf-bg-opacity-control"><label id="sy-right-shelf-bg-opacity-label">Nền thẻ kệ playlist bên phải</label><input id="fx-ui-right-shelf-bg-opacity" max="0.98" min="0" step="0.01" type="range" value="0.79"/><output id="fx-ui-right-shelf-bg-opacity-output">79%</output></div>
+<div class="fx-slider sy-panel-opacity-control" id="sy-panel-opacity-control"><label id="sy-panel-opacity-label">Bảng điều khiển hình ảnh</label><input id="fx-ui-panel-opacity" max="0.96" min="0.05" step="0.01" type="range" value="0.90"/><output id="fx-ui-panel-opacity-output">90%</output></div>
+<div class="fx-slider sy-panel-opacity-control" id="sy-left-shelf-opacity-control"><label id="sy-left-shelf-opacity-label">Kệ playlist bên trái</label><input id="fx-ui-left-shelf-opacity" max="0.96" min="0.05" step="0.01" type="range" value="0.90"/><output id="fx-ui-left-shelf-opacity-output">90%</output></div>
+<div class="fx-slider sy-panel-opacity-control" id="sy-right-shelf-opacity-control"><label id="sy-right-shelf-opacity-label">Kệ playlist bên phải</label><input id="fx-ui-right-shelf-opacity" max="1" min="0.05" step="0.01" type="range" value="1.00"/><output id="fx-ui-right-shelf-opacity-output">100%</output></div>
+<div class="fx-slider sy-panel-opacity-control" id="sy-right-shelf-bg-opacity-control"><label id="sy-right-shelf-bg-opacity-label">Nền thẻ kệ playlist bên phải</label><input id="fx-ui-right-shelf-bg-opacity" max="0.98" min="0.25" step="0.01" type="range" value="0.79"/><output id="fx-ui-right-shelf-bg-opacity-output">79%</output></div>
 <div class="fx-section-label">Giao diện</div>
 <div class="fx-slider"><label>Độ trong suốt nền</label><input id="fx-bgopacity" max="1" min="0" step="0.01" type="range"/><output></output></div>
 <div class="fx-slider"><label>Cắt ngang</label><input id="fx-bgcropx" max="100" min="0" step="1" type="range"/><output></output></div>
@@ -751,8 +751,8 @@
 <div class="fx-slider"><label>Vị trí trên–dưới</label><input id="fx-shelfy" max="0.9" min="-0.9" step="0.01" type="range"/><output></output></div>
 <div class="fx-slider"><label>Độ sâu trước–sau</label><input id="fx-shelfz" max="0.9" min="-0.9" step="0.01" type="range"/><output></output></div>
 <div class="fx-slider"><label>Góc nghiêng ngang</label><input id="fx-shelfangle" max="30" min="-30" step="1" type="range"/><output></output></div>
-<div class="fx-slider"><label>Độ trong suốt tổng thể</label><input id="fx-shelfopacity" max="1" min="0" step="0.01" type="range"/><output></output></div>
-<div class="fx-slider"><label>Độ trong suốt nền</label><input id="fx-shelfbgalpha" max="0.98" min="0" step="0.01" type="range"/><output></output></div>
+<div class="fx-slider"><label>Độ trong suốt tổng thể</label><input id="fx-shelfopacity" max="1" min="0.25" step="0.01" type="range"/><output></output></div>
+<div class="fx-slider"><label>Độ trong suốt nền</label><input id="fx-shelfbgalpha" max="0.98" min="0.25" step="0.01" type="range"/><output></output></div>
 <div class="fx-section-label">Vị trí trang chi tiết playlist</div>
 <div class="fx-slider"><label>Chi tiết trái/phải</label><input id="fx-shelfdetailx" max="4.8" min="-4.8" step="0.01" type="range"/><output></output></div>
 <div class="fx-slider"><label>Chi tiết lên/xuống</label><input id="fx-shelfdetaily" max="3.6" min="-3.6" step="0.01" type="range"/><output></output></div>
@@ -1625,11 +1625,11 @@ Có thể không dùng mốc thời gian; mỗi dòng sẽ tự dàn theo thời
 <script src="js/shinayuu-home-smart-queue.js?v=2.1.10"></script>
 <script src="js/shinayuu-v2-native.js?v=2.1.10"></script>
 <script src="js/shinayuu-background-media-library.js?v=2.2.0"></script>
-<script src="js/shinayuu-alpha2-features.js?v=2.2.0"></script>
+<script src="js/shinayuu-alpha2-features.js?v=2.1.10"></script>
 <script src="js/shinayuu-ui-v6.js"></script>
 <script src="spotify-direct-player.js?v=2.1.10"></script>
 <script src="js/shinayuu-2.0.15-foreground-prewarm.js?v=2.1.10"></script>
-<script src="js/shinayuu-alpha3.0.4-ui.js?v=2.2.0"></script>
-<script src="js/shinayuu-alpha3.0.5-fixes.js?v=2.2.0"></script>
+<script src="js/shinayuu-alpha3.0.4-ui.js?v=2.1.10"></script>
+<script src="js/shinayuu-alpha3.0.5-fixes.js?v=2.1.10"></script>
 </body>
 </html>

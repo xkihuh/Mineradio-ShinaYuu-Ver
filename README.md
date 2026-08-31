@@ -1,52 +1,108 @@
-# ShinaYuu Music 2.1.10
+# ShinaYuu Music 2.2.0
 
-Bản 2.1.10 tiếp tục từ ShinaYuu Music 2.1.9 và giữ toàn bộ sửa ổn định Spotify/Widevine, audio routing và lyrics clock.
+ShinaYuu Music 2.2.0 là bản Desktop stable của nhánh 2.2.x. Bản này giữ playback core ổn định của 2.1.10 và mở rộng hệ thống với SoundCloud exact-track playback, cải thiện đồng bộ lyrics, Discord Visible Lyrics và hệ thống nền đa phương tiện/Liquid Glass.
 
-## Sửa chính 2.1.10
+## Điểm nổi bật 2.2.0
 
-- Giảm độ trễ khi bấm phát Spotify/YouTube bằng bounded provider handoff.
-- Không chờ stop barrier không cần thiết khi chuyển trong cùng provider.
-- YouTube MV background ưu tiên stream FHD nhanh để video nền xuất hiện sớm hơn.
-- Chất lượng MV được nâng sau khi background đã chạy, không chặn đường phát audio.
-- Giữ nguyên VMP signing/verification trong release pipeline.
-- Đồng bộ package/display/build identity lên 2.1.10 / 2.1.10.0.
+### SoundCloud — Search + Exact URL Playback
 
-## 2.1.9 — Audio Routing + Lyrics Clock (historical)
+- SoundCloud đóng vai trò **tìm kiếm/discovery và xác định đúng track**.
+- Kết quả search giữ lại `permalink_url`/canonical URL của chính track SoundCloud.
+- Khi Play, ShinaYuu dùng resolver/yt-dlp để resolve **chính URL SoundCloud đó** thành media stream rồi đưa qua playback/proxy của ShinaYuu.
+- Không yêu cầu người dùng nhập SoundCloud Client ID hoặc Client Secret.
+- Không tự chuyển track SoundCloud sang YouTube/Spotify để phát thay thế.
+- Search ưu tiên SoundCloud web search để phản hồi nhanh; yt-dlp `scsearch` là fallback khi web search không khả dụng.
+- Artwork SoundCloud được chuẩn hóa theo CDN của SoundCloud.
 
-## Sửa chính 2.1.9
+Chi tiết: [`SOUNDCLOUD-2.2.0-IMPLEMENTATION.md`](./SOUNDCLOUD-2.2.0-IMPLEMENTATION.md)
 
-- Spotify audio output routing được kết nối với hệ thống phân phối đầu ra âm thanh của ShinaYuu ở cấp Windows process.
-- Khi thiết bị âm thanh thay đổi/refresh, routing Spotify được áp dụng lại theo thiết bị đầu ra chính mà app đang sử dụng.
-- Giữ nguyên Spotify Widevine playback sau production VMP signing.
-- Giữ nguyên Spotify restore clock và start-loop guard của 2.1.8.
-- Cải thiện shared lyrics clock stabilization cho Spotify, YouTube và local playback.
-- Đồng bộ package/display/build identity lên 2.1.9 / 2.1.9.0.
+### Lyrics — YouTube / YouTube Music
 
-## Log Spotify cần thấy
+- Khi video YouTube thường đang phát nhưng không có lyrics usable, ShinaYuu có thể dùng YouTube Music như nguồn nội dung lyrics.
+- Timeline lyrics phải được căn theo **audio đang thực sự phát**, không áp timestamp của một bản YT Music khác sang MV.
+- Giữ shared playback clock để lyrics, progress và media state bám cùng một timeline.
+
+### Discord Visible Lyrics
+
+- Discord mirror theo lyric transition thực tế của Stage.
+- Update activity được tuần tự hóa để không làm mất các câu ngắn.
+- Các state quá ngắn được chuẩn hóa để Discord không reject toàn bộ activity update.
+
+### Nền đa phương tiện / Media Library
+
+- MV background được đặt đúng layer khi người dùng chọn MV.
+- Album cover dùng `contain`, giữ đúng tỷ lệ và không ép ảnh nhỏ phủ toàn màn hình.
+- Media Library tải theo viewport, giới hạn tải đồng thời và ưu tiên scroll mượt.
+- Video preview chỉ kích hoạt khi **hover** card; không tự động phát hàng loạt khi cuộn.
+- Hover preview được tách khỏi pointer-move effect nặng để tránh khựng/lag khi cuộn hoặc di chuyển chuột.
+
+### Liquid Glass
+
+- Bề mặt panel/kệ playlist có thể giảm opacity fill xuống **0%**.
+- Nền có thể trong hoàn toàn trong khi border, highlight và sắc kính vẫn được giữ để phân biệt UI với wallpaper.
+- Nội dung (text, button, control) không bị làm trong theo background surface.
+
+## Kiến trúc playback
 
 ```text
-[SpotifyDRM] Castlabs components ready: ...
-[SpotifyDRM] mediaKeySystem allowed requester=... embedder=...
-[SpotifyHost] ready device=...
-[SpotifyPlayback] request=... target=spotify:track:... device=...
+Search Provider
+    ├─ Spotify
+    ├─ YouTube
+    ├─ YouTube Music
+    └─ SoundCloud
+          │
+          ▼
+   Unified track descriptor
+          │
+          ▼
+   Provider Resolver
+          │
+          ▼
+   ShinaYuu playback/proxy
+          │
+          ▼
+      Audio Player
 ```
 
-Khi chạy bản release Spotify, executable phải đi qua production VMP signing/verification của release pipeline trước khi kiểm thử playback DRM.
+SoundCloud là ngoại lệ có ý nghĩa: **track descriptor vẫn giữ URL SoundCloud gốc để resolver phát đúng track đó**.
 
-## Audio output
+## Phiên bản
 
-- YouTube/local playback tiếp tục sử dụng routing audio của renderer/media layer.
-- Spotify sử dụng routing theo Windows process vì Spotify Web Playback SDK không cung cấp API public để chọn sink audio riêng cho player.
-- Không capture/clone protected Spotify audio sang một playback pipeline thứ hai.
+- Desktop version: **2.2.0**
+- Build identity: **2.2.0 / 2.2.0.0**
+- Stable branch: **Desktop 2.2.x**
+- Baseline: **2.1.10 playback/Discord/lyrics core**
 
-## Lyrics synchronization
+## Kiểm thử phát hành
 
-Bản 2.1.9 giữ shared lyric clock stabilization cho cả ba nguồn phát và giảm sai lệch do snapshot clock của Spotify SDK. Timing của từng nguồn lyrics vẫn có thể cần offset riêng nếu dữ liệu lyric provider vốn đã lệch timestamp so với audio.
+- Full ShinaYuu test suite: **228/228 PASS**
+- i18n audit: **PASS**
+- Renderer bundle: **PASS**
+- Public npm registry audit: **PASS**
 
-## 2.1.8 YouTube Compatibility Hotfix
+## Tài liệu
 
-This source also contains the current YouTube `android_vr` 403 compatibility fix from August 2026.
+- [`RELEASE.md`](./RELEASE.md) — release overview 2.2.0
+- [`CHANGELOG.md`](./CHANGELOG.md) — lịch sử thay đổi
+- [`SOUNDCLOUD-2.2.0-IMPLEMENTATION.md`](./SOUNDCLOUD-2.2.0-IMPLEMENTATION.md) — kiến trúc SoundCloud
+- [`docs/RELEASE_NOTES_2.2.0.md`](./docs/RELEASE_NOTES_2.2.0.md) — ghi chú phát hành 2.2.0
+- [`docs/ARCHITECTURE_2.2.0.md`](./docs/ARCHITECTURE_2.2.0.md) — kiến trúc Desktop 2.2.x
+- [`docs/MEDIA_LIBRARY_2.2.0.md`](./docs/MEDIA_LIBRARY_2.2.0.md) — Media Library + background
+- [`docs/LYRICS_DISCORD_2.2.0.md`](./docs/LYRICS_DISCORD_2.2.0.md) — lyrics + Discord synchronization
 
-## 2.1.8 Spotify Restore Clock and Loop Fix
+Các file `PLAYBACK-FIX-NOTES.md` và tài liệu 1.x/2.1.x trong `docs/` được giữ lại làm **historical notes**, không phải trạng thái phát hành hiện tại.
 
-This historical 2.1.8 fix isolates startup restore state from active Spotify playback and prevents exact-track replay loops.
+## Acknowledgments
+
+Mineradio was originally designed and developed by XxHuberrr, and is now being maintained and localized for global users by x.kihuh. Special thanks to **emily**, who co-created early concepts for the visual foundation and inspired the optimization direction for the `emily` visual preset.
+
+We also want to thank akimiya7742 and MIKUHOLIC for their support during the development of the application.
+
+## Copyright and License
+
+Copyright (C) 2026 XxHuberrr.
+Copyright (C) 2026 X.kihuh (For modifications and maintenance).
+ShinaYuu Music is licensed under `GPL-3.0-only`. Redistribution of source or binaries must preserve the license, copyright notices, attribution, and the corresponding source obligations described by GPLv3.
+This project is licensed under the GPL-3.0 License. See the [LICENSE](./LICENSE) file for details.
+
+The ShinaYuu Logo, the name "ShinaYuu," the UI visual design, and original visual assets belong entirely to the original author. Third-party dependencies and services follow their respective open-source licenses and terms of service.

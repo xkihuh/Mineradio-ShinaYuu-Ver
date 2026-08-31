@@ -109,8 +109,8 @@ function bindFxPanel() {
         fx.shelfAngleYManual = true;
         fx.shelfAngleY = Math.round(clampRange(fx.shelfAngleY, -30, 30));
       }
-      if (pair[1] === 'shelfOpacity') fx.shelfOpacity = clampRange(fx.shelfOpacity, 0, 1);
-      if (pair[1] === 'shelfBgOpacity') fx.shelfBgOpacity = clampRange(fx.shelfBgOpacity, 0, 0.98);
+      if (pair[1] === 'shelfOpacity') fx.shelfOpacity = clampRange(fx.shelfOpacity, 0.25, 1);
+      if (pair[1] === 'shelfBgOpacity') fx.shelfBgOpacity = clampRange(fx.shelfBgOpacity, 0.25, 0.98);
       if (pair[1] === 'shelfDetailOffsetX') fx.shelfDetailOffsetX = clampRange(fx.shelfDetailOffsetX, -4.8, 4.8);
       if (pair[1] === 'shelfDetailOffsetY') fx.shelfDetailOffsetY = clampRange(fx.shelfDetailOffsetY, -3.6, 3.6);
       if (pair[1] === 'shelfDetailOffsetZ') fx.shelfDetailOffsetZ = clampRange(fx.shelfDetailOffsetZ, -3.6, 3.6);

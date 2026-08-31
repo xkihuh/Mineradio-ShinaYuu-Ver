@@ -65,9 +65,9 @@ function makeContentListManager() {
     makeRoundRect(ctx, 24, 28, W - 48, H - 56, 34);
     var bg = ctx.createLinearGradient(0, 0, W, H);
     var panelBgAlpha = shelfSettings().bgOpacity;
-    bg.addColorStop(0, 'rgba(0,0,0,' + Math.min(0.98, Math.max(0, panelBgAlpha + (panelBgAlpha > 0 ? 0.02 : 0))).toFixed(3) + ')');
-    bg.addColorStop(0.42, 'rgba(0,0,0,' + Math.max(0, panelBgAlpha).toFixed(3) + ')');
-    bg.addColorStop(1, 'rgba(0,0,0,' + Math.max(0, panelBgAlpha - 0.04).toFixed(3) + ')');
+    bg.addColorStop(0, 'rgba(0,0,0,' + Math.min(0.98, panelBgAlpha + 0.02).toFixed(3) + ')');
+    bg.addColorStop(0.42, 'rgba(0,0,0,' + panelBgAlpha.toFixed(3) + ')');
+    bg.addColorStop(1, 'rgba(0,0,0,' + Math.max(0.20, panelBgAlpha - 0.04).toFixed(3) + ')');
     ctx.fillStyle = bg; ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.16)';
     ctx.lineWidth = 1.4;
@@ -151,14 +151,14 @@ function makeContentListManager() {
     makeRoundRect(ctx, 14, 10, W - 28, H - 20, 22);
     var rowGrad = ctx.createLinearGradient(0, 0, W, H);
     var rowBgAlpha = shelfSettings().bgOpacity;
-    var centerRowBgAlpha = isCenter ? Math.max(rowBgAlpha, 0) : rowBgAlpha;
+    var centerRowBgAlpha = isCenter ? Math.max(rowBgAlpha, 0.92) : rowBgAlpha;
     if (isCenter) {
       rowGrad.addColorStop(0, 'rgba(8,14,24,' + Math.min(0.985, centerRowBgAlpha + 0.040).toFixed(3) + ')');
       rowGrad.addColorStop(0.48, 'rgba(0,0,0,' + Math.min(0.985, centerRowBgAlpha + 0.030).toFixed(3) + ')');
       rowGrad.addColorStop(1, 'rgba(0,0,0,' + Math.min(0.98, centerRowBgAlpha + 0.015).toFixed(3) + ')');
     } else {
-      rowGrad.addColorStop(0, 'rgba(16,16,20,' + Math.max(0, rowBgAlpha - 0.02).toFixed(3) + ')');
-      rowGrad.addColorStop(1, 'rgba(0,0,0,' + Math.max(0, rowBgAlpha - 0.04).toFixed(3) + ')');
+      rowGrad.addColorStop(0, 'rgba(16,16,20,' + Math.max(0.20, rowBgAlpha - 0.02).toFixed(3) + ')');
+      rowGrad.addColorStop(1, 'rgba(0,0,0,' + Math.max(0.20, rowBgAlpha - 0.04).toFixed(3) + ')');
     }
     if (isCenter) {
       ctx.shadowColor = canvasAccent(0.20);

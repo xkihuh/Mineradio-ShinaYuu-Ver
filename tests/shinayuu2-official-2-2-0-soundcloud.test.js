@@ -10,7 +10,7 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
 function json(rel) { return JSON.parse(read(rel)); }
 
-test('2.2.0 release identity is synchronized for the stable SoundCloud release', () => {
+test('2.2.0 release identity is synchronized for SoundCloud alpha', () => {
   const pkg = json('package.json');
   const lock = json('package-lock.json');
   assert.equal(pkg.version, '2.2.0');
