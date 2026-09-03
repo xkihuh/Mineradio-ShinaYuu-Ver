@@ -55,6 +55,7 @@
       "build/**/*",
       "server.js",
       "music-providers.js",
+      "soundcloud-api.js",
       "modern-music-routes.js",
       "local-library.js",
       "youtube-caption-provider.js",
