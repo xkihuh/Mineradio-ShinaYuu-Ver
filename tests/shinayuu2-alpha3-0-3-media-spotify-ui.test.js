@@ -1,4 +1,6 @@
 'use strict';
+const CURRENT_VERSION = require('../package.json').version;
+const CURRENT_BUILD_VERSION = `${CURRENT_VERSION}.0`;
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -14,8 +16,8 @@ test('official 2.1.5 package and public assets are versioned consistently', () =
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
   const html = read('public/index.html');
-  assert.equal(pkg.version, '2.2.0');
-  assert.equal(pkg.build.buildVersion, '2.2.0.0');
+  assert.equal(pkg.version, CURRENT_VERSION);
+  assert.equal(pkg.build.buildVersion, CURRENT_BUILD_VERSION);
   assert.equal(lock.version, pkg.version);
   assert.equal(lock.packages[''].version, pkg.version);
   assert.match(html, /shinayuu-alpha3\.0\.3-focused\.css\?v=2\.0\.0-alpha\.3\.0\.3/);

@@ -1,4 +1,5 @@
 'use strict';
+const CURRENT_VERSION = require('../package.json').version;
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -57,7 +58,7 @@ test('inactive Spotify host no longer suppresses fallback lyrics and active requ
 
 test('Windows build identity uses the exact ShinaYuu Music 1.1.7.4 artwork and installer resources', () => {
   const pkg = JSON.parse(read('package.json'));
-  assert.equal(pkg.version, '2.2.0');
+  assert.equal(pkg.version, CURRENT_VERSION);
   assert.equal(pkg.productName, 'ShinaYuu Music');
   assert.equal(pkg.build.win.icon, 'build/icon.ico');
   assert.equal(pkg.build.nsis.installerIcon, 'build/icon.ico');

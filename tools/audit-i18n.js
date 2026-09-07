@@ -158,6 +158,18 @@ function isCodeFragment(value) {
   return false;
 }
 
+// AI runtime strings are intentionally model-facing / conversational content.
+// They are not static application UI labels and must not be forced through the
+// legacy UI i18n dictionary. Localized AI responses are produced by the active
+// provider (or the local fallback) at runtime. Keep auditing the real UI files.
+function isAiRuntimeFile(file) {
+  const rel = path.relative(ROOT, file).replaceAll('\\', '/');
+  return rel === 'desktop/ai-core.js' ||
+    rel === 'desktop/ai-memory-engine.js' ||
+    rel === 'desktop/ai-location-engine.js' ||
+    rel === 'public/js/shinayuu-ai-v01.js';
+}
+
 function lineNumber(source, index) {
   return source.slice(0, index).split('\n').length;
 }
@@ -170,6 +182,7 @@ function auditDynamicStrings(dictionary) {
   ];
   const unresolved = [];
   for (const file of files) {
+    if (isAiRuntimeFile(file)) continue;
     const source = read(file);
     for (const item of extractStringLiterals(source)) {
       const value = item.value;

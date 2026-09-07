@@ -1,8 +1,8 @@
 {
   "name": "shinayuu-music",
   "productName": "ShinaYuu Music",
-  "version": "2.2.0",
-  "description": "ShinaYuu Music 2.2.0: adds credential-free SoundCloud public search and exact-track URL playback while preserving the 2.1.10 playback, lyrics, Discord and visual core.",
+  "version": "2.3.0",
+  "description": "ShinaYuu Music 2.3.0 with multi-provider AI intelligence layer.",
   "author": "ShinaYuu",
   "license": "GPL-3.0-only",
   "main": "desktop/main.js",
@@ -104,7 +104,7 @@
       "include": "build/installer.nsh",
       "artifactName": "ShinaYuu-Music-${version}-Setup.${ext}"
     },
-    "buildVersion": "2.2.0.0",
+    "buildVersion": "2.3.0.0",
     "electronDist": "node_modules/electron/dist",
     "publish": [
       {
@@ -137,8 +137,8 @@
     "rcedit": "^5.0.2"
   },
   "shinayuu": {
-    "displayVersion": "2.2.0",
-    "edition": "ShinaYuu Music 2.2.0 SoundCloud Integration Alpha",
+    "displayVersion": "2.3.0",
+    "edition": "ShinaYuu Music 2.3.0 AI Intelligence Release",
     "lineage": {
       "productCore": "ShinaYuu Music 1.1.8.7",
       "visualUiAndLyricsStage": "Mineradio 2.1.0 selective stability/layer ports on ShinaYuu 2.0.17",
@@ -186,12 +186,36 @@
       "checkIntervalMs": 21600000,
       "autoPrompt": true
     },
-    "buildVersion": "2.2.0.0"
+    "buildVersion": "2.3.0.0",
+    "ai": {
+      "version": "0.6.0",
+      "architecture": "isolated-intelligence-layer",
+      "defaultMode": "gemini-interactions-with-openai-failover",
+      "providers": [
+        "gemini-interactions",
+        "openai-responses",
+        "local-demo"
+      ],
+      "criticalPlaybackDependency": false,
+      "features": [
+        "ask-shinayuu",
+        "smart-search",
+        "smart-playlist",
+        "track-intelligence",
+        "lyrics-verification",
+        "smart-queue",
+        "ai-radio",
+        "natural-language-control",
+        "multi-provider",
+        "gemini-interactions",
+        "openai-failover"
+      ]
+    }
   },
   "engines": {
     "node": ">=22.0.0"
   },
-  "displayVersion": "2.2.0",
+  "displayVersion": "2.3.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/xkihuh/Mineradio-ShinaYuu-Ver.git"
@@ -199,5 +223,36 @@
   "homepage": "https://github.com/xkihuh/Mineradio-ShinaYuu-Ver#readme",
   "bugs": {
     "url": "https://github.com/xkihuh/Mineradio-ShinaYuu-Ver/issues"
+  },
+  "shinayuuAI": {
+    "enabled": true,
+    "provider": "gemini",
+    "apiKey": "PUT_YOUR_GEMINI_API_KEY_HERE",
+    "geminiApiKey": "",
+    "openaiApiKey": "",
+    "apiUrl": "auto",
+    "geminiApiUrl": "auto",
+    "openaiApiUrl": "auto",
+    "model": "auto",
+    "geminiModel": "auto",
+    "openaiModel": "auto",
+    "geminiFallbackModels": [
+      "gemini-3.7-flash",
+      "gemini-3.6-flash"
+    ],
+    "openaiFallbackModels": [
+      "gpt-5.6"
+    ],
+    "reasoning": "low",
+    "webSearch": false,
+    "toolCalling": true,
+    "memory": true,
+    "cache": true,
+    "failover": true,
+    "timeoutMs": 25000,
+    "latencyMode": "fast",
+    "fastThinking": "low",
+    "normalThinking": "low",
+    "complexThinking": "medium"
   }
 }

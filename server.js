@@ -60,6 +60,13 @@ const { fileURLToPath } = require('url');
 const { analyzePodcastDjStream, analyzePodcastDjIntro } = require('./dj-analyzer');
 const { appendCuefieldFeedback, readCuefieldFeedbackStats } = require('./desktop/cuefield/feedback-log');
 const { planCuefieldTransitionFromCache } = require('./desktop/cuefield/shinayuu-transition-planner');
+const { createAiCore } = require('./desktop/ai-core');
+const aiCore = createAiCore({ providers: {
+  youtubeMusicSearch: (...args) => musicProviders.youtubeMusicSearch(...args),
+  soundcloudSearch: (...args) => musicProviders.soundcloudSearch(...args),
+  spotifySearch: (...args) => musicProviders.spotifySearch(...args),
+  lyricsFor: (...args) => musicProviders.lyricsFor(...args),
+} });
 const musicProviders = require('./music-providers');
 const { getLocalLibrary } = require('./local-library');
 const localLibrary = getLocalLibrary();
@@ -3496,6 +3503,51 @@ function modernProviderError(res, error, fallbackStatus = 500) {
 async function handleModernMusicRoute(req, res, url, pn) {
   const baseUrl = requestBaseUrl(req);
 
+
+
+  // ShinaYuu AI v0.1: isolated assistant layer. It never sits on playback critical paths.
+  if (pn === '/api/ai/status' && req.method === 'GET') {
+    try { sendJSON(res, aiCore.status()); }
+    catch (error) { modernProviderError(res, error, 500); }
+    return true;
+  }
+
+  if (pn === '/api/ai/discover' && req.method === 'GET') {
+    try {
+      const query = url.searchParams.get('q') || url.searchParams.get('query') || '';
+      const limit = Number(url.searchParams.get('limit') || 18);
+      sendJSON(res, { ok: true, ...(await aiCore.discover(query, { limit })) });
+    } catch (error) { modernProviderError(res, error, 502); }
+    return true;
+  }
+
+  if (pn === '/api/ai/lyrics-verify' && req.method === 'POST') {
+    try {
+      const body = await readRequestBody(req);
+      sendJSON(res, { ok: true, ...(await aiCore.verifyLyrics(body.context || {})) });
+    } catch (error) { modernProviderError(res, error, 502); }
+    return true;
+  }
+
+  if (pn === '/api/ai/memory-event' && req.method === 'POST') {
+    try {
+      const body = await readRequestBody(req);
+      sendJSON(res, { ok: true, ...(aiCore.recordMemory(body || {})) });
+    } catch (error) { modernProviderError(res, error, Number(error && error.status) || 500); }
+    return true;
+  }
+
+  if (pn === '/api/ai/chat' && req.method === 'POST') {
+    try {
+      const body = await readRequestBody(req);
+      const result = await aiCore.chat(body.message || '', body.context || {});
+      sendJSON(res, { ok: true, ...result });
+    } catch (error) {
+      modernProviderError(res, error, Number(error && error.status) || 502);
+    }
+    return true;
+  }
+
   if (pn === '/api/providers/config') {
     try {
       if (req.method === 'POST') {
@@ -4510,6 +4562,21 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (pn === '/api/weather/current') {
+    try {
+      const lat = url.searchParams.get('lat');
+      const lon = url.searchParams.get('lon');
+      const timezone = url.searchParams.get('timezone') || '';
+      const city = url.searchParams.get('city') || '';
+      if (lat == null || lon == null) throw Object.assign(new Error('WEATHER_COORDINATES_REQUIRED'), { status: 400 });
+      sendJSON(res, { ok: true, weather: await fetchOpenMeteoWeather({ lat, lon, timezone, city }) });
+    } catch (err) {
+      console.error('[WeatherCurrent]', err);
+      sendJSON(res, { ok: false, error: err.message, weather: null }, Number(err && err.status) || 502);
+    }
+    return;
+  }
+
   if (pn === '/api/weather/radio') {
     try {
       const data = await buildWeatherRadio({
@@ -5318,24 +5385,46 @@ const server = http.createServer(async (req, res) => {
     try {
       const trackUrl = String(url.searchParams.get('url') || url.searchParams.get('id') || '').trim();
       const quality = String(url.searchParams.get('quality') || 'standard').trim();
+      const seekStart = Math.max(0, Number(url.searchParams.get('start') || 0) || 0);
       if (!trackUrl) { res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Missing SoundCloud track URL'); return; }
       const streamUrl = await musicProviders.resolveSoundCloudPlayback(trackUrl, quality);
       const upstream = String(streamUrl && streamUrl.upstreamUrl || '').trim();
       if (!upstream) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('SoundCloud stream unavailable'); return; }
+      const isSeekRequest = seekStart > 0.01;
+      const seekArgs = isSeekRequest ? ['-ss', seekStart.toFixed(3)] : [];
+      // Normal playback keeps the existing MP3-compatible stream.  For seek
+      // requests, avoid re-encoding the SoundCloud AAC upstream: remux it into
+      // a fragmented MP4 stream instead.  This removes encoder startup and
+      // gives Chromium a much faster path from target segment -> audible data.
+      const outputArgs = isSeekRequest
+        ? [
+            '-vn', '-map', '0:a:0',
+            '-c:a', 'copy',
+            '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
+            '-avoid_negative_ts', 'make_zero',
+            '-f', 'mp4', 'pipe:1'
+          ]
+        : [
+            '-vn', '-map', '0:a:0',
+            '-c:a', 'libmp3lame', '-b:a', '160k', '-ar', '48000', '-ac', '2',
+            '-f', 'mp3', 'pipe:1'
+          ];
       child = spawn(ffmpegPath, [
         '-hide_banner', '-loglevel', 'error',
-        '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5',
+        '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '2',
+        '-fflags', 'nobuffer', '-flags', 'low_delay',
+        '-probesize', '32k', '-analyzeduration', '0', '-seek_timestamp', '1',
+        ...seekArgs,
         '-i', upstream,
-        '-vn', '-map', '0:a:0',
-        '-c:a', 'libmp3lame', '-b:a', '160k', '-ar', '48000', '-ac', '2',
-        '-f', 'mp3', 'pipe:1'
+        ...outputArgs
       ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
       res.writeHead(200, {
-        'Content-Type': 'audio/mpeg',
+        'Content-Type': isSeekRequest ? 'audio/mp4' : 'audio/mpeg',
         'Cache-Control': 'no-store',
         'Access-Control-Allow-Origin': '*',
         'Cross-Origin-Resource-Policy': 'cross-origin',
         'Accept-Ranges': 'none',
+        'X-ShinaYuu-Seek-Offset': String(seekStart),
         'X-ShinaYuu-Provider': 'soundcloud',
         'X-ShinaYuu-Attribution': 'SoundCloud',
       });

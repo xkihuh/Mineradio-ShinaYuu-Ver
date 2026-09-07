@@ -1,4 +1,6 @@
 'use strict';
+const CURRENT_VERSION = require('../package.json').version;
+const CURRENT_BUILD_VERSION = `${CURRENT_VERSION}.0`;
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -11,12 +13,12 @@ const pkg = require(path.join(root, 'package.json'));
 const lock = require(path.join(root, 'package-lock.json'));
 
 test('2.1.5 identity and installer metadata are synchronized', () => {
-  assert.equal(pkg.version, '2.2.0');
-  assert.equal(pkg.displayVersion, '2.2.0');
-  assert.equal(pkg.shinayuu.displayVersion, '2.2.0');
-  assert.equal(pkg.build.buildVersion, '2.2.0.0');
-  assert.equal(lock.version, '2.2.0');
-  assert.equal(lock.packages[''].version, '2.2.0');
+  assert.equal(pkg.version, CURRENT_VERSION);
+  assert.equal(pkg.displayVersion, CURRENT_VERSION);
+  assert.equal(pkg.shinayuu.displayVersion, CURRENT_VERSION);
+  assert.equal(pkg.build.buildVersion, CURRENT_BUILD_VERSION);
+  assert.equal(lock.version, CURRENT_VERSION);
+  assert.equal(lock.packages[''].version, CURRENT_VERSION);
 });
 
 test('Home wallpaper exposes a Liquid content customization entry', () => {

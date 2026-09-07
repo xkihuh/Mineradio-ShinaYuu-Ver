@@ -740,7 +740,7 @@ function flushMainWindowFxAutosave(reason) {
   ]).catch((e) => ({ ok: false, error: e.message || String(e) }));
 }
 
-const LOCAL_APP_PERMISSION_ALLOWLIST = new Set(['speaker-selection', 'pointerLock', 'pointer-lock']);
+const LOCAL_APP_PERMISSION_ALLOWLIST = new Set(['speaker-selection', 'pointerLock', 'pointer-lock', 'geolocation']);
 const SPOTIFY_PERMISSION_HOST_SUFFIXES = Object.freeze([
   'spotify.com',
   'scdn.co',

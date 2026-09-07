@@ -1,4 +1,6 @@
 'use strict';
+const CURRENT_VERSION = require('../package.json').version;
+const CURRENT_BUILD_VERSION = `${CURRENT_VERSION}.0`;
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -13,13 +15,13 @@ function json(rel) { return JSON.parse(read(rel)); }
 test('2.2.0 release identity is synchronized for SoundCloud alpha', () => {
   const pkg = json('package.json');
   const lock = json('package-lock.json');
-  assert.equal(pkg.version, '2.2.0');
-  assert.equal(pkg.displayVersion, '2.2.0');
-  assert.equal(pkg.shinayuu.displayVersion, '2.2.0');
-  assert.equal(pkg.build.buildVersion, '2.2.0.0');
-  assert.equal(pkg.shinayuu.buildVersion, '2.2.0.0');
-  assert.equal(lock.version, '2.2.0');
-  assert.equal(lock.packages[''].version, '2.2.0');
+  assert.equal(pkg.version, CURRENT_VERSION);
+  assert.equal(pkg.displayVersion, CURRENT_VERSION);
+  assert.equal(pkg.shinayuu.displayVersion, CURRENT_VERSION);
+  assert.equal(pkg.build.buildVersion, CURRENT_BUILD_VERSION);
+  assert.equal(pkg.shinayuu.buildVersion, CURRENT_BUILD_VERSION);
+  assert.equal(lock.version, CURRENT_VERSION);
+  assert.equal(lock.packages[''].version, CURRENT_VERSION);
   assert.ok(pkg.shinayuu.providers.playback.includes('soundcloud'));
 });
 

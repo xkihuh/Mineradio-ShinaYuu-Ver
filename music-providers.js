@@ -5852,68 +5852,6 @@ async function lyricsFor(id, provider, query = {}) {
     }
   }
 
-  // When a normal YouTube video is the selected playback item but does not
-  // expose usable caption timing, prefer the exact corresponding YouTube Music
-  // song lyrics as text and align them against THIS video's audio. This keeps
-  // the user's chosen MV intact while recovering lyrics from the music catalog.
-  if (provider === 'youtube' && youtubeSourceType === 'video' && id) {
-    try {
-      let ytmFallback = null;
-      try { ytmFallback = await youtubeMusicNativeLyrics(id); } catch (_) { ytmFallback = null; }
-      if (!ytmFallback || !ytmFallback.plainLyric) {
-        ytmFallback = await youtubeMusicReferenceLyrics(metadata, query);
-      }
-      const ytmPlain = ytmFallback && String(ytmFallback.plainLyric || '').trim();
-      if (ytmPlain) {
-        const alignResult = await youtubeForcedAlignmentService.request(id, {
-          syncedLyric: '',
-          plainLyric: ytmPlain,
-          duration,
-          language: query.language || providerConfig().language || 'auto',
-          track: trackName,
-          artist: artistName,
-          exactVideoAlignment: true,
-        }, {
-          getYtDlpEngine: prepareYouTubeEngine,
-          findNodeRuntime,
-        });
-        const ref = ytmFallback.youtubeMusicReference || null;
-        const ytmMeta = {
-          available: true,
-          provider: ytmFallback.provider || 'YouTube Music',
-          syncType: ytmFallback.syncType || 'UNSYNCED',
-          reference: ref || undefined,
-        };
-        if (alignResult && alignResult.status === 'ready' && alignResult.result) {
-          return {
-            ...alignResult.result,
-            metadataProvider: 'youtube-video',
-            metadata,
-            match: ref ? { score: Number(ref.score || 96), duration: Number(ref.duration || duration), source: 'youtube-music-reference' } : { score: 100, duration, source: 'youtube-music-exact-id' },
-            exactVideoTiming: true,
-            youtubeMusicLyrics: ytmMeta,
-            alignment: { status: 'ready', stage: 'ready', source: 'youtube-music-text-on-selected-video' },
-          };
-        }
-        if (alignResult && alignResult.status === 'processing') {
-          return {
-            lyric: '', tlyric: '', yrc: '', plainLyric: '',
-            pendingPlainLyric: ytmPlain,
-            source: 'youtube-video-ytm-alignment-pending',
-            metadataProvider: 'youtube-video',
-            metadata,
-            match: ref ? { score: Number(ref.score || 96), duration: Number(ref.duration || duration), source: 'youtube-music-reference' } : { score: 100, duration, source: 'youtube-music-exact-id' },
-            exactVideoTiming: false,
-            youtubeMusicLyrics: ytmMeta,
-            alignment: alignResult,
-          };
-        }
-      }
-    } catch (error) {
-      console.warn('[YouTubeVideoYtmLyricsFallback]', error && error.message || error);
-    }
-  }
-
   // YouTube Music keeps the previous fallback behaviour: use captions only when
   // QQ/NetEase and native music lyrics provide no usable text.
   if (provider === 'youtube' && youtubeSourceType !== 'video' && id && !(primaryCrossLyrics && (primaryCrossLyrics.plainLyric || primaryCrossLyrics.lyric || primaryCrossLyrics.yrc))) {

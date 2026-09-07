@@ -1,4 +1,6 @@
 'use strict';
+const CURRENT_VERSION = require('../package.json').version;
+const CURRENT_BUILD_VERSION = `${CURRENT_VERSION}.0`;
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -13,12 +15,12 @@ const { DiscordPresenceManager, normalizeConfig } = require(path.join(root, 'des
 test('2.1.5 release identity is synchronized', () => {
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
-  assert.equal(pkg.version, '2.2.0');
-  assert.equal(pkg.displayVersion, '2.2.0');
-  assert.equal(pkg.shinayuu.displayVersion, '2.2.0');
-  assert.equal(pkg.build.buildVersion, '2.2.0.0');
-  assert.equal(lock.version, '2.2.0');
-  assert.equal(lock.packages[''].version, '2.2.0');
+  assert.equal(pkg.version, CURRENT_VERSION);
+  assert.equal(pkg.displayVersion, CURRENT_VERSION);
+  assert.equal(pkg.shinayuu.displayVersion, CURRENT_VERSION);
+  assert.equal(pkg.build.buildVersion, CURRENT_BUILD_VERSION);
+  assert.equal(lock.version, CURRENT_VERSION);
+  assert.equal(lock.packages[''].version, CURRENT_VERSION);
 });
 
 test('Discord presence accepts legacy renderer metadata and builds track progress timestamps', () => {

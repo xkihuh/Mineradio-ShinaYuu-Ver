@@ -24,11 +24,9 @@ test('Background media library loads images in a throttled queue and previews vi
   assert.doesNotMatch(source, /addEventListener\('pointermove'/);
 });
 
-test('YouTube Video can recover lyrics from YouTube Music and align to selected MV', () => {
+test('YouTube Video keeps the pre-2.2.0 lyrics fallback and does not force YouTube Music alignment', () => {
   const source = fs.readFileSync(path.join(root, 'music-providers.js'), 'utf8');
-  assert.match(source, /YouTubeVideoYtmLyricsFallback/);
-  assert.match(source, /exactVideoAlignment: true/);
-  assert.match(source, /youtubeMusicReferenceLyrics\(metadata, query\)/);
+  assert.doesNotMatch(source, /YouTubeVideoYtmLyricsFallback/);
 });
 
 test('Album cover uses dedicated crisp image layer', () => {

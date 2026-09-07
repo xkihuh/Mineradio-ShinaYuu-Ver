@@ -1,103 +1,94 @@
-# ShinaYuu Music 2.2.0
+# ShinaYuu Music 2.3.0
 
-ShinaYuu Music 2.2.0 là bản Desktop stable của nhánh 2.2.x. Bản này giữ playback core ổn định của 2.1.10 và mở rộng hệ thống với SoundCloud exact-track playback, cải thiện đồng bộ lyrics, Discord Visible Lyrics và hệ thống nền đa phương tiện/Liquid Glass.
+ShinaYuu Music 2.3.0 là bản Desktop AI Intelligence Upgrade. Bản này giữ nền playback, SoundCloud exact-track playback, YouTube/YouTube Music legacy lyrics, Discord Visible Lyrics và Liquid Glass từ nhánh stable trước đó, đồng thời đưa AI thành một lớp intelligence cá nhân hóa có memory, hiểu ngôn ngữ tìm nhạc và đồng bộ context thời gian/vị trí/thời tiết.
 
-## Điểm nổi bật 2.2.0
+## Điểm nổi bật 2.3.0
 
-### SoundCloud — Search + Exact URL Playback
+### AI Intelligence
+- AI Multi-Provider hỗ trợ Gemini, OpenAI và Local fallback.
+- Fast Path cho lệnh playback, volume và các intent đơn giản để giảm tối đa độ trễ.
+- Natural-language control và tool calling vẫn được giữ cho các tác vụ nhiều bước.
+- AI Memory 2.0 lưu các **sở thích và thói quen nghe nhạc không nhạy cảm** dưới dạng hồ sơ tổng hợp thay vì lưu toàn bộ lịch sử hội thoại.
+- AI có thể học artist/style/mood/language/provider/version preference, giờ nghe, xu hướng skip/completion, volume habits, recurring intents và explicit preferences.
+- Music Intent Engine hiểu cách người dùng Việt Nam dùng các nhãn rộng như “EDM”, “EDM chill”, “EDM buồn”, “EDM quẩy”, “nhạc remix nhẹ”.
+- Reference Artist Search coi DEAMN, TheFatRat, Avicii, Alan Walker và các nghệ sĩ khác như **style anchors**, không ép chúng thành một genre duy nhất.
 
-- SoundCloud đóng vai trò **tìm kiếm/discovery và xác định đúng track**.
-- Kết quả search giữ lại `permalink_url`/canonical URL của chính track SoundCloud.
-- Khi Play, ShinaYuu dùng resolver/yt-dlp để resolve **chính URL SoundCloud đó** thành media stream rồi đưa qua playback/proxy của ShinaYuu.
-- Không yêu cầu người dùng nhập SoundCloud Client ID hoặc Client Secret.
-- Không tự chuyển track SoundCloud sang YouTube/Spotify để phát thay thế.
-- Search ưu tiên SoundCloud web search để phản hồi nhanh; yt-dlp `scsearch` là fallback khi web search không khả dụng.
-- Artwork SoundCloud được chuẩn hóa theo CDN của SoundCloud.
+### Runtime Context — Location + Weather + Time
+- Vị trí được lấy từ geolocation của thiết bị và reverse-geocode thành locality/city/district/ward khi dữ liệu đủ chính xác.
+- Raw latitude/longitude không được gửi vào AI prompt và không lưu trong `ai-memory.json`.
+- Date, time và timezone lấy từ runtime hệ thống.
+- Weather dùng cùng context tọa độ với location engine để tránh lệch khu vực/thời gian.
+- Location và weather được cache/chạy nền để không chặn phản hồi AI hoặc playback.
 
-Chi tiết: [`SOUNDCLOUD-2.2.0-IMPLEMENTATION.md`](./SOUNDCLOUD-2.2.0-IMPLEMENTATION.md)
+### SoundCloud
+- SoundCloud tiếp tục đóng vai trò tìm kiếm/discovery và xác định đúng track.
+- Kết quả search giữ `permalink_url`/canonical URL của chính track SoundCloud.
+- Khi Play, ShinaYuu resolve chính URL SoundCloud bằng yt-dlp rồi đưa media qua playback/proxy.
+- Không yêu cầu SoundCloud Client ID/Client Secret.
 
-### Lyrics — YouTube / YouTube Music
+### Lyrics / Discord / Media
+- Giữ legacy YouTube lyrics flow và shared playback clock.
+- Discord Visible Lyrics được giữ các validation/short-state fixes của nhánh trước.
+- Media Library, video hover preview và Liquid Glass tiếp tục được giữ từ baseline stable.
 
-- Khi video YouTube thường đang phát nhưng không có lyrics usable, ShinaYuu có thể dùng YouTube Music như nguồn nội dung lyrics.
-- Timeline lyrics phải được căn theo **audio đang thực sự phát**, không áp timestamp của một bản YT Music khác sang MV.
-- Giữ shared playback clock để lyrics, progress và media state bám cùng một timeline.
-
-### Discord Visible Lyrics
-
-- Discord mirror theo lyric transition thực tế của Stage.
-- Update activity được tuần tự hóa để không làm mất các câu ngắn.
-- Các state quá ngắn được chuẩn hóa để Discord không reject toàn bộ activity update.
-
-### Nền đa phương tiện / Media Library
-
-- MV background được đặt đúng layer khi người dùng chọn MV.
-- Album cover dùng `contain`, giữ đúng tỷ lệ và không ép ảnh nhỏ phủ toàn màn hình.
-- Media Library tải theo viewport, giới hạn tải đồng thời và ưu tiên scroll mượt.
-- Video preview chỉ kích hoạt khi **hover** card; không tự động phát hàng loạt khi cuộn.
-- Hover preview được tách khỏi pointer-move effect nặng để tránh khựng/lag khi cuộn hoặc di chuyển chuột.
-
-### Liquid Glass
-
-- Bề mặt panel/kệ playlist có thể giảm opacity fill xuống **0%**.
-- Nền có thể trong hoàn toàn trong khi border, highlight và sắc kính vẫn được giữ để phân biệt UI với wallpaper.
-- Nội dung (text, button, control) không bị làm trong theo background surface.
-
-## Kiến trúc playback
+## Kiến trúc tổng quát
 
 ```text
-Search Provider
-    ├─ Spotify
-    ├─ YouTube
-    ├─ YouTube Music
-    └─ SoundCloud
-          │
-          ▼
-   Unified track descriptor
-          │
-          ▼
-   Provider Resolver
-          │
-          ▼
-   ShinaYuu playback/proxy
-          │
-          ▼
-      Audio Player
+User
+  │
+  ▼
+AI Intent / Conversation Layer
+  ├─ Fast Path
+  ├─ Music Intent Engine
+  ├─ Reference Artist / Music DNA
+  ├─ AI Memory 2.0
+  └─ Runtime Context
+       ├─ Date / Time / Timezone
+       ├─ Location / Locality
+       └─ Weather
+  │
+  ▼
+AI Provider Layer
+  ├─ Gemini
+  ├─ OpenAI
+  └─ Local fallback
+  │
+  ▼
+ShinaYuu Tools / Search / Playback / Lyrics
 ```
 
-SoundCloud là ngoại lệ có ý nghĩa: **track descriptor vẫn giữ URL SoundCloud gốc để resolver phát đúng track đó**.
+## AI Memory
+
+Memory được lưu ngoài thư mục cài đặt:
+
+```text
+%APPDATA%\ShinaYuu Music\ai-memory.json
+```
+
+Dữ liệu được tổng hợp thành các tín hiệu hành vi; các preference nhạy cảm không được suy luận hoặc lưu chỉ để cá nhân hóa âm nhạc.
 
 ## Phiên bản
 
-- Desktop version: **2.2.0**
-- Build identity: **2.2.0 / 2.2.0.0**
-- Stable branch: **Desktop 2.2.x**
-- Baseline: **2.1.10 playback/Discord/lyrics core**
+- Desktop version: **2.3.0**
+- Build identity: **2.3.0 / 2.3.0.0**
+- Stable branch: **Desktop 2.3.x**
+- AI branch: **AI Intelligence / Memory 2.0**
+- Playback foundation: kế thừa nhánh 2.2.x stable
 
 ## Kiểm thử phát hành
 
-- Full ShinaYuu test suite: **228/228 PASS**
-- i18n audit: **PASS**
-- Renderer bundle: **PASS**
+- Full ShinaYuu test suite: **233/233 PASS**
 - Public npm registry audit: **PASS**
+- Renderer bundle: **PASS**
+- i18n audit: **PASS**
 
 ## Tài liệu
 
-- [`RELEASE.md`](./RELEASE.md) — release overview 2.2.0
+- [`RELEASE.md`](./RELEASE.md) — tổng quan phát hành 2.3.0
 - [`CHANGELOG.md`](./CHANGELOG.md) — lịch sử thay đổi
-- [`SOUNDCLOUD-2.2.0-IMPLEMENTATION.md`](./SOUNDCLOUD-2.2.0-IMPLEMENTATION.md) — kiến trúc SoundCloud
-- [`docs/RELEASE_NOTES_2.2.0.md`](./docs/RELEASE_NOTES_2.2.0.md) — ghi chú phát hành 2.2.0
-- [`docs/ARCHITECTURE_2.2.0.md`](./docs/ARCHITECTURE_2.2.0.md) — kiến trúc Desktop 2.2.x
-- [`docs/MEDIA_LIBRARY_2.2.0.md`](./docs/MEDIA_LIBRARY_2.2.0.md) — Media Library + background
-- [`docs/LYRICS_DISCORD_2.2.0.md`](./docs/LYRICS_DISCORD_2.2.0.md) — lyrics + Discord synchronization
+- [`AI-SETUP-2.3.0.md`](./AI-SETUP-2.3.0.md) — cấu hình AI
+- [`AI-LOCATION-AND-FAST-RESPONSE-2.3.0.md`](./AI-LOCATION-AND-FAST-RESPONSE-2.3.0.md) — location, weather, time và fast response
+- [`docs/AI-CONFIGURATION.md`](./docs/AI-CONFIGURATION.md) — cấu hình AI lâu dài
+- [`SOUNDCLOUD-2.2.0-IMPLEMENTATION.md`](./SOUNDCLOUD-2.2.0-IMPLEMENTATION.md) — tài liệu kiến trúc SoundCloud (historical origin, còn áp dụng cho 2.3.0)
 
-Các file `PLAYBACK-FIX-NOTES.md` và tài liệu 1.x/2.1.x trong `docs/` được giữ lại làm **historical notes**, không phải trạng thái phát hành hiện tại.
-
-## Acknowledgments
-Mineradio was originally designed and developed by XxHuberrr, and is now being maintained and localized for global users by x.kihuh. Special thanks to **emily**, who co-created early concepts for the visual foundation and inspired the optimization direction for the `emily` visual preset.
-We also want to thank akimiya7742 and MIKUHOLIC for their support during the development of the application.
-## Copyright and License
-Copyright (C) 2026 XxHuberrr.
-Copyright (C) 2026 X.kihuh (For modifications and maintenance).
-ShinaYuu Music is licensed under `GPL-3.0-only`. Redistribution of source or binaries must preserve the license, copyright notices, attribution, and the corresponding source obligations described by GPLv3.
-This project is licensed under the GPL-3.0 License. See the [LICENSE](./LICENSE) file for details.
-The ShinaYuu Logo, the name "ShinaYuu," the UI visual design, and original visual assets belong entirely to the original author. Third-party dependencies and services follow their respective open-source licenses and terms of service.
+Các file 1.x/2.1.x và tài liệu SoundCloud mang số 2.2.0 được giữ nguyên tên khi chúng là **historical architecture notes**; chúng không đại diện cho version release hiện tại.
