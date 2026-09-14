@@ -1,6 +1,4 @@
-# ShinaYuu Music 2.3.0 — SoundCloud Search + Exact URL Playback
-
-> Historical document: the SoundCloud implementation originated in 2.2.0 and remains compatible with the 2.3.0 release.
+# ShinaYuu Music 2.2.0 — SoundCloud Search + Exact URL Playback
 
 ## Architecture
 
@@ -42,6 +40,6 @@ The resolver uses the same yt-dlp family already used by ShinaYuu's YouTube comp
 - Full ShinaYuu test suite: 226/226 PASS
 - Live SoundCloud network playback/search still needs to be tested on the user's Windows machine because the isolated build environment has no external DNS/network access.
 
-## 2.3.0 Compatibility
+## 2.2.1 Compatibility
 
-The SoundCloud architecture documented here remains unchanged in 2.3.0: SoundCloud is used for discovery and the selected canonical track URL is resolved by ShinaYuu for playback without requiring user-provided Client ID or Client Secret.
+The SoundCloud architecture documented here remains unchanged in 2.2.1: SoundCloud is used for discovery and the selected canonical track URL is resolved by ShinaYuu for playback without requiring user-provided Client ID or Client Secret.

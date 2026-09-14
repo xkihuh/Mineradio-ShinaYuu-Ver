@@ -30,3 +30,7 @@ Mineradio 名称、MR Logo、界面视觉设计、启动动画方向、粒子视
 emily 作为 Mineradio 早期视觉底层想法与 `emily` 视觉预设改进方向的共创者和灵感来源之一，特此致谢。
 
 感谢小天才e宝、应春日、锋将军、軌跡、林中、骊、风痕、花椰菜🥦在早期体验、测试反馈和发布准备中的帮助。
+
+## Cuefield upstream integration
+
+ShinaYuu Music 2.4.0 incorporates selected Cuefield planning and diagnostics code derived from the open-source Mineradio v2.2.0 release by XxHuberrr (commit `9402566`). Upstream reference: https://github.com/XxHuberrr/Mineradio/releases/tag/v2.2.0 . The integration remains under the applicable project license and is isolated from ShinaYuu's provider/playback ownership architecture.

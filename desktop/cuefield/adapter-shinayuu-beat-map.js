@@ -163,6 +163,10 @@ function normalizeShinaYuuBeatMap(track, map, extra = {}) {
       beatConfidence: quality.beatConfidence,
       downbeatStability: quality.downbeatStability,
       dataConfidence: quality.dataConfidence,
+      // Preserve richer upstream-compatible analysis when the ShinaYuu cache already
+      // contains it. These are optional and never required for legacy beat maps.
+      musicalProfile: extra.musicalProfile || map && map.musicalProfile || null,
+      audioMetrics: extra.audioMetrics || map && map.audioMetrics || null,
     },
   };
 }

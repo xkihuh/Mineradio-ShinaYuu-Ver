@@ -1,4 +1,4 @@
-# ShinaYuu AI 2.3.0 — One-key configuration
+# ShinaYuu AI 2.4.0 — One-key configuration
 
 For a personal/internal build, you only need to edit `package.json` and put the provider key in `shinayuuAI.apiKey`.
 

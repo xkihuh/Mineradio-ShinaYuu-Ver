@@ -1,60 +1,41 @@
-# ShinaYuu Music 2.3.0 — AI Intelligence Release
+# ShinaYuu Music 2.4.0 — AI + Cuefield Intelligence Release
 
 ## Overview
 
-ShinaYuu Music 2.3.0 nâng AI từ một lớp điều khiển bằng lệnh thành một **intelligence layer** có thể hiểu ngôn ngữ tự nhiên, cá nhân hóa kết quả theo thói quen nghe nhạc và sử dụng context runtime của thiết bị mà không chặn playback.
+ShinaYuu Music 2.4.0 is a controlled evolution of the 2.3.x AI line. It preserves the existing provider and playback ownership architecture while combining AI user intelligence with the selectively ported Cuefield transition-planning layer derived from Mineradio v2.2.0.
 
-Bản phát hành kế thừa nền playback/SoundCloud/lyrics/Discord ổn định của nhánh 2.2.x và tập trung vào AI.
+## AI Intelligence
 
-## 2.3.0 highlights
+- Persistent AI Memory 2.0 for non-sensitive music habits and explicit preferences.
+- Vietnamese music-intent understanding for broad labels such as EDM, remix, chill, mood and reference artists.
+- Runtime context for local date/time, timezone, locality and current weather using one location/time context.
+- Smart Search, Smart Playlist, Smart Queue, natural-language controls and provider failover remain isolated from the playback critical path.
+- Deterministic fast-path handling keeps routine player commands responsive.
 
-### AI response speed
-- Fast Path cho các lệnh deterministic như next, previous, play/pause, volume và các intent đơn giản.
-- Natural conversation vẫn dùng provider thật khi AI được cấu hình; không ép greeting/chat thường sang Local Demo.
-- Reasoning mặc định ưu tiên low cho quick/normal requests và medium cho tác vụ phức tạp.
-- Context và memory được rút gọn theo nhu cầu để giảm payload và latency.
-- AI không phải critical dependency của playback.
+## Cuefield Intelligence
 
-### AI Memory 2.0
-- Persistent memory tại `%APPDATA%\ShinaYuu Music\ai-memory.json`.
-- Học các tín hiệu nghe nhạc không nhạy cảm: artist, style, mood, language, provider, version preference, listening time, skip/completion tendency, volume habits, recurring intents và explicit preferences.
-- Memory được aggregate, không lưu nguyên transcript của mọi cuộc hội thoại.
-- Legacy preference data được migrate sang explicit preferences.
+The release contains a controlled port of selected Mineradio v2.2.0 Cuefield planning improvements (commit `9402566`):
 
-### Music Intelligence
-- Hiểu các nhãn rộng trong cách nói của người dùng Việt Nam như EDM, remix, chill, buồn, quẩy, bay.
-- Reference Artist Search dùng nghệ sĩ/bài mẫu làm style anchor.
-- Có thể suy luận profile âm nhạc theo nhiều trục: genre, mood, energy, melodic, vocal, atmosphere, danceability và production style.
-- Mục tiêu là tìm đúng **kiểu nhạc người dùng muốn nghe**, không chỉ đúng tên genre.
+- musical profile and compatibility scoring
+- structure maps and section candidates
+- boundary evidence and lyric-aware links
+- transition-window planning and routing
+- bridge/rescue planning
+- transition artifacts and shadow diagnostics
+- upgraded execution with a legacy ShinaYuu planner fallback
 
-### Runtime Context
-- Date/time/timezone lấy từ runtime hệ thống.
-- Location được reverse-geocode thành locality/city/district/ward khi độ chính xác và dữ liệu hành chính cho phép.
-- Weather dùng cùng tọa độ/context với location engine và đồng bộ timezone.
-- Context được cache/chạy nền để không làm chậm AI response.
-- Raw latitude/longitude không được gửi vào model prompt và không lưu vào AI memory.
+The upstream provider/playback ownership model is not copied. Cuefield operates as an isolated planning layer inside ShinaYuu.
 
-### Provider architecture
-- Gemini là provider chính được hỗ trợ.
-- OpenAI được hỗ trợ làm provider/fallback.
-- Local Demo vẫn tồn tại như fallback không có network/model.
-- User configuration có thể được giữ trong AppData để không mất sau khi update EXE/patch.
+## Reliability rule
 
-## Compatibility retained from 2.2.x
+A Cuefield planning failure must not become a playback failure. The upgraded planner is attempted first; when it throws, returns an invalid plan, or cannot produce a safe transition, the legacy ShinaYuu planner remains available.
 
-- SoundCloud exact canonical URL discovery + yt-dlp resolution.
-- Legacy YouTube/YouTube Music lyrics flow.
-- Discord Visible Lyrics robustness.
-- Media Library hover preview và Liquid Glass transparency work.
+## Release identity
 
-## Version identity
+- Desktop version: **2.4.0**
+- Build identity: **2.4.0 / 2.4.0.0**
+- Previous release: **2.3.0**
 
-- Desktop version: **2.3.0**
-- Build identity: **2.3.0 / 2.3.0.0**
+## Historical documentation
 
-## Validation
-
-- Public npm registry audit: PASS
-- Renderer bundle: PASS
-- i18n audit: PASS
-- Full ShinaYuu test suite: **233/233 PASS**
+Files describing 2.2.x or earlier behavior are retained when they document historical implementation decisions. Their filenames are not treated as current release identity.

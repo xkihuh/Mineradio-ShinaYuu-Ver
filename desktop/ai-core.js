@@ -1,4 +1,4 @@
-/* ShinaYuu AI Core v0.5 — 2.3.0 intelligence layer */
+/* ShinaYuu AI Core v0.5 — 2.4.0 intelligence layer */
 'use strict';
 
 const fs = require('fs');
@@ -214,7 +214,7 @@ function localBrain(message, context) {
     if (!track.title && !track.name) return { reply: 'Hiện chưa có bài hát nào đang phát.', action: null, engine: 'local-demo', model: '' };
     return { reply: track.artist ? `Hiện đang phát “${safeText(track.title || track.name,180)}” — ${safeText(track.artist,160)}.` : `Hiện đang phát “${safeText(track.title || track.name,180)}”.`, action: null, engine: 'local-demo', model: '' };
   }
-  return { reply: 'AI Local Demo đang hoạt động. Bạn có thể cấu hình AI trực tiếp trong package.json (khối shinayuuAI) hoặc dùng ai-config.json trong AppData để dùng model thật để dùng Smart Search, Tool Calling, Web Search, Memory và các tính năng AI đầy đủ của ShinaYuu 2.3.0.', action: null, engine: 'local-demo', model: '' };
+  return { reply: 'AI Local Demo đang hoạt động. Bạn có thể cấu hình AI trực tiếp trong package.json (khối shinayuuAI) hoặc dùng ai-config.json trong AppData để dùng model thật để dùng Smart Search, Tool Calling, Web Search, Memory và các tính năng AI đầy đủ của ShinaYuu 2.4.0.', action: null, engine: 'local-demo', model: '' };
 }
 
 
@@ -612,7 +612,7 @@ function createAiCore(options = {}) {
     const key = cacheKey(cleanMessage, context);
     const hit = cached(key); if (hit && !hit.action) return { ...hit, cached: true };
     const contextPayload = {
-      app: 'ShinaYuu Music 2.3.0', aiVersion: AI_VERSION,
+      app: 'ShinaYuu Music 2.4.0', aiVersion: AI_VERSION,
       currentTrack: context.currentTrack || null, playing: !!context.playing,
       volume: Number.isFinite(Number(context.volume)) ? Number(context.volume) : null,
       queueLength: Number(context.queueLength || 0), currentIndex: Number(context.currentIndex == null ? -1 : context.currentIndex),
@@ -637,7 +637,7 @@ function createAiCore(options = {}) {
       ...(latencyIntent !== 'quick-command' ? { musicMemory: getMemoryPrompt() } : {})
     };
     const instructions = [
-      `You are ShinaYuu AI v${AI_VERSION}, embedded in the desktop music player ShinaYuu Music 2.3.0.`,
+      `You are ShinaYuu AI v${AI_VERSION}, embedded in the desktop music player ShinaYuu Music 2.4.0.`,
       'Answer in Vietnamese unless the user asks otherwise. Understand natural Vietnamese, English, mixed-language and conversational commands; do not require rigid command syntax.',
       'Use ShinaYuu tools whenever they improve accuracy or can execute the user request.',
       'For player actions, ALWAYS use control_player for transport/volume/radio controls. For an explicit named-song play/open request, use play_music; it searches the real ShinaYuu sources and returns the exact playable track.',
