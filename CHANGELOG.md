@@ -1,18 +1,60 @@
-## 2.4.0 — AI + Cuefield Intelligence
+## 2.5.0 — Stability Hotfix (2026-09-18 UTC+7)
+
+- Fixed empty playlist shelf flashing/rebuild loops during asynchronous provider search/loading.
+- Fixed renderer reload/Desktop Mode rehydration so the native Wallpaper Engine/desktop session stays resident across refresh.
+- Scene wallpapers now suppress the external Wallpaper Engine source window from Alt-Tab/task-switcher while preserving the live DWM composition surface.
+- Hardened AI 4.1 playback safety: AI can select successors but cannot cut the current track early or skip queue order.
+- Hardened AI chat panel viewport geometry at small and medium desktop widths.
+- Kept video wallpapers on the existing in-app path.
+
+## [2.5.0]
+
+### AI 4.0 Personal Music Agent
+- Added deterministic intent/context planning before model execution.
+- Added bounded multi-step tool orchestration (6 rounds by default).
+- Added recommendation quality gates and verification.
+- Added final action verification so unverified playback targets are not executed.
+- Added `get_agent_plan` and `verify_recommendations` tools.
+- Kept all agent logic outside the playback critical path.
+
+## 2.5.0 — Stability + Mineradio 2.2.0 Integration Consolidation
+
+### AI 4.0 Personal Music Agent (foundation)
+- Upgraded the internal AI Core from 2.0.0 to 2.1.0 without changing the ShinaYuu playback ownership model.
+- Added short-term conversational memory so follow-up requests can resolve references such as “bài này”, “bài đó”, “như lúc nãy” and “thêm vài bài”.
+- Added behavioral preference learning from likes, skips, completions, searches and explicit music interactions.
+- Added personalized discovery re-ranking using artist, style, mood, language, version and negative preference signals.
+- Added deterministic Smart Next selection from the active queue so AI does not invent queue indexes.
+- Added `rate_current_track` and `recommend_music` tools for model-backed AI providers.
+- Added independent configuration switches for adaptive memory, conversation memory, preference re-ranking and Smart Next.
+- Kept all adaptive AI work outside the playback critical path; disabling AI cannot break normal playback.
+
+- Promoted the desktop application identity from 2.4.0 to 2.5.0 across package, build, updater, installer and renderer cache metadata.
+- Kept the ShinaYuu playback/provider architecture unchanged while retaining the validated Mineradio 2.2.0 stability ports.
+- Refreshed current release documentation and AI setup references for the 2.5.0 line.
+- No new experimental playback backend was introduced in this version.
+
+## 2.4.0 — AI + Cuefield + Mineradio 2.2.0 Reliability Update
 
 ### AI
-- Unified the current AI line under release 2.4.0.
-- Preserved AI Memory 2.0, music-intent understanding, reference-artist semantics, Smart Search, Smart Queue and natural-language controls from 2.3.x.
-- Kept location, weather and date/time context synchronized and outside the playback critical path.
+- Preserved AI Memory 2.0, music intent, reference-artist semantics, Smart Search, Smart Queue and fast-path natural-language control.
+- Kept location, weather, date/time and timezone synchronized and outside the playback critical path.
 
-### Cuefield / AutoMix
-- Promoted the selectively ported Mineradio v2.2.0 Cuefield planner into the 2.4.0 release line.
-- Kept the upgraded planner isolated from provider playback ownership.
-- Preserved legacy planner fallback behavior so transition failures do not break playback.
-- Retained musical profile, structure map, boundary evidence, lyric link, transition window, routing, bridge/rescue and shadow-diagnostic layers.
+### Mineradio 2.2.0-derived updates
+- Ported the structure-aware Cuefield planning layer: musical profiles, structure maps, section candidates, boundary evidence, lyric links, transition windows, routing, bridge/rescue planning, transition artifacts, shadow diagnostics and feedback metadata.
+- Added a ShinaYuu-native compatibility boundary so upstream planning data never takes ownership of ShinaYuu playback/providers.
+- Added safe-plan validation and legacy planner fallback for unsafe/failed transitions.
+- Added persistent built-in ShinaYuu playlist library with create, rename, delete, add/remove/reorder and paged loading.
+- Added gesture lifecycle, camera permission gating, player actions, sensitivity and hand-overlay controls.
+- Added single-repeat media restart handling without rebuilding the provider transaction unnecessarily.
+- Added Wallpaper Engine resident minimize/restore handling instead of forcing a native restart when the host surface remains resident.
+- Adopted Mineradio's current Kugou web playback/retry/VIP hardening while preserving ShinaYuu's provider API surface.
+- Retained ShinaYuu's existing Spotify, YouTube, SoundCloud, lyrics, Discord, Castlabs and AI ownership instead of replacing those subsystems with upstream code.
+- Added/retained visual performance controls and low-spec optimization guidance from the upstream release.
 
-### Release hygiene
-- Updated package, lockfile, build identity, UI asset cache-busters and current documentation to 2.4.0.
+### Reliability / release hygiene
+- Renderer bundle, i18n audit, public npm registry audit and ShinaYuu regression suite pass before release packaging.
+- Current package identity: 2.4.0 / build 2.4.0.0.
 
 ## 2.3.0 — Cuefield Upstream Integration
 
@@ -75,4 +117,9 @@ Details for 2.1.x and earlier releases remain available in the historical docume
 - Gemini thinking defaults to low for quick/normal requests and medium for complex requests.
 - Reduced AI context/memory payload on ordinary conversational requests.
 - Preserved full tool-calling path for complex music tasks.
+## 2.5.0 — Wallpaper Engine baseline restore
+
+- Restored `desktop/wallpaper-engine-runtime.js` to the AI 4.0 baseline behavior.
+- Removed the newer Scene-window suppression/ownership/parking changes from the 2.5.0 stability branch.
+- AI 4.1, AutoMix safety, playlist stability, chat-box layout, and Desktop Mode refresh fixes remain unchanged.
 

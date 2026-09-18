@@ -205,13 +205,17 @@
     if (!Array.isArray(window.playQueue) || window.playQueue.length < 2 || window.playMode === 'single') return -1;
     index = isFinite(Number(index)) ? Math.round(Number(index)) : window.currentIdx;
     var total = window.playQueue.length;
-    for (var step = 1; step < total; step++) {
-      var candidate = (index + step + total) % total;
-      var song = window.playQueue[candidate];
-      if (!song || isPodcast(song)) continue;
-      if (state.failureCooldown[trackFailureKey(song)] > Date.now()) continue;
-      return candidate;
-    }
+    // AutoMix may prepare far ahead, but it must never skip over the immediate
+    // queue successor merely because another candidate looks more suitable.
+    // Deterministic queue ownership belongs to the player; AI/Cuefield may
+    // shape the transition, not replace the queue order.
+    var immediate = (index + 1 + total) % total;
+    var immediateSong = window.playQueue[immediate];
+    // AutoMix owns transition styling/timing only. Queue order remains a hard
+    // player invariant: never jump from A to C because B failed to preload. If
+    // B is not mixable, return no AutoMix plan and let the normal onended/player
+    // path decide how to play B.
+    if (immediateSong && !isPodcast(immediateSong)) return immediate;
     return -1;
   }
 
@@ -437,6 +441,53 @@
 
   function executionActive(serial) {
     return !!(state.executing && Number(serial) === Number(state.executionSerial));
+  }
+
+  function safeMixTriggerAt(duration, proposedTrigger, fadeSec, warmupSec, gapless) {
+    var safeDuration = Math.max(0, Number(duration) || 0);
+    var proposed = Math.max(0, Number(proposedTrigger) || 0);
+    if (!safeDuration) return 0;
+    // AI/Cuefield may choose an attractive musical boundary, but it is NEVER
+    // allowed to decide that the current song can end early. Every transition
+    // is clamped into the terminal window of the actual track duration.
+    // Album-gapless gets a tiny terminal window; normal mixes get the larger
+    // fade window. The proposal can only move the transition later, never earlier.
+    var ratioFloor = gapless
+      ? safeDuration * 0.97
+      : (safeDuration >= 45 ? safeDuration * 0.88 : safeDuration * 0.82);
+    var defaultFade = gapless ? 0.9 : Math.max(Number(fadeSec) || 6, 4);
+    var fadeWindow = clamp(defaultFade, gapless ? 0.45 : 4, gapless ? 1.4 : 8);
+    var latestSafeStart = Math.max(0, safeDuration - fadeWindow);
+    var floor = Math.max(ratioFloor, latestSafeStart);
+    var trigger = Math.max(proposed, floor);
+    return Math.max(0, Math.min(Math.max(0, safeDuration - 0.05), trigger - Math.max(0, Number(warmupSec) || 0)));
+  }
+
+  function currentTrackPlaybackHealthy() {
+    try {
+      if (window.spotifyDirectState && window.spotifyDirectState.active) return !!window.spotifyDirectState.isPlaying;
+      return !!(window.audio && window.audio.src && !window.audio.paused && !window.audio.ended);
+    } catch (_) { return false; }
+  }
+
+  async function resumeCurrentTrackAfterAutoMixAbort(reason) {
+    if (currentTrackPlaybackHealthy()) return true;
+    try {
+      if (window.spotifyDirectState && window.spotifyDirectState.active) {
+        var direct = window.spotifyDirectState;
+        if (direct.sdkPlayer && typeof direct.sdkPlayer.resume === 'function') {
+          await direct.sdkPlayer.resume();
+          return !!direct.sdkPlayer;
+        }
+      }
+      if (window.audio && window.audio.src && !window.audio.ended && typeof window.audio.play === 'function') {
+        await window.audio.play();
+        return true;
+      }
+    } catch (error) {
+      console.warn('[CuefieldAutoMix] resume after abort:', reason || 'abort', error && (error.message || error));
+    }
+    return false;
   }
 
   function restoreAutoMixOutput(reason, options) {
@@ -883,7 +934,7 @@
       timelineExecution: timelineExecution,
       fadeSec: fadeSec,
       warmupSec: warmupSec,
-      triggerAt: Math.max(0, Math.min(fadeStartA - warmupSec, (duration || exitTime) - fadeSec - 0.45)),
+      triggerAt: safeMixTriggerAt(duration || exitTime, fadeStartA, fadeSec, warmupSec, gapless),
       fadeStartA: fadeStartA,
       bStart: bStart,
       gapless: gapless,
@@ -1618,6 +1669,25 @@
   async function execute(pending) {
     if (!pending || state.executing || !state.enabled) return;
     if (pending.token !== Number(window.trackSwitchToken) || pending.fromIndex !== Number(window.currentIdx)) return;
+    // Last-line safety: execute() is also called by manual/test controls, so
+    // the tick() gate alone is insufficient. Never cut a track before the
+    // measured terminal window, even if an AI/Cuefield plan asks for it.
+    var executeDuration = playbackDuration(currentSong());
+    if (!(executeDuration > 0)) {
+      state.pending = pending;
+      setStatus('waiting');
+      return;
+    }
+    var executeNow = playbackTime();
+    var executeFloor = safeMixTriggerAt(executeDuration, pending.triggerAt, pending.fadeSec, pending.warmupSec, !!pending.gapless);
+    if (executeNow + 0.05 < executeFloor) {
+      pending.triggerAt = executeFloor;
+      state.pending = pending;
+      state.lastCountdownSec = -1;
+      setStatus('ready');
+      updateUi();
+      return;
+    }
     var executionSerial = ++state.executionSerial;
     var settleExecution;
     var executionSettled = new Promise(function (resolve) { settleExecution = resolve; });
@@ -1683,11 +1753,20 @@
         } else {
           markTrackFailure(pending && pending.toSong, 90000);
           state.bypassToken = Number(window.trackSwitchToken);
+          // A failed mix must never strand the current song. Restore the audible
+          // owner, try one bounded resume, then hand control back to normal
+          // onended/queue logic. AutoMix itself stays bypassed for this token.
           setTimeout(function () {
             if (state.executing || !state.enabled || state.bypassToken !== Number(window.trackSwitchToken)) return;
-            var duration = playbackDuration(currentSong());
-            var remaining = Math.max(0, duration - playbackTime());
-            if (!playbackRunning() || (duration > 0 && remaining < 1.25)) {
+            resumeCurrentTrackAfterAutoMixAbort('transition-failed').then(function (resumed) {
+              if (resumed || playbackRunning()) return;
+              var duration = playbackDuration(currentSong());
+              var remaining = Math.max(0, duration - playbackTime());
+              if (duration > 0 && remaining > 1.25 && window.audio && !window.audio.ended) {
+                state.bypassToken = Number(window.trackSwitchToken);
+                console.warn('[CuefieldAutoMix] transition failed without resume; preserving current track');
+                return;
+              }
               var fallbackIndex = nextIndex(Number(window.currentIdx));
               if (fallbackIndex >= 0 && fallbackIndex !== Number(window.currentIdx)) {
                 Promise.resolve(window.playQueueAt(fallbackIndex, {
@@ -1696,10 +1775,7 @@
                   suppressPlayFailureNotice: true
                 })).catch(function () {});
               }
-            }
-            // When the current track is still healthy, do not immediately retry
-            // AutoMix on the same token. Normal onended/queue logic remains in
-            // control and the bypass clears on the next track.
+            });
           }, 0);
         }
       } finally {
@@ -1743,7 +1819,15 @@
       state.lastCountdownSec = remainingSec;
       updateUi();
     }
-    if (playbackTime() >= pending.triggerAt) execute(pending);
+    var nowTime = playbackTime();
+    var knownDuration = playbackDuration(currentSong());
+    // Hard playback invariant: without a real end-of-track duration AutoMix is
+    // not allowed to execute. This prevents stale metadata/AI plans from
+    // turning an unknown clock into an early jump.
+    if (!(knownDuration > 0)) return;
+    var hardFloor = safeMixTriggerAt(knownDuration, pending.triggerAt, pending.fadeSec, pending.warmupSec, !!pending.gapless);
+    if (nowTime + 0.05 < hardFloor) return;
+    if (nowTime >= pending.triggerAt) execute(pending);
   }
 
   window.toggleCuefieldAutoMix = function () {

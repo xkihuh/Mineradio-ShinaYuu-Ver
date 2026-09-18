@@ -1,4 +1,4 @@
-# ShinaYuu AI 2.4.0 — One-key configuration
+# ShinaYuu AI 2.5.0 — One-key configuration
 
 For a personal/internal build, you only need to edit `package.json` and put the provider key in `shinayuuAI.apiKey`.
 
@@ -15,6 +15,10 @@ Default Gemini setup:
   "webSearch": false,
   "toolCalling": true,
   "memory": true,
+  "adaptiveMemory": true,
+  "conversationMemory": true,
+  "preferenceReranking": true,
+  "smartNext": true,
   "cache": true,
   "failover": true,
   "timeoutMs": 25000
@@ -49,3 +53,12 @@ This file is outside the installed application and is therefore preserved when a
 A real API key placed in `package.json` becomes part of the application distribution. Because this build uses `asar: false`, a person with the installed files can extract that key. This is acceptable for a personal/private build, but **do not ship a shared provider key in a public EXE**. For public distribution, each user should put their own key in the persistent AppData configuration or, preferably, enter it through a future in-app AI Settings page.
 
 Environment variables are still supported and override package/user configuration for advanced setups.
+
+
+## AI 4.1 Personal Music Agent
+
+ShinaYuu Music 2.5.0 stores a bounded local conversation window, learns non-sensitive music preferences from likes/skips/completions and explicit interactions, re-ranks real provider search results using those signals, and chooses Smart Next from the actual queue. The adaptive layer stays outside the playback critical path. AI 4.1 adds intent planning, multi-step tool execution, recommendation verification, and safe final-action verification without taking ownership of playback internals.
+
+
+### AI 4.1 agent controls
+`agentPlanning` enables deterministic intent planning. `agentVerification` enables tool/result and final-action verification. `agentMaxToolRounds` limits the model tool loop to prevent unbounded execution. Environment variables: `SHINAYUU_AI_AGENT_PLANNING`, `SHINAYUU_AI_AGENT_VERIFICATION`, `SHINAYUU_AI_AGENT_MAX_TOOL_ROUNDS`.

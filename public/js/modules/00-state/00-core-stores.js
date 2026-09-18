@@ -55,7 +55,7 @@ var AUDIO_FADE_IN_MS = audioFadePreference.fadeInMs;
 var AUDIO_FADE_OUT_MS = audioFadePreference.fadeOutMs;
 var AUDIO_SILENCE_GAIN = 0.0001;
 var audioFadeEnvelope = 1;
-var userPlaylists = [], youtubePlaylists = [], spotifyPlaylists = [], playlistCoverCache = {};
+var userPlaylists = [], builtInPlaylists = [], youtubePlaylists = [], spotifyPlaylists = [], playlistCoverCache = {};
 // Compatibility state retained by the original ShinaYuu 1.1.7.4 3D shelf.
 // The 2.0 provider layer does not currently expose podcast collections, but the
 // restored shelf and playlist catalog still reference this array. Keeping it as

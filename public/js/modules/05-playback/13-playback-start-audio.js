@@ -52,6 +52,31 @@ var albumGaplessTailFreqData = null;
 var shinayuuPlaybackDescriptorCache = new Map();
 var shinayuuPlaybackDescriptorInflight = new Map();
 var SHINAYUU_YOUTUBE_DESCRIPTOR_TTL_MS = 8 * 60 * 1000;
+
+function restartSingleRepeatMedia(media, token, index, reason) {
+  if (playMode !== 'single' || !media || token !== trackSwitchToken || index !== currentIdx || audio !== media) return false;
+  try { media.loop = true; } catch (_) {}
+  setTimeout(function () {
+    if (token !== trackSwitchToken || index !== currentIdx || audio !== media || playMode !== 'single') return;
+    try { media.currentTime = 0; } catch (_) {}
+    try {
+      var playPromise = media.play && media.play();
+      playing = true;
+      if (typeof setPlayIcon === 'function') setPlayIcon(true);
+      if (typeof updatePlaybackProgressUi === 'function') updatePlaybackProgressUi();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(function () {
+          if (token !== trackSwitchToken || index !== currentIdx || audio !== media || playMode !== 'single') return;
+          playQueueAt(index, { autoRepeat: true, preserveHomeState: true, suppressPlayFailureNotice: true });
+        });
+      }
+    } catch (_) {
+      if (token === trackSwitchToken && index === currentIdx && audio === media && playMode === 'single') playQueueAt(index, { autoRepeat: true, preserveHomeState: true, suppressPlayFailureNotice: true });
+    }
+  }, 0);
+  return true;
+}
+
 var SHINAYUU_SPOTIFY_DESCRIPTOR_TTL_MS = 2 * 60 * 1000;
 
 function shinayuuDescriptorHasPlayback(data) {
@@ -817,7 +842,7 @@ async function playLocalQueueSong(song, idx, token, firstVisualPlay, opts, resum
     }
     finalizeListenSession(true);
     if (playAlbumGaplessNextOnEnded(token)) return;
-    if (playMode === 'single') setTimeout(function () { playQueueAt(currentIdx, { autoRepeat: true, suppressPlayFailureNotice: true }); }, 0);
+    if (playMode === 'single' && restartSingleRepeatMedia(this, token, currentIdx, 'online-ended')) return;
     else setTimeout(nextTrack, 0);
   };
   audio.onloadedmetadata = function () {
@@ -1351,7 +1376,7 @@ async function playQueueAt(idx, opts) {
         }
         finalizeListenSession(true);
         if (playAlbumGaplessNextOnEnded(token)) return;
-        if (playMode === 'single') setTimeout(function () { playQueueAt(currentIdx, { autoRepeat: true, suppressPlayFailureNotice: true }); }, 0);
+        if (playMode === 'single' && restartSingleRepeatMedia(this, token, currentIdx, 'online-ended')) return;
         else setTimeout(nextTrack, 0);
       };
       scheduleAudioResumePosition(audio, opts.resumeAt != null ? opts.resumeAt : restoreResumeAt, token);

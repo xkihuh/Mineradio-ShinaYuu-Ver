@@ -1428,6 +1428,23 @@ function applyWallpaperModeState(force) {
   normalizeDevelopmentLockedFxState();
   var payload = wallpaperPayload();
   if (typeof api.setWallpaperMode !== 'function') return Promise.resolve({ ok: false, enabled: false, error: 'WALLPAPER_DESKTOP_API_UNAVAILABLE' });
+  // Renderer bootstrap/reload must first rehydrate the native runtime state.
+  // Calling setWallpaperMode(true) unconditionally here re-enters the native
+  // Desktop Mode transition and briefly tears down/rebinds the visual surface,
+  // which is exactly the wallpaper flash seen after Ctrl+R/F5. Explicit user
+  // toggles still use the normal enable/disable path via force=true.
+  if (force !== true && typeof api.getWallpaperModeStatus === 'function') {
+    return Promise.resolve().then(function () { return api.getWallpaperModeStatus(); }).then(function (runtimeResult) {
+      var runtimeStatus = runtimeResult && runtimeResult.status ? runtimeResult.status : runtimeResult;
+      if (runtimeStatus && (runtimeStatus.enabled === true || runtimeStatus.active === true || runtimeStatus.attaching === true)) {
+        applyDesktopWallpaperRuntimeStatus(runtimeStatus);
+        return { ok: true, enabled: true, preserved: true, status: runtimeStatus, reason: 'renderer-rehydrate' };
+      }
+      return applyWallpaperModeState(true);
+    }).catch(function () {
+      return applyWallpaperModeState(true);
+    });
+  }
   var operation = ++desktopWallpaperRendererOperation;
   if (payload.enabled) {
     desktopWallpaperRuntimeState = Object.assign({}, desktopWallpaperRuntimeState, { attaching: true, enabled: true, lastError: '' });

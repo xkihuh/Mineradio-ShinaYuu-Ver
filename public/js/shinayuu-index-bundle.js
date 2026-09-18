@@ -60,7 +60,7 @@ var AUDIO_FADE_IN_MS = audioFadePreference.fadeInMs;
 var AUDIO_FADE_OUT_MS = audioFadePreference.fadeOutMs;
 var AUDIO_SILENCE_GAIN = 0.0001;
 var audioFadeEnvelope = 1;
-var userPlaylists = [], youtubePlaylists = [], spotifyPlaylists = [], playlistCoverCache = {};
+var userPlaylists = [], builtInPlaylists = [], youtubePlaylists = [], spotifyPlaylists = [], playlistCoverCache = {};
 // Compatibility state retained by the original ShinaYuu 1.1.7.4 3D shelf.
 // The 2.0 provider layer does not currently expose podcast collections, but the
 // restored shelf and playlist catalog still reference this array. Keeping it as
@@ -1006,6 +1006,9 @@ var fxDefaults = {
   memorySafetyRevision: 3,
   liveBackgroundKeep: true,
   cam: 'off',
+  gesturePlayerActions: true,
+  gestureHandOverlay: true,
+  gestureSensitivity: 'balanced',
 };
 function normalizeForegroundFpsMode(value) {
   var mode = String(value || '').trim().toLowerCase();
@@ -22338,6 +22341,15 @@ function makeShelfManager() {
       console.warn('[ShelfCatalogAdapter]', error);
       nextItems = allItems && allItems.length ? allItems.slice() : [];
     }
+    var nextSig = sig(nextItems);
+    // Provider/search/bootstrap callbacks can arrive several times while the
+    // shelf is still empty. Rebuilding the single "empty shelf" card on every
+    // callback tears down its GPU objects and recreates the same card, which
+    // looks like the playlist shelf is flashing/reloading. Keep the existing
+    // render tree when the logical shelf content has not changed.
+    if (nextSig === lastSig && Array.isArray(allItems) && allItems.length === nextItems.length) {
+      return;
+    }
     disposeRenderedCards();
     if (connectorParticles) {
       if (connectorParticles.parent) connectorParticles.parent.remove(connectorParticles);
@@ -22352,7 +22364,7 @@ function makeShelfManager() {
       floorMirror = null;
     }
     allItems = Array.isArray(nextItems) ? nextItems : [];
-    lastSig = sig(allItems);
+    lastSig = nextSig;
     if (allItems.length && mode !== 'off') shelfVisibility = Math.max(Number(shelfVisibility) || 0, 0.36);
     lastCardRedrawAt = -10;
     lastCardPulseBucket = -1;
@@ -29886,41 +29898,51 @@ function renderCollectModal() {
   var cover = songCoverSrc(song, 80);
   current.innerHTML = (cover ? '<img src="' + cover + '" alt="">' : '<div class="cover-placeholder"></div>') +
     '<div style="min-width:0"><div class="collect-title">' + escHtml(song.name || 'Bài hiện tại') + '</div><div class="collect-sub">' + escHtml(song.artist || '') + '</div></div>';
-  var provider = songAccountProvider(song);
-  var adapter = songAccountAdapter(provider);
-  if (!adapter || !adapter.collect) {
-    list.innerHTML = '<div class="collect-empty">' + escHtml(songAccountUnsupportedMessage(provider, 'collect')) + '</div>';
-    return;
-  }
-  if (!isSongAccountLoggedIn(provider)) {
-    list.innerHTML = '<div class="collect-empty">Đăng nhập' + escHtml(adapter.label) + ' để hiển thị playlist của bạn</div>';
-    return;
-  }
-  if (!userPlaylists.length) {
-    list.innerHTML = miniQueueSkeleton();
-    return;
-  }
-  var mine = userPlaylists.filter(function (pl) {
-    return playlistAccountProvider(pl) === provider && !pl.subscribed && !pl.virtual;
-  });
-  if (!mine.length) {
-    list.innerHTML = '<div class="collect-empty">Chưa có playlist có thể ghi; hãy tạo một playlist trước</div>';
-    return;
-  }
-  list.innerHTML = mine.map(function (pl) {
+  var builtIn = Array.isArray(builtInPlaylists) ? builtInPlaylists.filter(function (pl) { return pl && !pl.subscribed && !pl.virtual; }) : [];
+  var builtInHtml = builtIn.length ? '<div class="collect-section-label">Playlist ShinaYuu</div>' + builtIn.map(function (pl) {
     var thumb = pl.cover ? coverUrlWithSize(pl.cover, 80) : '';
-    return '<div class="collect-item" data-collect-pid="' + escHtml(String(pl.id || '')) + '" onclick="addCollectTargetToPlaylist(this.getAttribute(\'data-collect-pid\'))">' +
+    return '<div class="collect-item" data-collect-provider="shinayuu" data-collect-pid="' + escHtml(String(pl.id || '')) + '" onclick="addCollectTargetToPlaylist(this.getAttribute(\'data-collect-pid\'), \'shinayuu\')">' +
       (thumb ? '<img src="' + thumb + '" alt="">' : '<div class="cover-placeholder"></div>') +
       '<div style="min-width:0"><div class="collect-title">' + escHtml(pl.name || '') + '</div><div class="collect-sub">' + (pl.trackCount || 0) + ' bài</div></div>' +
       '</div>';
-  }).join('');
+  }).join('') : '';
+
+  var provider = songAccountProvider(song);
+  var adapter = songAccountAdapter(provider);
+  var providerHtml = '';
+  var providerMessage = '';
+  if (!adapter || !adapter.collect) {
+    providerMessage = songAccountUnsupportedMessage(provider, 'collect');
+  } else if (!isSongAccountLoggedIn(provider)) {
+    providerMessage = 'Đăng nhập ' + adapter.label + ' để hiển thị playlist của bạn';
+  } else {
+    var mine = userPlaylists.filter(function (pl) {
+      return playlistAccountProvider(pl) === provider && !pl.subscribed && !pl.virtual;
+    });
+    providerHtml = mine.map(function (pl) {
+      var thumb = pl.cover ? coverUrlWithSize(pl.cover, 80) : '';
+      return '<div class="collect-item" data-collect-provider="' + escHtml(provider) + '" data-collect-pid="' + escHtml(String(pl.id || '')) + '" onclick="addCollectTargetToPlaylist(this.getAttribute(\'data-collect-pid\'), this.getAttribute(\'data-collect-provider\'))">' +
+        (thumb ? '<img src="' + thumb + '" alt="">' : '<div class="cover-placeholder"></div>') +
+        '<div style="min-width:0"><div class="collect-title">' + escHtml(pl.name || '') + '</div><div class="collect-sub">' + (pl.trackCount || 0) + ' bài</div></div>' +
+        '</div>';
+    }).join('');
+    if (!mine.length) providerMessage = 'Chưa có playlist ' + adapter.label + ' có thể ghi; hãy tạo một playlist trước';
+  }
+
+  if (!builtIn.length && !providerHtml) {
+    list.innerHTML = '<div class="collect-empty">' + escHtml(providerMessage || 'Chưa có playlist có thể ghi; hãy tạo một playlist trước') + '</div>';
+    return;
+  }
+  list.innerHTML = builtInHtml + (providerHtml ? '<div class="collect-section-label">' + escHtml(adapter.label) + '</div>' + providerHtml : (providerMessage ? '<div class="collect-provider-note">' + escHtml(providerMessage) + '</div>' : ''));
   if (window.gsap) animateListItems(list, '.collect-item', { x: 0, y: 6, stagger: 0.012, duration: 0.18, limit: 18 });
 }
-function setCollectBusyPid(pid, busy) {
+function setCollectBusyPid(pid, busy, provider) {
   var list = document.getElementById('collect-list');
   if (!list) return;
   list.querySelectorAll('.collect-item').forEach(function (item) {
-    item.classList.toggle('busy', !!busy && item.getAttribute('data-collect-pid') === String(pid));
+    var sameId = item.getAttribute('data-collect-pid') === String(pid);
+    var sameProvider = !provider || item.getAttribute('data-collect-provider') === String(provider);
+    item.classList.toggle('busy', !!busy && sameId && sameProvider);
   });
 }
 async function createPlaylistFromCollect() {
@@ -30000,10 +30022,28 @@ async function verifySongInPlaylist(pid, song) {
   }
   return false;
 }
-async function addCollectTargetToPlaylist(pid) {
+async function addCollectTargetToPlaylist(pid, targetProvider) {
   if (collectBusy || !collectTargetSong || !pid) return;
   var targetSong = collectTargetSong;
-  var provider = songAccountProvider(targetSong);
+  var provider = targetProvider || songAccountProvider(targetSong);
+  if (provider === 'shinayuu') {
+    collectBusy = true;
+    setCollectBusyPid(pid, true, 'shinayuu');
+    try {
+      var added = await addTrackToBuiltInPlaylist(pid, targetSong, { silentSuccess: true });
+      if (!added) throw new Error('BUILT_IN_PLAYLIST_ADD_FAILED');
+      showToast(added === 'duplicate' ? 'Bài hát đã có trong playlist ShinaYuu' : 'Đã thêm vào playlist ShinaYuu');
+      closeCollectModal();
+      await refreshUserPlaylists(true);
+    } catch (err) {
+      showToast('Thêm vào playlist ShinaYuu thất bại');
+    } finally {
+      collectBusy = false;
+      setCollectBusyPid(pid, false, 'shinayuu');
+      updateLikeButtons();
+    }
+    return;
+  }
   var adapter = songAccountAdapter(provider);
   if (!adapter || !adapter.collect || !adapter.playlistAddUrl) {
     showToast(songAccountUnsupportedMessage(provider, 'collect'));
@@ -30011,7 +30051,7 @@ async function addCollectTargetToPlaylist(pid) {
   }
   if (!ensureLoggedInForAction(provider)) return;
   collectBusy = true;
-  setCollectBusyPid(pid, true);
+  setCollectBusyPid(pid, true, provider);
   updateLikeButtons();
   showToast('Đang thêm vào playlist...');
   try {
@@ -30035,7 +30075,7 @@ async function addCollectTargetToPlaylist(pid) {
     showToast(err && err.message ? err.message : 'Thêm vào playlist thất bại');
   } finally {
     collectBusy = false;
-    setCollectBusyPid(pid, false);
+    setCollectBusyPid(pid, false, provider);
     updateLikeButtons();
   }
 }
@@ -33799,6 +33839,31 @@ var albumGaplessTailFreqData = null;
 var shinayuuPlaybackDescriptorCache = new Map();
 var shinayuuPlaybackDescriptorInflight = new Map();
 var SHINAYUU_YOUTUBE_DESCRIPTOR_TTL_MS = 8 * 60 * 1000;
+
+function restartSingleRepeatMedia(media, token, index, reason) {
+  if (playMode !== 'single' || !media || token !== trackSwitchToken || index !== currentIdx || audio !== media) return false;
+  try { media.loop = true; } catch (_) {}
+  setTimeout(function () {
+    if (token !== trackSwitchToken || index !== currentIdx || audio !== media || playMode !== 'single') return;
+    try { media.currentTime = 0; } catch (_) {}
+    try {
+      var playPromise = media.play && media.play();
+      playing = true;
+      if (typeof setPlayIcon === 'function') setPlayIcon(true);
+      if (typeof updatePlaybackProgressUi === 'function') updatePlaybackProgressUi();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(function () {
+          if (token !== trackSwitchToken || index !== currentIdx || audio !== media || playMode !== 'single') return;
+          playQueueAt(index, { autoRepeat: true, preserveHomeState: true, suppressPlayFailureNotice: true });
+        });
+      }
+    } catch (_) {
+      if (token === trackSwitchToken && index === currentIdx && audio === media && playMode === 'single') playQueueAt(index, { autoRepeat: true, preserveHomeState: true, suppressPlayFailureNotice: true });
+    }
+  }, 0);
+  return true;
+}
+
 var SHINAYUU_SPOTIFY_DESCRIPTOR_TTL_MS = 2 * 60 * 1000;
 
 function shinayuuDescriptorHasPlayback(data) {
@@ -34564,7 +34629,7 @@ async function playLocalQueueSong(song, idx, token, firstVisualPlay, opts, resum
     }
     finalizeListenSession(true);
     if (playAlbumGaplessNextOnEnded(token)) return;
-    if (playMode === 'single') setTimeout(function () { playQueueAt(currentIdx, { autoRepeat: true, suppressPlayFailureNotice: true }); }, 0);
+    if (playMode === 'single' && restartSingleRepeatMedia(this, token, currentIdx, 'online-ended')) return;
     else setTimeout(nextTrack, 0);
   };
   audio.onloadedmetadata = function () {
@@ -35098,7 +35163,7 @@ async function playQueueAt(idx, opts) {
         }
         finalizeListenSession(true);
         if (playAlbumGaplessNextOnEnded(token)) return;
-        if (playMode === 'single') setTimeout(function () { playQueueAt(currentIdx, { autoRepeat: true, suppressPlayFailureNotice: true }); }, 0);
+        if (playMode === 'single' && restartSingleRepeatMedia(this, token, currentIdx, 'online-ended')) return;
         else setTimeout(nextTrack, 0);
       };
       scheduleAudioResumePosition(audio, opts.resumeAt != null ? opts.resumeAt : restoreResumeAt, token);
@@ -37654,13 +37719,17 @@ function clearPlayerControlFocusState(reason) {
     if (!Array.isArray(window.playQueue) || window.playQueue.length < 2 || window.playMode === 'single') return -1;
     index = isFinite(Number(index)) ? Math.round(Number(index)) : window.currentIdx;
     var total = window.playQueue.length;
-    for (var step = 1; step < total; step++) {
-      var candidate = (index + step + total) % total;
-      var song = window.playQueue[candidate];
-      if (!song || isPodcast(song)) continue;
-      if (state.failureCooldown[trackFailureKey(song)] > Date.now()) continue;
-      return candidate;
-    }
+    // AutoMix may prepare far ahead, but it must never skip over the immediate
+    // queue successor merely because another candidate looks more suitable.
+    // Deterministic queue ownership belongs to the player; AI/Cuefield may
+    // shape the transition, not replace the queue order.
+    var immediate = (index + 1 + total) % total;
+    var immediateSong = window.playQueue[immediate];
+    // AutoMix owns transition styling/timing only. Queue order remains a hard
+    // player invariant: never jump from A to C because B failed to preload. If
+    // B is not mixable, return no AutoMix plan and let the normal onended/player
+    // path decide how to play B.
+    if (immediateSong && !isPodcast(immediateSong)) return immediate;
     return -1;
   }
 
@@ -37886,6 +37955,53 @@ function clearPlayerControlFocusState(reason) {
 
   function executionActive(serial) {
     return !!(state.executing && Number(serial) === Number(state.executionSerial));
+  }
+
+  function safeMixTriggerAt(duration, proposedTrigger, fadeSec, warmupSec, gapless) {
+    var safeDuration = Math.max(0, Number(duration) || 0);
+    var proposed = Math.max(0, Number(proposedTrigger) || 0);
+    if (!safeDuration) return 0;
+    // AI/Cuefield may choose an attractive musical boundary, but it is NEVER
+    // allowed to decide that the current song can end early. Every transition
+    // is clamped into the terminal window of the actual track duration.
+    // Album-gapless gets a tiny terminal window; normal mixes get the larger
+    // fade window. The proposal can only move the transition later, never earlier.
+    var ratioFloor = gapless
+      ? safeDuration * 0.97
+      : (safeDuration >= 45 ? safeDuration * 0.88 : safeDuration * 0.82);
+    var defaultFade = gapless ? 0.9 : Math.max(Number(fadeSec) || 6, 4);
+    var fadeWindow = clamp(defaultFade, gapless ? 0.45 : 4, gapless ? 1.4 : 8);
+    var latestSafeStart = Math.max(0, safeDuration - fadeWindow);
+    var floor = Math.max(ratioFloor, latestSafeStart);
+    var trigger = Math.max(proposed, floor);
+    return Math.max(0, Math.min(Math.max(0, safeDuration - 0.05), trigger - Math.max(0, Number(warmupSec) || 0)));
+  }
+
+  function currentTrackPlaybackHealthy() {
+    try {
+      if (window.spotifyDirectState && window.spotifyDirectState.active) return !!window.spotifyDirectState.isPlaying;
+      return !!(window.audio && window.audio.src && !window.audio.paused && !window.audio.ended);
+    } catch (_) { return false; }
+  }
+
+  async function resumeCurrentTrackAfterAutoMixAbort(reason) {
+    if (currentTrackPlaybackHealthy()) return true;
+    try {
+      if (window.spotifyDirectState && window.spotifyDirectState.active) {
+        var direct = window.spotifyDirectState;
+        if (direct.sdkPlayer && typeof direct.sdkPlayer.resume === 'function') {
+          await direct.sdkPlayer.resume();
+          return !!direct.sdkPlayer;
+        }
+      }
+      if (window.audio && window.audio.src && !window.audio.ended && typeof window.audio.play === 'function') {
+        await window.audio.play();
+        return true;
+      }
+    } catch (error) {
+      console.warn('[CuefieldAutoMix] resume after abort:', reason || 'abort', error && (error.message || error));
+    }
+    return false;
   }
 
   function restoreAutoMixOutput(reason, options) {
@@ -38332,7 +38448,7 @@ function clearPlayerControlFocusState(reason) {
       timelineExecution: timelineExecution,
       fadeSec: fadeSec,
       warmupSec: warmupSec,
-      triggerAt: Math.max(0, Math.min(fadeStartA - warmupSec, (duration || exitTime) - fadeSec - 0.45)),
+      triggerAt: safeMixTriggerAt(duration || exitTime, fadeStartA, fadeSec, warmupSec, gapless),
       fadeStartA: fadeStartA,
       bStart: bStart,
       gapless: gapless,
@@ -39067,6 +39183,25 @@ function clearPlayerControlFocusState(reason) {
   async function execute(pending) {
     if (!pending || state.executing || !state.enabled) return;
     if (pending.token !== Number(window.trackSwitchToken) || pending.fromIndex !== Number(window.currentIdx)) return;
+    // Last-line safety: execute() is also called by manual/test controls, so
+    // the tick() gate alone is insufficient. Never cut a track before the
+    // measured terminal window, even if an AI/Cuefield plan asks for it.
+    var executeDuration = playbackDuration(currentSong());
+    if (!(executeDuration > 0)) {
+      state.pending = pending;
+      setStatus('waiting');
+      return;
+    }
+    var executeNow = playbackTime();
+    var executeFloor = safeMixTriggerAt(executeDuration, pending.triggerAt, pending.fadeSec, pending.warmupSec, !!pending.gapless);
+    if (executeNow + 0.05 < executeFloor) {
+      pending.triggerAt = executeFloor;
+      state.pending = pending;
+      state.lastCountdownSec = -1;
+      setStatus('ready');
+      updateUi();
+      return;
+    }
     var executionSerial = ++state.executionSerial;
     var settleExecution;
     var executionSettled = new Promise(function (resolve) { settleExecution = resolve; });
@@ -39132,11 +39267,20 @@ function clearPlayerControlFocusState(reason) {
         } else {
           markTrackFailure(pending && pending.toSong, 90000);
           state.bypassToken = Number(window.trackSwitchToken);
+          // A failed mix must never strand the current song. Restore the audible
+          // owner, try one bounded resume, then hand control back to normal
+          // onended/queue logic. AutoMix itself stays bypassed for this token.
           setTimeout(function () {
             if (state.executing || !state.enabled || state.bypassToken !== Number(window.trackSwitchToken)) return;
-            var duration = playbackDuration(currentSong());
-            var remaining = Math.max(0, duration - playbackTime());
-            if (!playbackRunning() || (duration > 0 && remaining < 1.25)) {
+            resumeCurrentTrackAfterAutoMixAbort('transition-failed').then(function (resumed) {
+              if (resumed || playbackRunning()) return;
+              var duration = playbackDuration(currentSong());
+              var remaining = Math.max(0, duration - playbackTime());
+              if (duration > 0 && remaining > 1.25 && window.audio && !window.audio.ended) {
+                state.bypassToken = Number(window.trackSwitchToken);
+                console.warn('[CuefieldAutoMix] transition failed without resume; preserving current track');
+                return;
+              }
               var fallbackIndex = nextIndex(Number(window.currentIdx));
               if (fallbackIndex >= 0 && fallbackIndex !== Number(window.currentIdx)) {
                 Promise.resolve(window.playQueueAt(fallbackIndex, {
@@ -39145,10 +39289,7 @@ function clearPlayerControlFocusState(reason) {
                   suppressPlayFailureNotice: true
                 })).catch(function () {});
               }
-            }
-            // When the current track is still healthy, do not immediately retry
-            // AutoMix on the same token. Normal onended/queue logic remains in
-            // control and the bypass clears on the next track.
+            });
           }, 0);
         }
       } finally {
@@ -39192,7 +39333,15 @@ function clearPlayerControlFocusState(reason) {
       state.lastCountdownSec = remainingSec;
       updateUi();
     }
-    if (playbackTime() >= pending.triggerAt) execute(pending);
+    var nowTime = playbackTime();
+    var knownDuration = playbackDuration(currentSong());
+    // Hard playback invariant: without a real end-of-track duration AutoMix is
+    // not allowed to execute. This prevents stale metadata/AI plans from
+    // turning an unknown clock into an early jump.
+    if (!(knownDuration > 0)) return;
+    var hardFloor = safeMixTriggerAt(knownDuration, pending.triggerAt, pending.fadeSec, pending.warmupSec, !!pending.gapless);
+    if (nowTime + 0.05 < hardFloor) return;
+    if (nowTime >= pending.triggerAt) execute(pending);
   }
 
   window.toggleCuefieldAutoMix = function () {
@@ -40195,6 +40344,175 @@ function updateLyricsHighlight() { /* v8: 由 tickLyricsParticles 接管 */ }
 
 ;
 
+/* ===== js/modules/06-lyrics/00-built-in-playlists.js ===== */
+function normalizeBuiltInPlaylistRows(rows) {
+  return (Array.isArray(rows) ? rows : []).map(function (playlist) {
+    return Object.assign({}, playlist, {
+      provider: 'shinayuu',
+      source: 'shinayuu',
+      builtin: true,
+      creator: playlist.creator || 'ShinaYuu',
+      shelfPane: 'mine',
+      subscribed: false
+    });
+  }).filter(function (playlist) { return !!playlist.id; });
+}
+
+function applyBuiltInPlaylistSnapshot(result, opts) {
+  opts = opts || {};
+  if (!result || result.ok !== true) return false;
+  builtInPlaylists = normalizeBuiltInPlaylistRows(result.playlists);
+  if (typeof rebuildUserPlaylistsFromCatalog === 'function') {
+    rebuildUserPlaylistsFromCatalog({
+      animate: !!opts.animate,
+      preserveScroll: opts.preserveScroll !== false,
+      reason: opts.reason || 'built-in-playlists'
+    });
+  } else {
+    userPlaylists = builtInPlaylists.concat(neteasePlaylists, qqPlaylists, kugouPlaylists, qishuiPlaylists, spotifyPlaylists);
+    playlistCatalogRevision += 1;
+  }
+  return true;
+}
+
+function builtInPlaylistApiAvailable() {
+  return !!(window.desktopWindow && typeof window.desktopWindow.listBuiltInPlaylists === 'function');
+}
+
+function builtInPlaylistErrorMessage(result, fallback) {
+  var code = String(result && result.error || '');
+  if (code === 'BUILT_IN_PLAYLIST_LIMIT_REACHED') return '内置歌单数量已达到上限';
+  if (code === 'BUILT_IN_PLAYLIST_TRACK_LIMIT_REACHED') return '这个内置歌单已经装满了';
+  if (code === 'BUILT_IN_PLAYLIST_INDEX_TOO_LARGE') return '内置歌单数据已达到存储上限';
+  if (code === 'BUILT_IN_PLAYLIST_TRACK_INVALID') return '这首歌缺少可保存的音源标识';
+  if (code === 'BUILT_IN_PLAYLIST_NOT_FOUND') return '内置歌单已不存在';
+  return fallback || '内置歌单操作失败';
+}
+
+function refreshBuiltInPlaylists(force) {
+  if (!builtInPlaylistApiAvailable()) return Promise.resolve(false);
+  if (builtInPlaylistLoadPromise && !force) return builtInPlaylistLoadPromise;
+  var request = window.desktopWindow.listBuiltInPlaylists().then(function (result) {
+    if (!result || result.ok !== true) throw new Error(result && result.error || 'BUILT_IN_PLAYLIST_READ_FAILED');
+    applyBuiltInPlaylistSnapshot(result, { preserveScroll: true, reason: 'built-in-playlists-refresh' });
+    return true;
+  }).catch(function (error) {
+    console.warn('[BuiltInPlaylists]', error);
+    return false;
+  }).finally(function () {
+    if (builtInPlaylistLoadPromise === request) builtInPlaylistLoadPromise = null;
+  });
+  builtInPlaylistLoadPromise = request;
+  return request;
+}
+
+async function builtInPlaylistTracksPage(id, options) {
+  if (!builtInPlaylistApiAvailable() || typeof window.desktopWindow.readBuiltInPlaylist !== 'function') {
+    return { ok: false, playlist: null, tracks: [], total: 0, hasMore: false, error: 'BUILT_IN_PLAYLIST_UNAVAILABLE' };
+  }
+  return window.desktopWindow.readBuiltInPlaylist(String(id || ''), options || {});
+}
+
+async function createBuiltInPlaylist(name, initialTrack) {
+  name = String(name || '').trim();
+  if (!name) {
+    if (typeof showToast === 'function') showToast('先输入内置歌单名称');
+    return null;
+  }
+  if (!builtInPlaylistApiAvailable() || typeof window.desktopWindow.createBuiltInPlaylist !== 'function') {
+    if (typeof showToast === 'function') showToast('当前环境无法保存内置歌单');
+    return null;
+  }
+  var result = await window.desktopWindow.createBuiltInPlaylist(name);
+  if (!result || result.ok !== true || !result.playlist) {
+    if (typeof showToast === 'function') showToast(builtInPlaylistErrorMessage(result, '创建内置歌单失败'));
+    return null;
+  }
+  applyBuiltInPlaylistSnapshot(result, { animate: true, reason: 'built-in-playlist-create' });
+  if (initialTrack) {
+    var added = await addTrackToBuiltInPlaylist(result.playlist.id, initialTrack, { silentSuccess: true });
+    if (!added) return result.playlist;
+  }
+  if (typeof showToast === 'function') showToast('内置歌单已创建');
+  return result.playlist;
+}
+
+function promptCreateBuiltInPlaylist() {
+  var name = window.prompt(uiText('新建 Mineradio 内置歌单'), uiText('未命名歌单'));
+  if (name == null) return;
+  createBuiltInPlaylist(name).catch(function (error) {
+    console.warn('[BuiltInPlaylistCreate]', error);
+    if (typeof showToast === 'function') showToast('创建内置歌单失败');
+  });
+}
+
+async function addTrackToBuiltInPlaylist(id, track, opts) {
+  opts = opts || {};
+  if (!builtInPlaylistApiAvailable() || typeof window.desktopWindow.addBuiltInPlaylistTrack !== 'function') return false;
+  var result = await window.desktopWindow.addBuiltInPlaylistTrack(String(id || ''), track || {});
+  if (!result || result.ok !== true) {
+    if (typeof showToast === 'function') showToast(builtInPlaylistErrorMessage(result, '加入内置歌单失败'));
+    return false;
+  }
+  applyBuiltInPlaylistSnapshot(result, { preserveScroll: true, reason: 'built-in-playlist-add-track' });
+  if (typeof showToast === 'function' && !opts.silentSuccess) showToast(result.duplicate ? '歌曲已在这个内置歌单中' : '已加入内置歌单');
+  return result.duplicate ? 'duplicate' : true;
+}
+
+async function removeTrackFromBuiltInPlaylist(id, index) {
+  if (!builtInPlaylistApiAvailable() || typeof window.desktopWindow.removeBuiltInPlaylistTrack !== 'function') return false;
+  var result = await window.desktopWindow.removeBuiltInPlaylistTrack(String(id || ''), Number(index));
+  if (!result || result.ok !== true) {
+    if (typeof showToast === 'function') showToast(builtInPlaylistErrorMessage(result, '移除歌曲失败'));
+    return false;
+  }
+  if (playlistPanelDetailState && playlistPanelDetailState.key === 'shinayuu:' + String(id || '')) {
+    playlistPanelDetailState.tracks.splice(Number(index), 1);
+    playlistPanelDetailState.total = Math.max(0, playlistPanelDetailState.tracks.length);
+    playlistPanelDetailState.nextOffset = playlistPanelDetailState.tracks.length;
+    playlistPanelDetailState.hasMore = false;
+  }
+  applyBuiltInPlaylistSnapshot(result, { preserveScroll: true, reason: 'built-in-playlist-remove-track' });
+  if (typeof showToast === 'function') showToast('已从内置歌单移除');
+  return true;
+}
+
+async function renameBuiltInPlaylist(id, currentName) {
+  var name = window.prompt('重命名内置歌单', String(currentName || ''));
+  if (name == null || !String(name).trim()) return false;
+  var result = await window.desktopWindow.renameBuiltInPlaylist(String(id || ''), String(name).trim());
+  if (!result || result.ok !== true) {
+    if (typeof showToast === 'function') showToast(builtInPlaylistErrorMessage(result, '重命名失败'));
+    return false;
+  }
+  if (playlistPanelDetailState && playlistPanelDetailState.key === 'shinayuu:' + String(id || '') && playlistPanelDetailState.playlist) {
+    playlistPanelDetailState.playlist.name = String(name).trim();
+  }
+  applyBuiltInPlaylistSnapshot(result, { preserveScroll: true, reason: 'built-in-playlist-rename' });
+  if (typeof showToast === 'function') showToast('内置歌单已重命名');
+  return true;
+}
+
+async function deleteBuiltInPlaylist(id, currentName) {
+  if (!window.confirm(uiText('删除内置歌单“') + String(currentName || uiText('未命名歌单')) + uiText('”？') + '\n' + uiText('只删除歌单，不会删除平台或本地歌曲。'))) return false;
+  var result = await window.desktopWindow.deleteBuiltInPlaylist(String(id || ''));
+  if (!result || result.ok !== true) {
+    if (typeof showToast === 'function') showToast(builtInPlaylistErrorMessage(result, '删除内置歌单失败'));
+    return false;
+  }
+  if (playlistPanelDetailState && playlistPanelDetailState.key === 'shinayuu:' + String(id || '')) {
+    cancelPlaylistPanelDetailRequest();
+    playlistPanelDetailState.key = '';
+    playlistPanelDetailState.tracks = [];
+    playlistPanelDetailState.playlist = null;
+  }
+  applyBuiltInPlaylistSnapshot(result, { preserveScroll: true, reason: 'built-in-playlist-delete' });
+  if (typeof showToast === 'function') showToast('内置歌单已删除');
+  return true;
+}
+
+;
+
 /* ===== js/modules/06-lyrics/01-playlist-panel-shell.js ===== */
 // ============================================================
 function animateListItems(container, selector, opts) {
@@ -40760,7 +41078,7 @@ function rebuildUserPlaylistsFromCatalog(opts) {
   opts = opts || {};
   youtubePlaylists = validPlaylistCatalogRows(youtubePlaylists, 'youtube');
   spotifyPlaylists = validPlaylistCatalogRows(spotifyPlaylists, 'spotify');
-  userPlaylists = youtubePlaylists.concat(spotifyPlaylists);
+  userPlaylists = (typeof builtInPlaylists !== 'undefined' ? builtInPlaylists : []).concat(youtubePlaylists, spotifyPlaylists);
   if (typeof applyUserPlaylistOrder === 'function') applyUserPlaylistOrder();
   playlistCatalogRevision += 1;
   renderUserPlaylistsList({ animate: !!opts.animate, reset: !!opts.reset, preserveScroll: opts.preserveScroll !== false });
@@ -40856,8 +41174,13 @@ function requestNextPlaylistCatalogPage(reason) {
   return true;
 }
 async function refreshUserPlaylists(force) {
+  if (typeof refreshBuiltInPlaylists === 'function') await refreshBuiltInPlaylists(!!force);
   if (!youtubeLoginStatus.loggedIn && !spotifyLoginStatus.loggedIn) {
     resetPlaylistPanelRenderLimit();
+    if (Array.isArray(builtInPlaylists) && builtInPlaylists.length) {
+      rebuildUserPlaylistsFromCatalog({ animate: false, reset: true, preserveScroll: true, reason: 'built-in-only-playlists' });
+      return;
+    }
     document.getElementById('pl-list').innerHTML = '<div class="playlist-empty-state">Kết nối YouTube Music hoặc Spotify để hiển thị playlist của bạn.</div>';
     return;
   }
@@ -41040,13 +41363,20 @@ function bindMiniQueueLazyRender() {
   }, { passive: true });
 }
 function normalizePlaylistProvider(provider) {
-  return String(provider || '').toLowerCase() === 'spotify' ? 'spotify' : 'youtube';
+  provider = String(provider || '').toLowerCase();
+  if (provider === 'shinayuu' || provider === 'mineradio') return 'shinayuu';
+  if (provider === 'spotify') return 'spotify';
+  return 'youtube';
 }
 function playlistProviderLabel(provider) {
-  return normalizePlaylistProvider(provider) === 'spotify' ? 'SP' : 'YT';
+  provider = normalizePlaylistProvider(provider);
+  if (provider === 'shinayuu') return 'SY';
+  return provider === 'spotify' ? 'SP' : 'YT';
 }
 function playlistProviderName(provider) {
-  return normalizePlaylistProvider(provider) === 'spotify' ? 'Spotify' : 'YouTube Music';
+  provider = normalizePlaylistProvider(provider);
+  if (provider === 'shinayuu') return 'ShinaYuu';
+  return provider === 'spotify' ? 'Spotify' : 'YouTube Music';
 }
 function playlistPanelKey(provider, id) {
   provider = normalizePlaylistProvider(provider);
@@ -41178,6 +41508,7 @@ function playlistTracksEndpoint(provider, id, params) {
       query += '&' + encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
     });
   }
+  if (provider === 'shinayuu') return '';
   return provider === 'spotify' ? '/api/spotify/playlist/tracks?' + query : '/api/youtube-music/playlist/tracks?' + query;
 }
 function playlistPanelDetailHtml(pl, provider, detailWindow) {
@@ -41273,6 +41604,34 @@ async function loadMorePlaylistPanelDetailTracks(reason) {
   var pid = parts.slice(1).join(':');
   var offset = reason === 'initial' ? 0 : Math.max(0, Number(st.nextOffset) || st.tracks.length);
   var token = st.token;
+  if (provider === 'shinayuu' && typeof builtInPlaylistTracksPage === 'function') {
+    try {
+      var localResult = await builtInPlaylistTracksPage(pid, { limit: PLAYLIST_DETAIL_BATCH_SIZE, offset: offset });
+      if (playlistPanelDetailState.token !== token || playlistPanelDetailState.key !== st.key) return false;
+      var localTracks = (localResult && localResult.tracks) || [];
+      var localMapped = localTracks.map(cloneSong);
+      var localAdded = appendPlaylistPanelDetailTracks(st.tracks, localMapped);
+      st.total = Math.max(st.total || 0, Number(localResult && localResult.total) || 0, st.tracks.length);
+      st.nextOffset = Math.max(offset + localTracks.length, Number(localResult && localResult.nextOffset) || 0);
+      st.hasMore = !!(localResult && localResult.hasMore);
+      st.loading = false;
+      st.loadingMore = false;
+      st.error = localResult && localResult.error || '';
+      st.message = localResult && (localResult.message || '') || '';
+      if (localResult && localResult.playlist) st.playlist = Object.assign({}, st.playlist || {}, localResult.playlist);
+      if (reason === 'initial') { renderPlaylistPanelDetailState(); scrollPlaylistPanelDetailIntoView(st.key); }
+      else renderPlaylistPanelDetailRows();
+      return localAdded > 0;
+    } catch (localError) {
+      st.loading = false;
+      st.loadingMore = false;
+      st.hasMore = false;
+      st.error = 'BUILT_IN_PLAYLIST_PAGE_FAILED';
+      st.message = 'Không tải được playlist ShinaYuu.';
+      if (reason === 'initial') renderPlaylistPanelDetailState(); else renderPlaylistPanelDetailRows();
+      return false;
+    }
+  }
   var controller = window.AbortController ? new AbortController() : null;
   var timer = controller ? setTimeout(function () { controller.abort(); }, 12000) : 0;
   st.controller = controller;
@@ -41449,9 +41808,9 @@ function playlistPanelBuildVirtualEntries() {
   if (playlistPanelVirtualCache.revision === playlistCatalogRevision &&
       playlistPanelVirtualCache.detailKey === playlistPanelDetailState.key &&
       playlistPanelVirtualCache.detailSig === detailSig) return playlistPanelVirtualCache;
-  var labels = { youtube: 'Playlist YouTube Music', spotify: 'Playlist Spotify' };
-  var order = ['youtube', 'spotify'];
-  var groups = { youtube: [], spotify: [] };
+  var labels = { shinayuu: 'Playlist ShinaYuu', youtube: 'Playlist YouTube Music', spotify: 'Playlist Spotify' };
+  var order = ['shinayuu', 'youtube', 'spotify'];
+  var groups = { shinayuu: [], youtube: [], spotify: [] };
   userPlaylists.forEach(function (pl, sourceIndex) {
     var key = playlistPanelGroupKey(pl);
     if (!groups[key]) groups[key] = [];
@@ -41666,6 +42025,8 @@ document.getElementById('pl-list').addEventListener('click', function (e) {
 // Playlist queue loader for YouTube Music and Spotify.
 function playlistQueueSource(id) {
   var raw = String(id || '');
+  if (raw.indexOf('shinayuu:') === 0) return { provider: 'shinayuu', id: raw.slice(9), requestId: raw };
+  if (raw.indexOf('mineradio:') === 0) return { provider: 'shinayuu', id: raw.slice(10), requestId: 'shinayuu:' + raw.slice(10) };
   if (raw.indexOf('spotify:') === 0) return { provider: 'spotify', id: raw.slice(8), requestId: raw };
   if (raw.indexOf('netease:') === 0) return { provider: 'spotify', id: raw.slice(8), requestId: 'spotify:' + raw.slice(8) };
   if (raw.indexOf('youtube:') === 0) return { provider: 'youtube', id: raw.slice(8), requestId: raw };
@@ -41674,6 +42035,7 @@ function playlistQueueSource(id) {
 }
 function playlistQueuePageSize(provider, initial) {
   if (provider === 'spotify') return initial ? 96 : 100;
+  if (provider === 'shinayuu') return initial ? 96 : 160;
   return initial ? PLAYLIST_QUEUE_INITIAL_BATCH_SIZE : PLAYLIST_QUEUE_BACKGROUND_BATCH_SIZE;
 }
 function playlistQueuePageUrl(source, offset, limit) {
@@ -41715,7 +42077,10 @@ async function hydratePlaylistQueueNextPage(reason) {
   var limit = playlistQueuePageSize(state.provider, false);
   state.loading = true;
   state.pausedForBuffer = false;
-  state.promise = apiJson(playlistQueuePageUrl(source, offset, limit), { timeoutMs: 16000 }).then(function (r) {
+  var pageRequest = state.provider === 'shinayuu' && typeof builtInPlaylistTracksPage === 'function'
+    ? builtInPlaylistTracksPage(source.id, { offset: offset, limit: limit })
+    : apiJson(playlistQueuePageUrl(source, offset, limit), { timeoutMs: 16000 });
+  state.promise = Promise.resolve(pageRequest).then(function (r) {
     if (!playlistQueueHydrationValid(state, token)) return false;
     var rawTracks = r && r.tracks || [];
     if (r && r.error && !rawTracks.length) throw new Error(r.message || r.error);
@@ -41803,7 +42168,9 @@ async function loadPlaylistIntoQueueById(id, autoplay, title, opts) {
   var seedTracks = Array.isArray(opts.seedTracks) && opts.seedTracks.length ? opts.seedTracks.map(cloneSong) : [];
   try {
     if (!seedTracks.length) {
-      r = await apiJson(playlistQueuePageUrl(source, 0, playlistQueuePageSize(source.provider, true)), { timeoutMs: 16000 });
+      r = source.provider === 'shinayuu' && typeof builtInPlaylistTracksPage === 'function'
+        ? await builtInPlaylistTracksPage(source.id, { offset: 0, limit: playlistQueuePageSize(source.provider, true) })
+        : await apiJson(playlistQueuePageUrl(source, 0, playlistQueuePageSize(source.provider, true)), { timeoutMs: 16000 });
       if (
         playlistPlaybackOpts
         && typeof playbackSelectionIntentIsActive === 'function'
@@ -47668,6 +48035,22 @@ function restartWallpaperEngineAfterHostBoundsChange() {
 }
 
 function handleWallpaperEngineHostBoundsChange(payload) {
+  if (payload && payload.phase === 'resident') {
+    var residentSessionId = String(payload.sessionId || '');
+    var nativeStatus = wallpaperEngineRuntimeState || {};
+    if (!wallpaperEngineSelected || !wallpaperEngineSelected.active || residentSessionId !== String(nativeStatus.sessionId || '') || String(nativeStatus.captureMode || '') !== 'dwm-thumbnail') return;
+    wallpaperEngineHostBoundsPreparing = false;
+    wallpaperEngineDesktopPreviewActive = false;
+    wallpaperEngineDesktopPreviewUsesAsset = false;
+    applyWallpaperEngineVisualSettings(true);
+    clearWallpaperEngineFreezeFrame(false);
+    if (!wallpaperEngineGlassCaptureStream || !wallpaperEngineGlassCaptureStream.getVideoTracks || !wallpaperEngineGlassCaptureStream.getVideoTracks().some(function (track) { return track.readyState === 'live'; })) {
+      scheduleWallpaperEngineGlassSamplerCapture(residentSessionId, wallpaperEngineLayerToken, 0);
+    }
+    updateWallpaperEngineEntryUi();
+    return;
+  }
+
   var phase = String(payload && payload.phase || 'restart');
   if (phase === 'restart') {
     if (!wallpaperEngineHostBoundsPreparing && !wallpaperEngineDesktopPreviewActive) return;
@@ -54107,6 +54490,28 @@ var particleSpin = { vx: 0, vy: 0, damping: 0.90 };
 // 手势驱动的总旋转 (累计角度), 输出到 particles
 var gestureRotation = { x: 0, y: 0 };
 var gestureGrip = { value: 0, target: 0, openness: 1, lastState: 'open', pulse: 0 };
+var gestureActionState = {
+  candidate: '',
+  since: 0,
+  fired: false,
+  cooldownUntil: 0,
+  swipeAnchor: null,
+  volumeArmed: false,
+  volumeBaseY: 0,
+  volumeBaseValue: 0,
+  volumeLastApply: 0,
+  lastAction: ''
+};
+var gestureStartEpoch = 0;
+var gestureStartPromise = null;
+var gestureInferenceBusy = false;
+var gestureLastInferenceAt = 0;
+var gestureLastInferenceErrorAt = 0;
+var gestureInferenceErrorCount = 0;
+var gestureLifecycleState = 'off';
+var gestureHostResumeTimer = 0;
+var gestureLastHudSignature = '';
+var gestureLastHudAt = 0;
 var PARTICLE_POINTER_SPIN_X = 0.0032;
 var PARTICLE_POINTER_SPIN_Y = 0.0034;
 var PARTICLE_HAND_SPIN_X = 4.15;
@@ -54164,50 +54569,415 @@ var handCanvas = null, handCanvasCtx = null;
 // 平滑系数 (越小越平滑, 但反应越慢)
 var HAND_SMOOTH_ALPHA = 0.35;
 
-async function startGestureControl() {
-  if (gestureActive) return;
-  showToast('正在加载手势识别…');
+function normalizeGestureSensitivity(value) {
+  value = String(value || '').trim().toLowerCase();
+  return /^(steady|balanced|quick)$/.test(value) ? value : 'balanced';
+}
+
+function gestureSensitivityProfile() {
+  var mode = normalizeGestureSensitivity(fx && fx.gestureSensitivity);
+  if (mode === 'steady') return { hold: 820, volumeHold: 620, swipeDistance: 0.245, swipeWindow: 620, cooldown: 1320 };
+  if (mode === 'quick') return { hold: 470, volumeHold: 350, swipeDistance: 0.165, swipeWindow: 520, cooldown: 860 };
+  return { hold: 640, volumeHold: 470, swipeDistance: 0.205, swipeWindow: 570, cooldown: 1080 };
+}
+
+function gestureLandmarkDistance(a, b) {
+  if (!a || !b) return 0;
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function gestureFingerExtended(lm, tipIndex, pipIndex, mcpIndex, palm) {
+  var span = Math.max(0.045, gestureLandmarkDistance(lm[5], lm[17]));
+  var tipPalm = gestureLandmarkDistance(lm[tipIndex], palm);
+  var pipPalm = gestureLandmarkDistance(lm[pipIndex], palm);
+  var tipMcp = gestureLandmarkDistance(lm[tipIndex], lm[mcpIndex]);
+  var pipMcp = gestureLandmarkDistance(lm[pipIndex], lm[mcpIndex]);
+  return tipPalm > pipPalm + span * 0.13 && tipMcp > pipMcp * 1.18;
+}
+
+function classifyGesturePlayerPose(lm, palm, pinchDist) {
+  var span = Math.max(0.045, gestureLandmarkDistance(lm[5], lm[17]));
+  var index = gestureFingerExtended(lm, 8, 6, 5, palm);
+  var middle = gestureFingerExtended(lm, 12, 10, 9, palm);
+  var ring = gestureFingerExtended(lm, 16, 14, 13, palm);
+  var pinky = gestureFingerExtended(lm, 20, 18, 17, palm);
+  var thumbReach = gestureLandmarkDistance(lm[4], palm);
+  var thumbUp = thumbReach > span * 0.78 && lm[4].y < palm.y - span * 0.52;
+  if (thumbUp && !index && !middle && !ring && !pinky) return 'like';
+  if (index && middle && !ring && !pinky && gestureLandmarkDistance(lm[8], lm[12]) > span * 0.26) return 'play';
+  if (index && middle && ring && !pinky) return 'lyrics';
+  if (index && !middle && !ring && !pinky && pinchDist > span * 0.30) return 'volume';
+  return '';
+}
+
+function resetGesturePlayerActionState(keepCooldown) {
+  gestureActionState.candidate = '';
+  gestureActionState.since = 0;
+  gestureActionState.fired = false;
+  gestureActionState.swipeAnchor = null;
+  gestureActionState.volumeArmed = false;
+  gestureActionState.volumeLastApply = 0;
+  if (!keepCooldown) gestureActionState.cooldownUntil = 0;
+}
+
+function gesturePlayerActionsAllowed() {
+  if (!gestureActive || !fx || fx.gesturePlayerActions === false) return false;
+  if (!gestureHostVisible()) return false;
+  if (document.body && document.body.classList.contains('desktop-software-locked')) return false;
+  if (typeof progressDragState !== 'undefined' && progressDragState && progressDragState.active) return false;
+  if (document.querySelector('.modal-mask.show,.modal.show,.login-easter-overlay.show,.login-easter-overlay.active')) return false;
+  var active = document.activeElement;
+  if (active && (/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName) || active.isContentEditable)) return false;
+  return true;
+}
+
+function setGestureCandidate(candidate, now, holdMs, label, detail) {
+  if (gestureActionState.candidate !== candidate) {
+    gestureActionState.candidate = candidate;
+    gestureActionState.since = now;
+    gestureActionState.fired = false;
+  }
+  var progress = Math.max(0, Math.min(1, (now - gestureActionState.since) / Math.max(1, holdMs)));
+  showGestureHUD(label, progress, gestureActionState.fired ? 'Đã thực hiện; thả tay để kích hoạt lại' : detail);
+  return progress;
+}
+
+function executeGesturePlayerAction(action, now, cooldownMs) {
+  if (gestureActionState.fired || now < gestureActionState.cooldownUntil) return false;
+  gestureActionState.fired = true;
+  gestureActionState.lastAction = action;
+  gestureActionState.cooldownUntil = now + cooldownMs;
   try {
+    if (action === 'play') {
+      Promise.resolve(togglePlay()).catch(function () { });
+      showToast('Cử chỉ: phát / tạm dừng');
+    } else if (action === 'like') {
+      if (typeof toggleLikeCurrent === 'function') toggleLikeCurrent();
+      showToast('Cử chỉ: thích bài hiện tại');
+    } else if (action === 'lyrics') {
+      if (typeof setParticleLyricsSilently === 'function') {
+        setParticleLyricsSilently(!fx.particleLyrics);
+        saveLyricLayout({ user: true, reason: 'gesture-lyrics' });
+        showToast(fx.particleLyrics ? 'Cử chỉ: đã hiện lyrics' : 'Cử chỉ: đã ẩn lyrics');
+      }
+    } else if (action === 'next') {
+      nextTrack(true);
+      showToast('Cử chỉ: bài tiếp theo');
+    } else if (action === 'previous') {
+      prevTrack(true);
+      showToast('Cử chỉ: bài trước');
+    }
+    return true;
+  } catch (e) {
+    console.warn('[GestureAction]', action, e);
+    return false;
+  }
+}
+
+function updateGestureSwipeAction(palm, openness, now, profile) {
+  if (openness < 0.72) {
+    gestureActionState.swipeAnchor = null;
+    return false;
+  }
+  var anchor = gestureActionState.swipeAnchor;
+  if (!anchor || now - anchor.time > profile.swipeWindow) {
+    gestureActionState.swipeAnchor = { x: palm.x, y: palm.y, time: now };
+    return false;
+  }
+  var dx = palm.x - anchor.x;
+  var dy = palm.y - anchor.y;
+  if (Math.abs(dy) > 0.16 || Math.abs(dx) < profile.swipeDistance || Math.abs(dx) < Math.abs(dy) * 1.65 || now < gestureActionState.cooldownUntil) return false;
+  var action = dx < 0 ? 'next' : 'previous';
+  gestureActionState.candidate = action;
+  gestureActionState.since = now;
+  gestureActionState.fired = false;
+  gestureActionState.swipeAnchor = null;
+  executeGesturePlayerAction(action, now, profile.cooldown);
+  showGestureHUD(dx < 0 ? '左滑 · 下一首' : '右滑 · 上一首', 1, '已执行，回到中央后可继续');
+  return true;
+}
+
+function updateGesturePlayerActions(lm, palm, openness, pinchDist, isPinch, isFist, now) {
+  if (!gesturePlayerActionsAllowed()) {
+    resetGesturePlayerActionState(true);
+    return false;
+  }
+  var profile = gestureSensitivityProfile();
+  if (!isPinch && !isFist && updateGestureSwipeAction(palm, openness, now, profile)) return true;
+  if (isPinch || isFist || openness > 0.72) {
+    if (openness <= 0.72) gestureActionState.swipeAnchor = null;
+    gestureActionState.candidate = '';
+    gestureActionState.since = 0;
+    gestureActionState.fired = false;
+    gestureActionState.volumeArmed = false;
+    return false;
+  }
+
+  var pose = classifyGesturePlayerPose(lm, palm, pinchDist);
+  if (!pose) {
+    gestureActionState.candidate = '';
+    gestureActionState.since = 0;
+    gestureActionState.fired = false;
+    gestureActionState.volumeArmed = false;
+    return false;
+  }
+  if (pose === 'volume') {
+    var volumeProgress = setGestureCandidate('volume', now, profile.volumeHold, 'Âm lượng bằng ngón trỏ', 'Giữ rồi di chuyển lên/xuống để chỉnh âm lượng');
+    if (volumeProgress >= 1 && !gestureActionState.volumeArmed) {
+      gestureActionState.volumeArmed = true;
+      gestureActionState.volumeBaseY = palm.y;
+      gestureActionState.volumeBaseValue = typeof targetVolume === 'number' ? targetVolume : 0.7;
+      gestureActionState.volumeLastApply = 0;
+    }
+    if (gestureActionState.volumeArmed) {
+      var nextVolume = Math.max(0, Math.min(1, gestureActionState.volumeBaseValue + (gestureActionState.volumeBaseY - palm.y) * 1.85));
+      if (now - gestureActionState.volumeLastApply >= 80) {
+        gestureActionState.volumeLastApply = now;
+        if (typeof setVolume === 'function') setVolume(nextVolume, true);
+      }
+      showGestureHUD('音量 ' + Math.round(nextVolume * 100) + '%', nextVolume, '食指向上增加 · 向下降低');
+    }
+    return true;
+  }
+
+  var labels = {
+    play: ['V 手势 · 播放', 'Giữ để phát / tạm dừng'],
+    like: ['拇指向上 · 喜欢', 'Giữ để thích / bỏ thích'],
+    lyrics: ['三指 · 歌词', 'Giữ để hiện / ẩn lyrics']
+  };
+  var progress = setGestureCandidate(pose, now, profile.hold, labels[pose][0], labels[pose][1]);
+  if (progress >= 1) executeGesturePlayerAction(pose, now, profile.cooldown);
+  return true;
+}
+
+function applyGestureSettingsUi() {
+  if (!fx) return;
+  var actions = document.getElementById('t-gesturePlayerActions');
+  if (actions) actions.classList.toggle('on', fx.gesturePlayerActions !== false);
+  var overlay = document.getElementById('t-gestureHandOverlay');
+  if (overlay) overlay.classList.toggle('on', fx.gestureHandOverlay !== false);
+  var mode = normalizeGestureSensitivity(fx.gestureSensitivity);
+  document.querySelectorAll('#gesture-sensitivity-seg button').forEach(function (button) {
+    button.classList.toggle('active', button.dataset.gestureSensitivity === mode);
+  });
+  if (handCanvas) handCanvas.classList.toggle('show', gestureActive && fx.gestureHandOverlay !== false);
+}
+
+function toggleGesturePlayerActions() {
+  fx.gesturePlayerActions = fx.gesturePlayerActions === false;
+  resetGesturePlayerActionState(true);
+  applyGestureSettingsUi();
+  saveLyricLayout({ user: true, reason: 'gesturePlayerActions' });
+  showToast(fx.gesturePlayerActions ? 'Điều khiển trình phát bằng cử chỉ đã bật' : 'Chỉ giữ cử chỉ hiệu ứng');
+}
+
+function toggleGestureHandOverlay() {
+  fx.gestureHandOverlay = fx.gestureHandOverlay === false;
+  applyGestureSettingsUi();
+  if (!fx.gestureHandOverlay && handCanvasCtx) handCanvasCtx.clearRect(0, 0, handCanvas.width, handCanvas.height);
+  saveLyricLayout({ user: true, reason: 'gestureHandOverlay' });
+  showToast(fx.gestureHandOverlay ? 'Hiệu ứng bàn tay đã bật' : 'Ẩn hiệu ứng bàn tay, nhận diện vẫn chạy');
+}
+
+function setGestureSensitivity(mode) {
+  fx.gestureSensitivity = normalizeGestureSensitivity(mode);
+  resetGesturePlayerActionState(true);
+  applyGestureSettingsUi();
+  saveLyricLayout({ user: true, reason: 'gestureSensitivity' });
+}
+
+function gestureInferenceIntervalMs() {
+  var quality = fx && String(fx.performanceQuality || 'eco');
+  if (quality === 'high' || quality === 'ultra') return 42;
+  if (quality === 'balanced') return 55;
+  return 72;
+}
+
+function gestureModelComplexity() {
+  // 手势是显式开启的交互能力，识别可靠性优先于模型降档。
+  // 帧率仍按性能档限流，低配机不会因此把推理频率拉高。
+  return 1;
+}
+
+function gestureHostVisible() {
+  if (typeof desktopRuntimeState === 'object' && desktopRuntimeState && desktopRuntimeState.desktop) {
+    // 完整桌面模式会把同一个 Mineradio HWND 嵌入桌面；此时 Electron
+    // 的 isVisible/isMinimized 可能不代表用户肉眼看到的桌面宿主。
+    if (desktopRuntimeState.embedded === true || desktopRuntimeState.interactive === true) return true;
+    return desktopRuntimeState.minimized !== true && desktopRuntimeState.visible !== false;
+  }
+  return !document.hidden;
+}
+
+function syncGestureCameraUi() {
+  if (!fx) return;
+  var wantsGesture = fx.cam === 'gesture';
+  var starting = wantsGesture && gestureLifecycleState === 'starting';
+  var running = wantsGesture && gestureActive && gestureLifecycleState === 'active';
+  document.querySelectorAll('#cam-seg button').forEach(function (button) {
+    var mode = button.dataset.cam;
+    button.classList.toggle('active', mode === 'gesture' ? (running || starting) : !wantsGesture);
+    button.classList.toggle('pending', mode === 'gesture' && starting);
+    button.setAttribute('aria-busy', mode === 'gesture' && starting ? 'true' : 'false');
+    button.setAttribute('aria-pressed', mode === 'gesture' ? String(running) : String(!wantsGesture));
+  });
+}
+
+function setGestureLifecycleState(state) {
+  gestureLifecycleState = String(state || 'off');
+  syncGestureCameraUi();
+}
+
+function persistGestureCameraDisabled(reason) {
+  fx.cam = 'off';
+  syncGestureCameraUi();
+  try { saveLyricLayout({ user: true, reason: 'cam', syncDisk: true }); } catch (e) { }
+  if (reason) console.warn('[GestureCamera] disabled:', reason);
+}
+
+function resumeSavedGestureControl(reason) {
+  if (!fx || fx.cam !== 'gesture') {
+    syncGestureCameraUi();
+    return Promise.resolve(false);
+  }
+  if ((document.body && document.body.classList.contains('splash-active')) || !gestureHostVisible()) {
+    setGestureLifecycleState('suspended');
+    return Promise.resolve(false);
+  }
+  return Promise.resolve(startGestureControl()).then(function (started) {
+    syncGestureCameraUi();
+    return started === true;
+  });
+}
+
+function syncGestureControlHostVisibility(reason) {
+  if (gestureHostResumeTimer) {
+    clearTimeout(gestureHostResumeTimer);
+    gestureHostResumeTimer = 0;
+  }
+  if (!fx || fx.cam !== 'gesture') {
+    if (gestureActive || gestureStartPromise || gestureVideo || gestureCamera || gestureHands) stopGestureControl();
+    else syncGestureCameraUi();
+    return;
+  }
+  if (!gestureHostVisible()) {
+    gestureStartEpoch++;
+    gestureStartPromise = null;
+    if (gestureActive || gestureVideo || gestureCamera || gestureHands) cleanupGestureControlRuntime('suspended');
+    else setGestureLifecycleState('suspended');
+    return;
+  }
+  if (document.body && document.body.classList.contains('splash-active')) return;
+  gestureHostResumeTimer = setTimeout(function () {
+    gestureHostResumeTimer = 0;
+    resumeSavedGestureControl(reason || 'host-visible');
+  }, 120);
+}
+
+async function startGestureControl() {
+  if (gestureActive) return true;
+  if (gestureStartPromise) return gestureStartPromise;
+  var epoch = ++gestureStartEpoch;
+  setGestureLifecycleState('starting');
+  gestureStartPromise = startGestureControlInternal(epoch);
+  try { return await gestureStartPromise; }
+  finally {
+    if (epoch === gestureStartEpoch) {
+      gestureStartPromise = null;
+      if (!gestureActive && gestureLifecycleState === 'starting') {
+        setGestureLifecycleState(fx && fx.cam === 'gesture' ? 'suspended' : 'off');
+      }
+    }
+  }
+}
+
+async function startGestureControlInternal(epoch) {
+  showToast('Đang tải nhận diện cử chỉ…');
+  try {
+    var desktopApi = typeof getDesktopWindowApi === 'function' ? getDesktopWindowApi() : window.desktopWindow;
+    if (desktopApi && typeof desktopApi.requestGestureCameraPermission === 'function') {
+      var permissionGrant = await desktopApi.requestGestureCameraPermission();
+      if (!permissionGrant || permissionGrant.ok !== true) {
+        throw new Error(permissionGrant && permissionGrant.error || 'GESTURE_CAMERA_PERMISSION_GRANT_FAILED');
+      }
+    }
     await loadScriptOnce('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js');
     await loadScriptOnce('https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js');
+    if (epoch !== gestureStartEpoch || fx.cam !== 'gesture') return false;
     gestureVideo = document.createElement('video');
     gestureVideo.playsInline = true; gestureVideo.muted = true;
     gestureVideo.style.display = 'none';
     document.body.appendChild(gestureVideo);
     gestureHands = new Hands({ locateFile: function (f) { return 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/' + f; } });
     // modelComplexity:1 比 0 更稳定, 但仍流畅. 提高 confidence 减少误检
-    gestureHands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
+    gestureHands.setOptions({ maxNumHands: 1, modelComplexity: gestureModelComplexity(), minDetectionConfidence: 0.58, minTrackingConfidence: 0.55 });
     gestureHands.onResults(function (res) {
       if (!gestureActive) return;
       var lm = res.multiHandLandmarks && res.multiHandLandmarks[0];
       if (!lm) { onHandLost(); return; }
       processHandFrame(lm);
     });
-    gestureCamera = new Camera(gestureVideo, { onFrame: async function () { if (gestureHands) await gestureHands.send({ image: gestureVideo }); }, width: 480, height: 360 });
+    gestureCamera = new Camera(gestureVideo, { onFrame: async function () {
+      if (!gestureHands || gestureInferenceBusy || !gestureHostVisible()) return;
+      var now = performance.now();
+      if (now - gestureLastInferenceAt < gestureInferenceIntervalMs()) return;
+      gestureLastInferenceAt = now;
+      gestureInferenceBusy = true;
+      try {
+        await gestureHands.send({ image: gestureVideo });
+      } catch (error) {
+        // camera_utils 只会在 onFrame Promise resolve 后排下一帧；这里若把
+        // 单帧错误继续抛出，整条摄像头 RAF 会永久停止。
+        gestureInferenceErrorCount++;
+        if (now - gestureLastInferenceErrorAt > 5000) {
+          gestureLastInferenceErrorAt = now;
+          console.warn('[GestureCamera] inference frame recovered:', error && (error.message || error.name) || error);
+        }
+        onHandLost();
+      }
+      finally { gestureInferenceBusy = false; }
+    }, width: 480, height: 360 });
     await gestureCamera.start();
+    if (epoch !== gestureStartEpoch || fx.cam !== 'gesture') {
+      cleanupGestureControlRuntime();
+      return false;
+    }
     gestureActive = true;
+    setGestureLifecycleState('active');
     // 准备 hand canvas
     handCanvas = document.getElementById('hand-canvas');
     handCanvasCtx = handCanvas.getContext('2d');
     resizeHandCanvas();
-    handCanvas.classList.add('show');
-    showToast('手势已开启: 手掌推开 · 捏合旋转 · 握拳收束');
-    showGestureHUD('待命', 0, '把手放进视野');
+    handCanvas.classList.toggle('show', fx.gestureHandOverlay !== false);
+    applyGestureSettingsUi();
+    showToast('Đã bật cử chỉ: điều khiển hạt + trình phát');
+    showGestureHUD('Chờ', 0, 'Đưa tay vào vùng camera');
+    return true;
   } catch (e) {
+    if (epoch !== gestureStartEpoch || !fx || fx.cam !== 'gesture') {
+      cleanupGestureControlRuntime(fx && fx.cam === 'gesture' ? 'suspended' : 'off');
+      return false;
+    }
     console.warn('Gesture failed:', e);
-    showToast('手势启动失败 (需要摄像头权限)');
-    fx.cam = 'off';
-    document.querySelectorAll('#cam-seg button').forEach(function (b) { b.classList.toggle('active', b.dataset.cam === 'off'); });
+    cleanupGestureControlRuntime('error');
+    var denied = /NotAllowed|Permission|permission|GESTURE_CAMERA/i.test(String(e && (e.name + ' ' + e.message) || e || ''));
+    showToast(denied ? 'Chưa cấp quyền camera. Hãy cho phép ứng dụng desktop truy cập camera trong Windows' : 'Không thể bật cử chỉ. Hãy kiểm tra camera có đang bị ứng dụng khác sử dụng không');
+    persistGestureCameraDisabled(e && (e.message || e.name) || e || 'startup-failed');
+    return false;
   }
 }
 
-function stopGestureControl() {
-  if (!gestureActive) return;
+function cleanupGestureControlRuntime(nextState) {
   try { if (gestureCamera && gestureCamera.stop) gestureCamera.stop(); } catch (e) { }
   try { if (gestureVideo && gestureVideo.srcObject) gestureVideo.srcObject.getTracks().forEach(function (t) { t.stop(); }); } catch (e) { }
+  try { if (gestureHands && gestureHands.close) gestureHands.close(); } catch (e) { }
   try { if (gestureVideo) gestureVideo.remove(); } catch (e) { }
   gestureVideo = null; gestureHands = null; gestureCamera = null;
   gestureActive = false;
+  gestureInferenceBusy = false;
+  gestureLastInferenceAt = 0;
+  gestureLastInferenceErrorAt = 0;
+  gestureInferenceErrorCount = 0;
   pinchState.active = false;
   handLmSmooth = null;
   uniforms.uHandActive.value = 0;
@@ -54215,16 +54985,26 @@ function stopGestureControl() {
   gestureGrip.value = 0;
   gestureGrip.target = 0;
   gestureGrip.openness = 1;
+  resetGesturePlayerActionState(false);
   document.getElementById('gesture-hud').classList.remove('show');
   if (handCanvas) {
     handCanvas.classList.remove('show');
     if (handCanvasCtx) handCanvasCtx.clearRect(0, 0, handCanvas.width, handCanvas.height);
   }
+  setGestureLifecycleState(nextState || 'off');
+}
+
+function stopGestureControl() {
+  gestureStartEpoch++;
+  gestureStartPromise = null;
+  if (!gestureActive && !gestureVideo && !gestureCamera && !gestureHands) return;
+  cleanupGestureControlRuntime('off');
 }
 
 function resizeHandCanvas() {
   if (!handCanvas) return;
-  var dpr = Math.min(devicePixelRatio || 1, 2);
+  var eco = fx && fx.performanceQuality === 'eco';
+  var dpr = eco ? 1 : Math.min(devicePixelRatio || 1, 2);
   handCanvas.width = innerWidth * dpr;
   handCanvas.height = innerHeight * dpr;
   handCanvas.style.width = innerWidth + 'px';
@@ -54237,12 +55017,13 @@ function onHandLost() {
   // 平滑淡出, 不立即清零 — 给一点缓冲
   if (pinchState.active) pinchState.active = false;
   gestureGrip.target = 0;
+  resetGesturePlayerActionState(true);
   uniforms.uHandActive.value *= 0.9;
   if (uniforms.uHandActive.value < 0.02) uniforms.uHandActive.value = 0;
   if (performance.now() - handLmLastSeen > 600) {
     handLmSmooth = null;
     if (handCanvasCtx) handCanvasCtx.clearRect(0, 0, innerWidth, innerHeight);
-    showGestureHUD('待命', 0, '把手放进视野');
+    showGestureHUD('Chờ', 0, 'Đưa tay vào vùng camera');
   }
 }
 
@@ -54308,6 +55089,7 @@ function processHandFrame(rawLm) {
   var pinchDist = Math.hypot(lm[8].x - lm[4].x, lm[8].y - lm[4].y);
   var isPinch = pinchDist < 0.075 && openness > 0.28;
   var isFist = !isPinch && gripTarget > 0.68;
+  var playerActionVisible = updateGesturePlayerActions(lm, palm, openness, pinchDist, isPinch, isFist, performance.now());
 
   if (isPinch && !pinchState.active) {
     unlockCenteredView();
@@ -54317,7 +55099,7 @@ function processHandFrame(rawLm) {
     pinchState.lastT = performance.now();
     particleSpin.vx = particleSpin.vy = 0;
     gestureGrip.target = Math.min(0.34, gestureGrip.target);
-    showGestureHUD('捏合拖动', 1, '移动手掌 -> 旋转封面');
+    if (!playerActionVisible) showGestureHUD('捏合拖动', 1, '移动手掌 -> 旋转封面');
   } else if (isPinch && pinchState.active) {
     unlockCenteredView();
     var dx = palm.x - pinchState.lastX;
@@ -54335,26 +55117,27 @@ function processHandFrame(rawLm) {
     pinchState.lastY = palm.y;
     pinchState.lastT = nowPinch;
     gestureGrip.target = Math.min(0.34, gestureGrip.target);
-    showGestureHUD('拖动中', 1, '松手后保留惯性');
+    if (!playerActionVisible) showGestureHUD('拖动中', 1, 'Thả tay để giữ quán tính');
   } else if (!isPinch && pinchState.active) {
     pinchState.active = false;
-    showGestureHUD('松开', 0.4, '可继续触碰或捏合');
+    if (!playerActionVisible) showGestureHUD('松开', 0.4, '可继续触碰或捏合');
   } else if (isFist) {
     if (gestureGrip.lastState !== 'fist') {
       gestureGrip.pulse = 1;
       uniforms.uBurstAmt.value = Math.max(uniforms.uBurstAmt.value, 0.26);
     }
     gestureGrip.lastState = 'fist';
-    showGestureHUD('握拳收束', Math.max(0.55, gripTarget), '粒子向中心收缩');
+    if (!playerActionVisible) showGestureHUD('握拳收束', Math.max(0.55, gripTarget), '粒子向中心收缩');
   } else {
     if (gestureGrip.lastState === 'fist' && openness > 0.58) {
       uniforms.uBurstAmt.value = Math.max(uniforms.uBurstAmt.value, 0.18);
     }
     gestureGrip.lastState = openness > 0.62 ? 'open' : 'hover';
-    showGestureHUD(openness > 0.62 ? '张开恢复' : '悬停', 0.30 + openness * 0.34, '手掌推开粒子 / 捏合旋转 / 握拳收束');
+    if (!playerActionVisible) showGestureHUD(openness > 0.62 ? '张开恢复' : '悬停', 0.30 + openness * 0.34, openness > 0.72 ? 'Vuốt trái/phải nhanh để đổi bài' : 'Đẩy hạt / chụm xoay / nắm để gom');
   }
 
-  drawHandSkeleton(lm, isPinch, openness, isFist);
+  if (fx.gestureHandOverlay !== false) drawHandSkeleton(lm, isPinch, openness, isFist);
+  else if (handCanvasCtx) handCanvasCtx.clearRect(0, 0, innerWidth, innerHeight);
 }
 
 // 画手掌骨架: 连线 + 关节圆点
@@ -54475,10 +55258,18 @@ function tickGestureRotation(dt) {
 function showGestureHUD(label, progress, detail) {
   var hud = document.getElementById('gesture-hud');
   if (!hud) return;
-  document.getElementById('gesture-label').textContent = label || '待命';
-  document.getElementById('gesture-confirm').textContent = detail || '将手放进摄像头视野';
+  var safeLabel = label || 'Chờ';
+  var safeDetail = detail || '将手放进摄像头视野';
+  var safeProgress = Math.max(0, Math.min(100, (progress || 0) * 100));
+  var signature = safeLabel + '|' + safeDetail + '|' + Math.round(safeProgress / 2);
+  var now = performance.now();
+  if (signature === gestureLastHudSignature && now - gestureLastHudAt < 100) return;
+  gestureLastHudSignature = signature;
+  gestureLastHudAt = now;
+  document.getElementById('gesture-label').textContent = safeLabel;
+  document.getElementById('gesture-confirm').textContent = safeDetail;
   var fill = document.getElementById('gesture-fill');
-  if (fill) fill.style.width = Math.max(0, Math.min(100, (progress || 0) * 100)) + '%';
+  if (fill) fill.style.width = safeProgress + '%';
   hud.classList.add('show');
 }
 function showGestureCursor() { }  // stub: 兼容旧调用
@@ -57207,6 +57998,23 @@ function applyWallpaperModeState(force) {
   normalizeDevelopmentLockedFxState();
   var payload = wallpaperPayload();
   if (typeof api.setWallpaperMode !== 'function') return Promise.resolve({ ok: false, enabled: false, error: 'WALLPAPER_DESKTOP_API_UNAVAILABLE' });
+  // Renderer bootstrap/reload must first rehydrate the native runtime state.
+  // Calling setWallpaperMode(true) unconditionally here re-enters the native
+  // Desktop Mode transition and briefly tears down/rebinds the visual surface,
+  // which is exactly the wallpaper flash seen after Ctrl+R/F5. Explicit user
+  // toggles still use the normal enable/disable path via force=true.
+  if (force !== true && typeof api.getWallpaperModeStatus === 'function') {
+    return Promise.resolve().then(function () { return api.getWallpaperModeStatus(); }).then(function (runtimeResult) {
+      var runtimeStatus = runtimeResult && runtimeResult.status ? runtimeResult.status : runtimeResult;
+      if (runtimeStatus && (runtimeStatus.enabled === true || runtimeStatus.active === true || runtimeStatus.attaching === true)) {
+        applyDesktopWallpaperRuntimeStatus(runtimeStatus);
+        return { ok: true, enabled: true, preserved: true, status: runtimeStatus, reason: 'renderer-rehydrate' };
+      }
+      return applyWallpaperModeState(true);
+    }).catch(function () {
+      return applyWallpaperModeState(true);
+    });
+  }
   var operation = ++desktopWallpaperRendererOperation;
   if (payload.enabled) {
     desktopWallpaperRuntimeState = Object.assign({}, desktopWallpaperRuntimeState, { attaching: true, enabled: true, lastError: '' });
@@ -58265,6 +59073,6 @@ requestMainLoopAnimationFrame();
 window.__shinayuuModulesLoaded = true;
 window.__shinayuuRendererBundleFinishedAt = performance.now();
 if (typeof window.__shinayuuMarkModulesLoaded === 'function') {
-  window.__shinayuuMarkModulesLoaded({ total: 100, loadFailures: [], bundled: true, durationMs: window.__shinayuuRendererBundleFinishedAt - window.__shinayuuRendererBundleStartedAt });
+  window.__shinayuuMarkModulesLoaded({ total: 101, loadFailures: [], bundled: true, durationMs: window.__shinayuuRendererBundleFinishedAt - window.__shinayuuRendererBundleStartedAt });
 }
 //# sourceURL=shinayuu-index-bundle.js

@@ -1,8 +1,8 @@
-# ShinaYuu Music 2.4.0
+# ShinaYuu Music 2.5.0
 
-## ShinaYuu 2.4.0 — AI Intelligence + Cuefield Intelligence
+## ShinaYuu 2.5.0 — AI Intelligence + Cuefield Intelligence
 
-ShinaYuu Music 2.4.0 is the Desktop evolution of the 2.3.x AI line. It keeps the existing Spotify, YouTube, YouTube Music, SoundCloud, lyrics, Discord and Castlabs playback architecture while adding two intelligence layers: a persistent user-aware AI layer and a structure-aware Cuefield transition engine selectively ported from Mineradio v2.2.0.
+ShinaYuu Music 2.5.0 is the Desktop evolution of the 2.3.x AI line. It keeps the existing Spotify, YouTube, YouTube Music, SoundCloud, lyrics, Discord and Castlabs playback architecture while adding two intelligence layers: a persistent user-aware AI layer and a structure-aware Cuefield transition engine selectively ported from Mineradio v2.2.0.
 
 ### AI Intelligence
 
@@ -14,7 +14,7 @@ ShinaYuu Music 2.4.0 is the Desktop evolution of the 2.3.x AI line. It keeps the
 
 ### Cuefield Intelligence
 
-The 2.4.0 Cuefield layer selectively integrates upstream planning concepts from Mineradio v2.2.0 / commit `9402566`:
+The 2.5.0 Cuefield layer selectively integrates upstream planning concepts from Mineradio v2.2.0 / commit `9402566`:
 
 - musical-profile compatibility scoring
 - structure maps and section candidates
@@ -25,6 +25,23 @@ The 2.4.0 Cuefield layer selectively integrates upstream planning concepts from 
 - upgraded transition execution with a legacy ShinaYuu planner fallback
 
 The integration is intentionally isolated: upstream provider/playback ownership is not copied into ShinaYuu. If the upgraded planner throws or cannot produce a safe plan, ShinaYuu falls back to its legacy planner rather than turning a transition problem into a playback failure.
+
+## Mineradio v2.2.0 compatibility layer
+
+ShinaYuu 2.5.0 incorporates the functional improvements from Mineradio v2.2.0 without replacing the ShinaYuu playback architecture. The port is split between direct ports, contract/adapter boundaries and ShinaYuu-native reimplementations where the upstream code is tightly coupled to Mineradio playback state.
+
+Included behavior:
+
+- structure-aware Cuefield and musical-profile transition planning
+- lyric-aware transition linking and bridge/rescue planning
+- built-in ShinaYuu playlist storage and paged queue hydration
+- gesture permission/lifecycle/player actions
+- single-repeat restart safety
+- Wallpaper Engine resident minimize/restore
+- Kugou resilience/retry/VIP hardening
+- visual/performance and low-spec guidance
+
+The upstream planner produces a plan; ShinaYuu remains responsible for provider resolution, playback transactions, lyrics, Discord state and UI ownership. A failed or unsafe upgraded plan falls back to the legacy ShinaYuu transition path instead of propagating a planning failure into playback.
 
 ## Playback architecture
 
@@ -57,17 +74,17 @@ SoundCloud remains a discovery/search source. ShinaYuu keeps the selected canoni
 
 ## Release identity
 
-- Desktop version: **2.4.0**
-- Build identity: **2.4.0 / 2.4.0.0**
+- Desktop version: **2.5.0**
+- Build identity: **2.5.0 / 2.5.0.0**
 - Current release line: **Desktop 2.4.x**
 - Previous release: **2.3.0 AI Intelligence + upstream Cuefield integration**
 
 ## Documentation
 
-- [`RELEASE.md`](./RELEASE.md) — 2.4.0 release overview
+- [`RELEASE.md`](./RELEASE.md) — 2.5.0 release overview
 - [`CHANGELOG.md`](./CHANGELOG.md) — release history
-- [`AI-SETUP-2.4.0.md`](./AI-SETUP-2.4.0.md) — AI provider setup
-- [`AI-LOCATION-AND-FAST-RESPONSE-2.4.0.md`](./AI-LOCATION-AND-FAST-RESPONSE-2.4.0.md) — location, weather, time and latency behavior
+- [`AI-SETUP-2.5.0.md`](./AI-SETUP-2.5.0.md) — AI provider setup
+- [`AI-LOCATION-AND-FAST-RESPONSE-2.5.0.md`](./AI-LOCATION-AND-FAST-RESPONSE-2.5.0.md) — location, weather, time and latency behavior
 - [`docs/AI-CONFIGURATION.md`](./docs/AI-CONFIGURATION.md) — persistent AI configuration
 - [`SOUNDCLOUD-2.2.0-IMPLEMENTATION.md`](./SOUNDCLOUD-2.2.0-IMPLEMENTATION.md) — historical SoundCloud implementation
 

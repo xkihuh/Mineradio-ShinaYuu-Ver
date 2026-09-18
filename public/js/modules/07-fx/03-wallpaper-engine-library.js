@@ -1670,6 +1670,22 @@ function restartWallpaperEngineAfterHostBoundsChange() {
 }
 
 function handleWallpaperEngineHostBoundsChange(payload) {
+  if (payload && payload.phase === 'resident') {
+    var residentSessionId = String(payload.sessionId || '');
+    var nativeStatus = wallpaperEngineRuntimeState || {};
+    if (!wallpaperEngineSelected || !wallpaperEngineSelected.active || residentSessionId !== String(nativeStatus.sessionId || '') || String(nativeStatus.captureMode || '') !== 'dwm-thumbnail') return;
+    wallpaperEngineHostBoundsPreparing = false;
+    wallpaperEngineDesktopPreviewActive = false;
+    wallpaperEngineDesktopPreviewUsesAsset = false;
+    applyWallpaperEngineVisualSettings(true);
+    clearWallpaperEngineFreezeFrame(false);
+    if (!wallpaperEngineGlassCaptureStream || !wallpaperEngineGlassCaptureStream.getVideoTracks || !wallpaperEngineGlassCaptureStream.getVideoTracks().some(function (track) { return track.readyState === 'live'; })) {
+      scheduleWallpaperEngineGlassSamplerCapture(residentSessionId, wallpaperEngineLayerToken, 0);
+    }
+    updateWallpaperEngineEntryUi();
+    return;
+  }
+
   var phase = String(payload && payload.phase || 'restart');
   if (phase === 'restart') {
     if (!wallpaperEngineHostBoundsPreparing && !wallpaperEngineDesktopPreviewActive) return;

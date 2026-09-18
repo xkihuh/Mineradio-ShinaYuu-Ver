@@ -562,7 +562,7 @@ function rebuildUserPlaylistsFromCatalog(opts) {
   opts = opts || {};
   youtubePlaylists = validPlaylistCatalogRows(youtubePlaylists, 'youtube');
   spotifyPlaylists = validPlaylistCatalogRows(spotifyPlaylists, 'spotify');
-  userPlaylists = youtubePlaylists.concat(spotifyPlaylists);
+  userPlaylists = (typeof builtInPlaylists !== 'undefined' ? builtInPlaylists : []).concat(youtubePlaylists, spotifyPlaylists);
   if (typeof applyUserPlaylistOrder === 'function') applyUserPlaylistOrder();
   playlistCatalogRevision += 1;
   renderUserPlaylistsList({ animate: !!opts.animate, reset: !!opts.reset, preserveScroll: opts.preserveScroll !== false });
@@ -658,8 +658,13 @@ function requestNextPlaylistCatalogPage(reason) {
   return true;
 }
 async function refreshUserPlaylists(force) {
+  if (typeof refreshBuiltInPlaylists === 'function') await refreshBuiltInPlaylists(!!force);
   if (!youtubeLoginStatus.loggedIn && !spotifyLoginStatus.loggedIn) {
     resetPlaylistPanelRenderLimit();
+    if (Array.isArray(builtInPlaylists) && builtInPlaylists.length) {
+      rebuildUserPlaylistsFromCatalog({ animate: false, reset: true, preserveScroll: true, reason: 'built-in-only-playlists' });
+      return;
+    }
     document.getElementById('pl-list').innerHTML = '<div class="playlist-empty-state">Kết nối YouTube Music hoặc Spotify để hiển thị playlist của bạn.</div>';
     return;
   }

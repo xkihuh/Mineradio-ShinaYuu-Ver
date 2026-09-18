@@ -192,6 +192,9 @@ var fxDefaults = {
   memorySafetyRevision: 3,
   liveBackgroundKeep: true,
   cam: 'off',
+  gesturePlayerActions: true,
+  gestureHandOverlay: true,
+  gestureSensitivity: 'balanced',
 };
 function normalizeForegroundFpsMode(value) {
   var mode = String(value || '').trim().toLowerCase();

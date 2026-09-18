@@ -14,7 +14,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 
-const UA = 'ShinaYuu Music/2.4.0';
+const UA = 'ShinaYuu Music/2.5.0';
 const YTDLP_WINDOWS_URL = 'https://github.com/yt-dlp/yt-dlp-master-builds/releases/latest/download/yt-dlp.exe';
 const YTDLP_MIN_DATE = 20260818;
 const CONFIG_FILE = process.env.SHINAYUU_PROVIDER_CONFIG || process.env.MINERADIO_PROVIDER_CONFIG || path.join(__dirname, 'config', 'providers.json');

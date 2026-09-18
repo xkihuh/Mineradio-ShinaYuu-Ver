@@ -21,6 +21,13 @@ const DEFAULTS = Object.freeze({
   webSearch: false,
   toolCalling: true,
   memory: true,
+  adaptiveMemory: true,
+  conversationMemory: true,
+  preferenceReranking: true,
+  smartNext: true,
+  agentPlanning: true,
+  agentVerification: true,
+  agentMaxToolRounds: 8,
   cache: true,
   failover: true,
   timeoutMs: 25000,
@@ -77,6 +84,13 @@ function fromEnvironment() {
     webSearch: ['SHINAYUU_AI_WEB_SEARCH'],
     toolCalling: ['SHINAYUU_AI_TOOL_CALLING'],
     memory: ['SHINAYUU_AI_MEMORY'],
+    adaptiveMemory: ['SHINAYUU_AI_ADAPTIVE_MEMORY'],
+    conversationMemory: ['SHINAYUU_AI_CONVERSATION_MEMORY'],
+    preferenceReranking: ['SHINAYUU_AI_PREFERENCE_RERANKING'],
+    smartNext: ['SHINAYUU_AI_SMART_NEXT'],
+    agentPlanning: ['SHINAYUU_AI_AGENT_PLANNING'],
+    agentVerification: ['SHINAYUU_AI_AGENT_VERIFICATION'],
+    agentMaxToolRounds: ['SHINAYUU_AI_AGENT_MAX_TOOL_ROUNDS'],
     cache: ['SHINAYUU_AI_CACHE'],
     failover: ['SHINAYUU_AI_FAILOVER'],
     timeoutMs: ['SHINAYUU_AI_TIMEOUT_MS']
@@ -129,6 +143,13 @@ function loadAiConfig(dataDir) {
   merged.webSearch = toBool(merged.webSearch, DEFAULTS.webSearch);
   merged.toolCalling = toBool(merged.toolCalling, DEFAULTS.toolCalling);
   merged.memory = toBool(merged.memory, DEFAULTS.memory);
+  merged.adaptiveMemory = toBool(merged.adaptiveMemory, DEFAULTS.adaptiveMemory);
+  merged.conversationMemory = toBool(merged.conversationMemory, DEFAULTS.conversationMemory);
+  merged.preferenceReranking = toBool(merged.preferenceReranking, DEFAULTS.preferenceReranking);
+  merged.smartNext = toBool(merged.smartNext, DEFAULTS.smartNext);
+  merged.agentPlanning = toBool(merged.agentPlanning, DEFAULTS.agentPlanning);
+  merged.agentVerification = toBool(merged.agentVerification, DEFAULTS.agentVerification);
+  merged.agentMaxToolRounds = Math.max(4, Math.min(10, Number(merged.agentMaxToolRounds) || DEFAULTS.agentMaxToolRounds));
   merged.cache = toBool(merged.cache, DEFAULTS.cache);
   merged.failover = toBool(merged.failover, DEFAULTS.failover);
   merged.enabled = toBool(merged.enabled, DEFAULTS.enabled);

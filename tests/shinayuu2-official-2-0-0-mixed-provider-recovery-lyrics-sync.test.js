@@ -18,14 +18,17 @@ test('Spotify mixed-queue playback normalizes nested items and retries from the 
   assert.match(player, /return playSpotifyQueueAt\(idx, Object\.assign\(\{\}, opts, \{ spotifyRecoveryAttempt: 1, spotifyPrepared: null \}\)\)/);
 });
 
-test('AutoMix skips a failed Spotify target and keeps later queue items playable', () => {
+test('AutoMix never skips the immediate queue successor and preserves later recovery', () => {
   const mix = read('public/js/modules/05-playback/18-cuefield-automix-integration.js');
   assert.match(mix, /function markTrackFailure\(song, durationMs\)/);
-  assert.match(mix, /state\.failureCooldown\[trackFailureKey\(song\)\] > Date\.now\(\)/);
+  assert.match(mix, /AutoMix owns transition styling\/timing only/);
+  assert.match(mix, /var immediate = \(index \+ 1 \+ total\) % total;/);
+  assert.match(mix, /if \(immediateSong && !isPodcast\(immediateSong\)\) return immediate;/);
   assert.match(mix, /function crossfadeHtmlToSpotify\(pending, executionSerial\)/);
   assert.match(mix, /keepOutgoingMedia: true/);
   assert.match(mix, /throwOnPlaybackFailure: true/);
-  assert.match(mix, /var fallbackIndex = nextIndex\(Number\(window\.currentIdx\)\)/);
+  assert.ok(mix.includes('var executeFloor = safeMixTriggerAt('));
+  assert.ok(mix.includes('if (!(knownDuration > 0)) return;'));
 });
 
 test('Spotify playback no longer disables queue lyric prefetch', () => {

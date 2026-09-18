@@ -1316,41 +1316,51 @@ function renderCollectModal() {
   var cover = songCoverSrc(song, 80);
   current.innerHTML = (cover ? '<img src="' + cover + '" alt="">' : '<div class="cover-placeholder"></div>') +
     '<div style="min-width:0"><div class="collect-title">' + escHtml(song.name || 'Bài hiện tại') + '</div><div class="collect-sub">' + escHtml(song.artist || '') + '</div></div>';
-  var provider = songAccountProvider(song);
-  var adapter = songAccountAdapter(provider);
-  if (!adapter || !adapter.collect) {
-    list.innerHTML = '<div class="collect-empty">' + escHtml(songAccountUnsupportedMessage(provider, 'collect')) + '</div>';
-    return;
-  }
-  if (!isSongAccountLoggedIn(provider)) {
-    list.innerHTML = '<div class="collect-empty">Đăng nhập' + escHtml(adapter.label) + ' để hiển thị playlist của bạn</div>';
-    return;
-  }
-  if (!userPlaylists.length) {
-    list.innerHTML = miniQueueSkeleton();
-    return;
-  }
-  var mine = userPlaylists.filter(function (pl) {
-    return playlistAccountProvider(pl) === provider && !pl.subscribed && !pl.virtual;
-  });
-  if (!mine.length) {
-    list.innerHTML = '<div class="collect-empty">Chưa có playlist có thể ghi; hãy tạo một playlist trước</div>';
-    return;
-  }
-  list.innerHTML = mine.map(function (pl) {
+  var builtIn = Array.isArray(builtInPlaylists) ? builtInPlaylists.filter(function (pl) { return pl && !pl.subscribed && !pl.virtual; }) : [];
+  var builtInHtml = builtIn.length ? '<div class="collect-section-label">Playlist ShinaYuu</div>' + builtIn.map(function (pl) {
     var thumb = pl.cover ? coverUrlWithSize(pl.cover, 80) : '';
-    return '<div class="collect-item" data-collect-pid="' + escHtml(String(pl.id || '')) + '" onclick="addCollectTargetToPlaylist(this.getAttribute(\'data-collect-pid\'))">' +
+    return '<div class="collect-item" data-collect-provider="shinayuu" data-collect-pid="' + escHtml(String(pl.id || '')) + '" onclick="addCollectTargetToPlaylist(this.getAttribute(\'data-collect-pid\'), \'shinayuu\')">' +
       (thumb ? '<img src="' + thumb + '" alt="">' : '<div class="cover-placeholder"></div>') +
       '<div style="min-width:0"><div class="collect-title">' + escHtml(pl.name || '') + '</div><div class="collect-sub">' + (pl.trackCount || 0) + ' bài</div></div>' +
       '</div>';
-  }).join('');
+  }).join('') : '';
+
+  var provider = songAccountProvider(song);
+  var adapter = songAccountAdapter(provider);
+  var providerHtml = '';
+  var providerMessage = '';
+  if (!adapter || !adapter.collect) {
+    providerMessage = songAccountUnsupportedMessage(provider, 'collect');
+  } else if (!isSongAccountLoggedIn(provider)) {
+    providerMessage = 'Đăng nhập ' + adapter.label + ' để hiển thị playlist của bạn';
+  } else {
+    var mine = userPlaylists.filter(function (pl) {
+      return playlistAccountProvider(pl) === provider && !pl.subscribed && !pl.virtual;
+    });
+    providerHtml = mine.map(function (pl) {
+      var thumb = pl.cover ? coverUrlWithSize(pl.cover, 80) : '';
+      return '<div class="collect-item" data-collect-provider="' + escHtml(provider) + '" data-collect-pid="' + escHtml(String(pl.id || '')) + '" onclick="addCollectTargetToPlaylist(this.getAttribute(\'data-collect-pid\'), this.getAttribute(\'data-collect-provider\'))">' +
+        (thumb ? '<img src="' + thumb + '" alt="">' : '<div class="cover-placeholder"></div>') +
+        '<div style="min-width:0"><div class="collect-title">' + escHtml(pl.name || '') + '</div><div class="collect-sub">' + (pl.trackCount || 0) + ' bài</div></div>' +
+        '</div>';
+    }).join('');
+    if (!mine.length) providerMessage = 'Chưa có playlist ' + adapter.label + ' có thể ghi; hãy tạo một playlist trước';
+  }
+
+  if (!builtIn.length && !providerHtml) {
+    list.innerHTML = '<div class="collect-empty">' + escHtml(providerMessage || 'Chưa có playlist có thể ghi; hãy tạo một playlist trước') + '</div>';
+    return;
+  }
+  list.innerHTML = builtInHtml + (providerHtml ? '<div class="collect-section-label">' + escHtml(adapter.label) + '</div>' + providerHtml : (providerMessage ? '<div class="collect-provider-note">' + escHtml(providerMessage) + '</div>' : ''));
   if (window.gsap) animateListItems(list, '.collect-item', { x: 0, y: 6, stagger: 0.012, duration: 0.18, limit: 18 });
 }
-function setCollectBusyPid(pid, busy) {
+function setCollectBusyPid(pid, busy, provider) {
   var list = document.getElementById('collect-list');
   if (!list) return;
   list.querySelectorAll('.collect-item').forEach(function (item) {
-    item.classList.toggle('busy', !!busy && item.getAttribute('data-collect-pid') === String(pid));
+    var sameId = item.getAttribute('data-collect-pid') === String(pid);
+    var sameProvider = !provider || item.getAttribute('data-collect-provider') === String(provider);
+    item.classList.toggle('busy', !!busy && sameId && sameProvider);
   });
 }
 async function createPlaylistFromCollect() {
@@ -1430,10 +1440,28 @@ async function verifySongInPlaylist(pid, song) {
   }
   return false;
 }
-async function addCollectTargetToPlaylist(pid) {
+async function addCollectTargetToPlaylist(pid, targetProvider) {
   if (collectBusy || !collectTargetSong || !pid) return;
   var targetSong = collectTargetSong;
-  var provider = songAccountProvider(targetSong);
+  var provider = targetProvider || songAccountProvider(targetSong);
+  if (provider === 'shinayuu') {
+    collectBusy = true;
+    setCollectBusyPid(pid, true, 'shinayuu');
+    try {
+      var added = await addTrackToBuiltInPlaylist(pid, targetSong, { silentSuccess: true });
+      if (!added) throw new Error('BUILT_IN_PLAYLIST_ADD_FAILED');
+      showToast(added === 'duplicate' ? 'Bài hát đã có trong playlist ShinaYuu' : 'Đã thêm vào playlist ShinaYuu');
+      closeCollectModal();
+      await refreshUserPlaylists(true);
+    } catch (err) {
+      showToast('Thêm vào playlist ShinaYuu thất bại');
+    } finally {
+      collectBusy = false;
+      setCollectBusyPid(pid, false, 'shinayuu');
+      updateLikeButtons();
+    }
+    return;
+  }
   var adapter = songAccountAdapter(provider);
   if (!adapter || !adapter.collect || !adapter.playlistAddUrl) {
     showToast(songAccountUnsupportedMessage(provider, 'collect'));
@@ -1441,7 +1469,7 @@ async function addCollectTargetToPlaylist(pid) {
   }
   if (!ensureLoggedInForAction(provider)) return;
   collectBusy = true;
-  setCollectBusyPid(pid, true);
+  setCollectBusyPid(pid, true, provider);
   updateLikeButtons();
   showToast('Đang thêm vào playlist...');
   try {
@@ -1465,7 +1493,7 @@ async function addCollectTargetToPlaylist(pid) {
     showToast(err && err.message ? err.message : 'Thêm vào playlist thất bại');
   } finally {
     collectBusy = false;
-    setCollectBusyPid(pid, false);
+    setCollectBusyPid(pid, false, provider);
     updateLikeButtons();
   }
 }

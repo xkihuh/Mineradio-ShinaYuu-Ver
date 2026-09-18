@@ -394,6 +394,15 @@ function makeShelfManager() {
       console.warn('[ShelfCatalogAdapter]', error);
       nextItems = allItems && allItems.length ? allItems.slice() : [];
     }
+    var nextSig = sig(nextItems);
+    // Provider/search/bootstrap callbacks can arrive several times while the
+    // shelf is still empty. Rebuilding the single "empty shelf" card on every
+    // callback tears down its GPU objects and recreates the same card, which
+    // looks like the playlist shelf is flashing/reloading. Keep the existing
+    // render tree when the logical shelf content has not changed.
+    if (nextSig === lastSig && Array.isArray(allItems) && allItems.length === nextItems.length) {
+      return;
+    }
     disposeRenderedCards();
     if (connectorParticles) {
       if (connectorParticles.parent) connectorParticles.parent.remove(connectorParticles);
@@ -408,7 +417,7 @@ function makeShelfManager() {
       floorMirror = null;
     }
     allItems = Array.isArray(nextItems) ? nextItems : [];
-    lastSig = sig(allItems);
+    lastSig = nextSig;
     if (allItems.length && mode !== 'off') shelfVisibility = Math.max(Number(shelfVisibility) || 0, 0.36);
     lastCardRedrawAt = -10;
     lastCardPulseBucket = -1;

@@ -33,4 +33,4 @@ emily 作为 Mineradio 早期视觉底层想法与 `emily` 视觉预设改进方
 
 ## Cuefield upstream integration
 
-ShinaYuu Music 2.4.0 incorporates selected Cuefield planning and diagnostics code derived from the open-source Mineradio v2.2.0 release by XxHuberrr (commit `9402566`). Upstream reference: https://github.com/XxHuberrr/Mineradio/releases/tag/v2.2.0 . The integration remains under the applicable project license and is isolated from ShinaYuu's provider/playback ownership architecture.
+ShinaYuu Music 2.5.0 incorporates selected Cuefield planning and diagnostics code derived from the open-source Mineradio v2.2.0 release by XxHuberrr (commit `9402566`). Upstream reference: https://github.com/XxHuberrr/Mineradio/releases/tag/v2.2.0 . The integration remains under the applicable project license and is isolated from ShinaYuu's provider/playback ownership architecture.

@@ -1,6 +1,8 @@
 // Playlist queue loader for YouTube Music and Spotify.
 function playlistQueueSource(id) {
   var raw = String(id || '');
+  if (raw.indexOf('shinayuu:') === 0) return { provider: 'shinayuu', id: raw.slice(9), requestId: raw };
+  if (raw.indexOf('mineradio:') === 0) return { provider: 'shinayuu', id: raw.slice(10), requestId: 'shinayuu:' + raw.slice(10) };
   if (raw.indexOf('spotify:') === 0) return { provider: 'spotify', id: raw.slice(8), requestId: raw };
   if (raw.indexOf('netease:') === 0) return { provider: 'spotify', id: raw.slice(8), requestId: 'spotify:' + raw.slice(8) };
   if (raw.indexOf('youtube:') === 0) return { provider: 'youtube', id: raw.slice(8), requestId: raw };
@@ -9,6 +11,7 @@ function playlistQueueSource(id) {
 }
 function playlistQueuePageSize(provider, initial) {
   if (provider === 'spotify') return initial ? 96 : 100;
+  if (provider === 'shinayuu') return initial ? 96 : 160;
   return initial ? PLAYLIST_QUEUE_INITIAL_BATCH_SIZE : PLAYLIST_QUEUE_BACKGROUND_BATCH_SIZE;
 }
 function playlistQueuePageUrl(source, offset, limit) {
@@ -50,7 +53,10 @@ async function hydratePlaylistQueueNextPage(reason) {
   var limit = playlistQueuePageSize(state.provider, false);
   state.loading = true;
   state.pausedForBuffer = false;
-  state.promise = apiJson(playlistQueuePageUrl(source, offset, limit), { timeoutMs: 16000 }).then(function (r) {
+  var pageRequest = state.provider === 'shinayuu' && typeof builtInPlaylistTracksPage === 'function'
+    ? builtInPlaylistTracksPage(source.id, { offset: offset, limit: limit })
+    : apiJson(playlistQueuePageUrl(source, offset, limit), { timeoutMs: 16000 });
+  state.promise = Promise.resolve(pageRequest).then(function (r) {
     if (!playlistQueueHydrationValid(state, token)) return false;
     var rawTracks = r && r.tracks || [];
     if (r && r.error && !rawTracks.length) throw new Error(r.message || r.error);
@@ -138,7 +144,9 @@ async function loadPlaylistIntoQueueById(id, autoplay, title, opts) {
   var seedTracks = Array.isArray(opts.seedTracks) && opts.seedTracks.length ? opts.seedTracks.map(cloneSong) : [];
   try {
     if (!seedTracks.length) {
-      r = await apiJson(playlistQueuePageUrl(source, 0, playlistQueuePageSize(source.provider, true)), { timeoutMs: 16000 });
+      r = source.provider === 'shinayuu' && typeof builtInPlaylistTracksPage === 'function'
+        ? await builtInPlaylistTracksPage(source.id, { offset: 0, limit: playlistQueuePageSize(source.provider, true) })
+        : await apiJson(playlistQueuePageUrl(source, 0, playlistQueuePageSize(source.provider, true)), { timeoutMs: 16000 });
       if (
         playlistPlaybackOpts
         && typeof playbackSelectionIntentIsActive === 'function'

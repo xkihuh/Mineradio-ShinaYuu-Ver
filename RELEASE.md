@@ -1,8 +1,8 @@
-# ShinaYuu Music 2.4.0 — AI + Cuefield Intelligence Release
+# ShinaYuu Music 2.5.0 — AI + Cuefield Intelligence Release
 
 ## Overview
 
-ShinaYuu Music 2.4.0 is a controlled evolution of the 2.3.x AI line. It preserves the existing provider and playback ownership architecture while combining AI user intelligence with the selectively ported Cuefield transition-planning layer derived from Mineradio v2.2.0.
+ShinaYuu Music 2.5.0 is a controlled evolution of the 2.3.x AI line. It preserves the existing provider and playback ownership architecture while combining AI user intelligence with the selectively ported Cuefield transition-planning layer derived from Mineradio v2.2.0.
 
 ## AI Intelligence
 
@@ -11,6 +11,20 @@ ShinaYuu Music 2.4.0 is a controlled evolution of the 2.3.x AI line. It preserve
 - Runtime context for local date/time, timezone, locality and current weather using one location/time context.
 - Smart Search, Smart Playlist, Smart Queue, natural-language controls and provider failover remain isolated from the playback critical path.
 - Deterministic fast-path handling keeps routine player commands responsive.
+
+## Mineradio 2.2.0-derived reliability updates
+
+The release also carries the compatible behavior changes from the upstream Mineradio v2.2.0 release:
+
+- persistent built-in playlist library
+- safer gesture camera permission and runtime lifecycle
+- gesture player actions and sensitivity/overlay controls
+- single-repeat restart without unnecessary source reconstruction
+- Wallpaper Engine resident minimize/restore behavior
+- Kugou official web playback retry and VIP hardening
+- visual/performance controls and low-spec guidance
+
+These updates are integrated into ShinaYuu-native services and playback ownership. The upstream playback bridge is not copied as a replacement for ShinaYuu's provider engine.
 
 ## Cuefield Intelligence
 
@@ -32,8 +46,8 @@ A Cuefield planning failure must not become a playback failure. The upgraded pla
 
 ## Release identity
 
-- Desktop version: **2.4.0**
-- Build identity: **2.4.0 / 2.4.0.0**
+- Desktop version: **2.5.0**
+- Build identity: **2.5.0 / 2.5.0.0**
 - Previous release: **2.3.0**
 
 ## Historical documentation

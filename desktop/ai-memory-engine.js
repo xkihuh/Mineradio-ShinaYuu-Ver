@@ -1,4 +1,4 @@
-/* ShinaYuu AI Memory Engine v2 — privacy-aware behavioral music memory */
+/* ShinaYuu AI Memory Engine v3 — privacy-aware behavioral + conversational music memory */
 'use strict';
 
 const fs = require('fs');
@@ -6,6 +6,7 @@ const path = require('path');
 
 const MAX_ITEMS = 80;
 const MAX_HISTORY = 250;
+const MAX_CONVERSATION_TURNS = 18;
 const DAY_NAMES = ['sun','mon','tue','wed','thu','fri','sat'];
 
 function clean(v, max = 180) { return String(v == null ? '' : v).trim().slice(0, max); }
@@ -24,7 +25,7 @@ function titleCaseSignal(text) {
 function createMemoryEngine(dataDir) {
   const file = path.join(dataDir, 'ai-memory.json');
   const state = {
-    version: 2,
+    version: 3,
     updatedAt: 0,
     explicitPreferences: {},
     profile: {
@@ -49,18 +50,22 @@ function createMemoryEngine(dataDir) {
       referenceTracks: {},
       lastTrack: null,
       recentTracks: [],
-      recentQueries: []
+      recentQueries: [],
+      recentConversations: []
     }
   };
   try {
     fs.mkdirSync(dataDir, { recursive: true });
     const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
     if (saved && typeof saved === 'object') {
-      state.version = Number(saved.version || 2);
+      state.version = Math.max(3, Number(saved.version || 3));
       state.updatedAt = Number(saved.updatedAt || 0);
       if (saved.musicPreferences && typeof saved.musicPreferences === 'object' && (!saved.explicitPreferences || !Object.keys(saved.explicitPreferences).length)) { for (const [k,v] of Object.entries(saved.musicPreferences)) { const values = Array.isArray(v) ? v : [v]; if (values.length) state.explicitPreferences[k] = { value: clean(values[values.length-1], 240), updatedAt: Number(saved.updatedAt||0) }; } }
       if (saved.explicitPreferences && typeof saved.explicitPreferences === 'object') state.explicitPreferences = saved.explicitPreferences;
-      if (saved.profile && typeof saved.profile === 'object') Object.assign(state.profile, saved.profile);
+      if (saved.profile && typeof saved.profile === 'object') {
+        Object.assign(state.profile, saved.profile);
+        if (!Array.isArray(state.profile.recentConversations)) state.profile.recentConversations = [];
+      }
     }
   } catch (_) {}
 
@@ -122,14 +127,53 @@ function createMemoryEngine(dataDir) {
     addRecent(state.profile.recentTracks, state.profile.lastTrack, 60);
   }
 
+  function recordConversation(role, content) {
+    const r = /^(user|assistant|tool|system)$/i.test(String(role || '')) ? String(role).toLowerCase() : 'user';
+    const text = clean(content, 700);
+    if (!text) return { ok: false, reason: 'empty' };
+    addRecent(state.profile.recentConversations, { role: r, content: text, at: new Date().toISOString() }, MAX_CONVERSATION_TURNS);
+    persist();
+    return { ok: true };
+  }
+
   function record(event = {}) {
     const type = clean(event.type || '', 60).toLowerCase();
     const track = event.track && typeof event.track === 'object' ? event.track : {};
     const at = Number.isFinite(Number(event.at)) ? Number(event.at) : Date.now();
     const dt = new Date(at);
     if (type === 'play_start') inferTrackProfile(track, { at });
-    else if (type === 'play_complete') state.profile.completed += 1;
-    else if (type === 'skip') state.profile.skipped += 1;
+    else if (type === 'play_complete') {
+      state.profile.completed += 1;
+      const artist = titleCaseSignal(track.artist || track.artists || '');
+      if (artist) bump(state.profile.preferredSignals, `artist:${artist}`, 0.5);
+      const features = track && typeof track === 'object' ? track : {};
+      const tags = Array.isArray(features.styleTags) ? features.styleTags : [];
+      tags.slice(0, 8).forEach(tag => bump(state.profile.preferredSignals, `style:${tag}`, 0.35));
+      if (features.mood) bump(state.profile.preferredSignals, `mood:${features.mood}`, 0.35);
+      if (features.version) bump(state.profile.preferredSignals, `version:${features.version}`, 0.25);
+    }
+    else if (type === 'skip') {
+      state.profile.skipped += 1;
+      const artist = titleCaseSignal(track.artist || track.artists || '');
+      if (artist) bump(state.profile.dislikedSignals, `artist:${artist}`, 0.75);
+      const features = track && typeof track === 'object' ? track : {};
+      const tags = Array.isArray(features.styleTags) ? features.styleTags : [];
+      tags.slice(0, 8).forEach(tag => bump(state.profile.dislikedSignals, `style:${tag}`, 0.5));
+      if (features.mood) bump(state.profile.dislikedSignals, `mood:${features.mood}`, 0.5);
+      if (features.version) bump(state.profile.dislikedSignals, `version:${features.version}`, 0.4);
+    }
+    else if (type === 'like' || type === 'dislike' || type === 'rate_current_track') {
+      const liked = type === 'like' || String(event.rating || '').toLowerCase() === 'like';
+      const artist = titleCaseSignal(track.artist || track.artists || '');
+      const bucket = liked ? state.profile.preferredSignals : state.profile.dislikedSignals;
+      const amount = liked ? 1.5 : 1.5;
+      if (artist) bump(bucket, `artist:${artist}`, amount);
+      const features = track && typeof track === 'object' ? track : {};
+      const tags = Array.isArray(features.styleTags) ? features.styleTags : [];
+      tags.slice(0, 10).forEach(tag => bump(bucket, `style:${tag}`, liked ? 0.9 : 0.9));
+      if (features.mood) bump(bucket, `mood:${features.mood}`, liked ? 0.9 : 0.9);
+      if (features.version) bump(bucket, `version:${features.version}`, liked ? 0.6 : 0.6);
+    }
     else if (type === 'search') {
       state.profile.searches += 1;
       const q = clean(event.query || '', 220);
@@ -203,6 +247,7 @@ function createMemoryEngine(dataDir) {
         preferredSignals: topEntries(p.preferredSignals, 10),
         dislikedSignals: topEntries(p.dislikedSignals, 10),
         referenceArtists: topEntries(p.referenceArtists, 12),
+        recentConversations: Array.isArray(p.recentConversations) ? p.recentConversations.slice(-MAX_CONVERSATION_TURNS) : [],
         lastTrack: p.lastTrack
       }
     };
@@ -223,7 +268,11 @@ function createMemoryEngine(dataDir) {
     return lines.join('\n');
   }
 
-  return { record, remember, snapshot, promptProfile, file };
+  function conversationPrompt() {
+    return (state.profile.recentConversations || []).slice(-10).map(turn => `${turn.role}: ${turn.content}`).join('\n');
+  }
+
+  return { record, remember, snapshot, promptProfile, conversationPrompt, recordConversation, file };
 }
 
 module.exports = { createMemoryEngine };

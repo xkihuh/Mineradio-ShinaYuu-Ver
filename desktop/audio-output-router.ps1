@@ -181,6 +181,7 @@ namespace ShinaYuu.AudioRouting {
       }
       int changed = 0;
       foreach (var pid in processIds) {
+        if (pid <= 0) continue;
         foreach (Role role in new[] { Role.Console, Role.Multimedia, Role.Communications }) {
           IntPtr ptr = IntPtr.Zero;
           try {
@@ -189,6 +190,12 @@ namespace ShinaYuu.AudioRouting {
             }
             uint hr = factory.SetPersistedDefaultAudioEndpoint(pid, DataFlow.Render, role, ptr);
             if (hr == 0) changed++;
+          } catch (ArgumentException) {
+            // Windows returns E_INVALIDARG for a process that vanished between
+            // process-tree enumeration and routing. Ignore that PID; do not
+            // turn an optional audio-output preference into a player error.
+          } catch (COMException) {
+            // Same rule for a transient COM endpoint race.
           } finally { if (ptr != IntPtr.Zero) { try { Combase.WindowsDeleteString(ptr); } catch { } } }
         }
       }

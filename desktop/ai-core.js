@@ -1,4 +1,4 @@
-/* ShinaYuu AI Core v0.5 — 2.4.0 intelligence layer */
+/* ShinaYuu AI Core 4.1 — 2.5.0 Personal Music Agent */
 'use strict';
 
 const fs = require('fs');
@@ -7,10 +7,11 @@ const path = require('path');
 const crypto = require('crypto');
 const { loadAiConfig, ensureUserConfig } = require('./ai-config');
 const { createMemoryEngine } = require('./ai-memory-engine');
+const { AGENT_VERSION, buildPlan, verifyToolResult, verifyFinalAction, critiqueRecommendation } = require('./ai-agent');
 const http = require('http');
 const https = require('https');
 
-const AI_VERSION = '2.0.0';
+const AI_VERSION = '4.1.0';
 const DEFAULT_MODEL = 'gpt-5.6';
 const PREMIUM_OPENAI_MODEL = 'gpt-6-astra';
 const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
@@ -155,8 +156,12 @@ const REFERENCE_STYLES = {
   'alan walker': ['melodic electronic', 'vocal electronic', 'electro house', 'atmospheric', 'cinematic']
 };
 function parseMusicIntent(query) {
-  const raw = safeText(query, 240); const q = raw.toLowerCase();
-  let expanded = raw; const features = { broadElectronic:false, references:[], moods:[], energy:null, styleTerms:[] };
+  const raw = safeText(query, 300); const q = raw.toLowerCase();
+  let expanded = raw;
+  const features = {
+    broadElectronic:false, references:[], moods:[], energy:null, styleTerms:[],
+    languages:[], versions:[], avoid:[], instrumental:null, vocal:null
+  };
   if (/\bedm\b|nhạc điện tử|nhạc remix/i.test(q)) {
     features.broadElectronic = true;
     features.styleTerms.push('electronic', 'melodic', 'dance', 'vocal');
@@ -168,28 +173,108 @@ function parseMusicIntent(query) {
       const terms = REFERENCE_STYLES[ref]; features.styleTerms.push(...terms); expanded += ' ' + terms.join(' ');
     }
   }
-  if (/chill|êm|nhẹ|thư giãn/i.test(q)) { features.energy='low'; features.moods.push('chill','soft','atmospheric'); expanded += ' chill atmospheric'; }
-  if (/buồn|tâm trạng|melanchol/i.test(q)) { features.moods.push('sad','emotional','melancholic'); expanded += ' emotional melancholic'; }
-  if (/quẩy|cháy|máu|bùng nổ|high energy/i.test(q)) { features.energy='high'; expanded += ' high energy dance'; }
-  if (/bay|mơ|mộng|phiêu/i.test(q)) { features.moods.push('dreamy','uplifting','atmospheric'); expanded += ' dreamy atmospheric'; }
-  return { original:raw, expanded:safeText(Array.from(new Set(expanded.split(/\s+/))).join(' '), 420), features };
+  const languageMap = [
+    [/j-?pop|japanese|nhạc nhật|anime/i, 'Japanese'],
+    [/k-?pop|korean|nhạc hàn/i, 'Korean'],
+    [/v-?pop|vietnamese|nhạc việt/i, 'Vietnamese'],
+    [/c-?pop|chinese|mandarin|nhạc trung/i, 'Chinese'],
+    [/english|nhạc âu mỹ|us-uk/i, 'English']
+  ];
+  for (const [re, name] of languageMap) if (re.test(q)) { features.languages.push(name); expanded += ` ${name}`; }
+  if (/chill|êm|nhẹ|thư giãn|relax/i.test(q)) { features.energy='low'; features.moods.push('chill','soft','atmospheric'); expanded += ' chill atmospheric'; }
+  if (/buồn|tâm trạng|melanchol|sad|cô đơn/i.test(q)) { features.moods.push('sad','emotional','melancholic'); expanded += ' emotional melancholic'; }
+  if (/vui|tươi|happy|uplifting|summer/i.test(q)) { features.moods.push('bright','uplifting'); expanded += ' uplifting bright'; }
+  if (/quẩy|cháy|máu|bùng nổ|high energy|energetic/i.test(q)) { features.energy='high'; expanded += ' high energy dance'; }
+  if (/bay|mơ|mộng|phiêu|dreamy/i.test(q)) { features.moods.push('dreamy','uplifting','atmospheric'); expanded += ' dreamy atmospheric'; }
+  if (/instrumental|không lời|nhạc không vocals?|không giọng|karaoke|piano solo/i.test(q)) { features.instrumental=true; expanded += ' instrumental'; }
+  if (/có lời|vocal|giọng hát|singer/i.test(q) && !/không lời|không vocals?/i.test(q)) { features.vocal=true; expanded += ' vocal'; }
+  const versionRules = [
+    [/nightcore|sped ?up|tăng tốc/i, 'nightcore'],
+    [/slowed|slow(ed)?|reverb|chậm|vang/i, 'slowed/reverb'],
+    [/remix|bản phối|bootleg|edit|mix/i, 'remix'],
+    [/live|concert|biểu diễn/i, 'live'],
+    [/acoustic|mộc/i, 'acoustic'],
+    [/original|bản gốc/i, 'original']
+  ];
+  for (const [re, name] of versionRules) if (re.test(q)) { features.versions.push(name); expanded += ` ${name}`; }
+  const avoidRules = [
+    [/không remix|đừng remix|không thích remix|tránh remix/i, 'remix'],
+    [/không live|đừng live|tránh live/i, 'live'],
+    [/không nightcore|đừng nightcore|tránh nightcore/i, 'nightcore'],
+    [/không slowed|đừng slowed|tránh slowed/i, 'slowed/reverb'],
+    [/không acoustic|đừng acoustic|tránh acoustic/i, 'acoustic']
+  ];
+  for (const [re, name] of avoidRules) if (re.test(q)) features.avoid.push(name);
+  return {
+    original:raw,
+    expanded:safeText(Array.from(new Set(expanded.split(/\s+/))).join(' '), 520),
+    features
+  };
 }
-function scoreMusicCandidate(song, intent) {
-  if (!song) return 0; const hay = `${song.title||''} ${song.artist||song.artists||''} ${song.album||''}`.toLowerCase(); let score=0;
+
+function scoreMusicCandidate(song, intent, memoryProfile = null) {
+  if (!song) return 0;
+  const hay = `${song.title||''} ${song.artist||song.artists||''} ${song.album||''}`.toLowerCase();
+  const inferred = inferTrackFeatures(song);
+  let score=0;
   for (const ref of intent.features.references) if (hay.includes(ref)) score += 50;
-  for (const term of intent.features.styleTerms.slice(0,16)) if (hay.includes(term)) score += 2;
+  for (const term of intent.features.styleTerms.slice(0,20)) if (hay.includes(term)) score += 2.5;
   if (intent.features.broadElectronic && /electro|electronic|house|remix|dance|edm|nightcore|future bass/i.test(hay)) score += 8;
-  if (intent.features.energy==='high' && /live|festival|club|remix|mix|edit|house/i.test(hay)) score += 3;
-  if (intent.features.moods.includes('chill') && /chill|lofi|ambient|acoustic/i.test(hay)) score += 4;
-  if (intent.features.moods.includes('sad') && /sad|lonely|heart|cry|melanchol|rain/i.test(hay)) score += 4;
+  if (intent.features.energy==='high' && (inferred.energy >= 0.75 || /live|festival|club|remix|mix|edit|house/i.test(hay))) score += 5;
+  if (intent.features.energy==='low' && inferred.energy <= 0.45) score += 5;
+  if (intent.features.moods.some(m => ['chill','soft','atmospheric'].includes(m)) && /chill|lofi|ambient|acoustic|atmospheric/i.test(hay)) score += 5;
+  if (intent.features.moods.some(m => ['sad','emotional','melancholic'].includes(m)) && /sad|lonely|heart|cry|melanchol|rain|emotional/i.test(hay)) score += 5;
+  if (intent.features.moods.some(m => ['bright','uplifting'].includes(m)) && /uplifting|summer|happy|joy|bright/i.test(hay)) score += 4;
+  for (const lang of intent.features.languages) if (String(inferred.language).toLowerCase() === lang.toLowerCase()) score += 7;
+  for (const version of intent.features.versions) if (String(inferred.version).includes(version.split('/')[0])) score += 9;
+  for (const avoid of intent.features.avoid) if (String(inferred.version).includes(avoid.split('/')[0]) || hay.includes(avoid)) score -= 30;
+  if (intent.features.instrumental === true) score += inferred.isInstrumental ? 12 : -7;
+  if (intent.features.vocal === true) score += inferred.isInstrumental ? -7 : 7;
+
+  const p = memoryProfile || {};
+  const artistKey = String(song.artist || song.artists || '').trim().toLowerCase();
+  const styleKeys = Array.isArray(inferred.styleTags) ? inferred.styleTags.map(v => String(v).toLowerCase()) : [];
+  const moodKeys = Array.isArray(inferred.moods) ? inferred.moods.map(v => String(v).toLowerCase()) : [];
+  const versionKey = String(inferred.version || '').toLowerCase();
+  const prefArtists = new Map((p.favoriteArtists || []).map(x => [String(x.name||'').toLowerCase(), Number(x.count||0)]));
+  const prefStyles = new Map((p.favoriteStyles || []).map(x => [String(x.name||'').toLowerCase(), Number(x.count||0)]));
+  const prefMoods = new Map((p.favoriteMoods || []).map(x => [String(x.name||'').toLowerCase(), Number(x.count||0)]));
+  const prefVersions = new Map((p.preferredVersions || []).map(x => [String(x.name||'').toLowerCase(), Number(x.count||0)]));
+  const disliked = new Map((p.dislikedSignals || []).map(x => [String(x.name||'').toLowerCase(), Number(x.count||0)]));
+  const preferred = new Map((p.preferredSignals || []).map(x => [String(x.name||'').toLowerCase(), Number(x.count||0)]));
+  if (artistKey && prefArtists.has(artistKey)) score += Math.min(16, 4 + prefArtists.get(artistKey) * 0.9);
+  for (const key of styleKeys) if (prefStyles.has(key)) score += Math.min(8, 1 + prefStyles.get(key) * 0.45);
+  for (const key of moodKeys) if (prefMoods.has(key)) score += Math.min(7, 1 + prefMoods.get(key) * 0.45);
+  if (versionKey && prefVersions.has(versionKey)) score += Math.min(5, prefVersions.get(versionKey) * 0.4);
+  for (const [signal, count] of disliked) {
+    const rawSignal = signal.replace(/^(artist|style|mood|version):/, '');
+    if ((signal.startsWith('artist:') && artistKey === rawSignal) ||
+        (signal.startsWith('style:') && styleKeys.includes(rawSignal)) ||
+        (signal.startsWith('mood:') && moodKeys.includes(rawSignal)) ||
+        (signal.startsWith('version:') && versionKey.includes(rawSignal))) score -= Math.min(18, 3 + count * 1.2);
+  }
+  for (const [signal, count] of preferred) {
+    const rawSignal = signal.replace(/^(artist|style|mood|version):/, '');
+    if ((signal.startsWith('artist:') && artistKey === rawSignal) ||
+        (signal.startsWith('style:') && styleKeys.includes(rawSignal)) ||
+        (signal.startsWith('mood:') && moodKeys.includes(rawSignal)) ||
+        (signal.startsWith('version:') && versionKey.includes(rawSignal))) score += Math.min(10, count * 0.8);
+  }
   return score;
 }
+
 
 
 function localBrain(message, context) {
   const q = safeText(message, 700).toLowerCase();
   const track = context && context.currentTrack || {};
   if (!q) return { reply: 'Mình đang sẵn sàng. Hãy hỏi về bài đang phát, tìm nhạc, tạo playlist hoặc điều khiển player.', action: null, engine: 'local-demo', model: '' };
+  if (/(không thích|ghét|skip bài này|đừng phát kiểu này)/i.test(q) && (track.title || track.name)) {
+    return { reply: `Mình sẽ ghi nhận rằng bạn không thích kiểu “${safeText(track.title || track.name,160)}”.`, action: { type: 'analyze_track' }, engine: 'local-demo', model: '' };
+  }
+  if (/(thích bài này|thích bài|like bài này|good song)/i.test(q) && (track.title || track.name)) {
+    return { reply: `Đã ghi nhận bạn thích “${safeText(track.title || track.name,160)}”.`, action: { type: 'analyze_track' }, engine: 'local-demo', model: '' };
+  }
   if (/(phân tích|analy[sz]e).*(bài|track|nhạc)|bài này.*(thuộc|thể loại|mood)|bài.*remix/i.test(q)) {
     const f = inferTrackFeatures(track); if (!track.title && !track.name) return { reply: 'Chưa có bài đang phát để phân tích.', action: null, engine: 'local-demo', model: '' };
     return { reply: `“${safeText(track.title || track.name, 160)}” — phiên bản ${f.version}, mood ${f.mood}, ngôn ngữ ${f.language.toUpperCase()}, instrumental: ${f.isInstrumental ? 'có' : 'chưa xác định'}.`, action: { type: 'analyze_track' }, engine: 'local-demo', model: '' };
@@ -214,7 +299,7 @@ function localBrain(message, context) {
     if (!track.title && !track.name) return { reply: 'Hiện chưa có bài hát nào đang phát.', action: null, engine: 'local-demo', model: '' };
     return { reply: track.artist ? `Hiện đang phát “${safeText(track.title || track.name,180)}” — ${safeText(track.artist,160)}.` : `Hiện đang phát “${safeText(track.title || track.name,180)}”.`, action: null, engine: 'local-demo', model: '' };
   }
-  return { reply: 'AI Local Demo đang hoạt động. Bạn có thể cấu hình AI trực tiếp trong package.json (khối shinayuuAI) hoặc dùng ai-config.json trong AppData để dùng model thật để dùng Smart Search, Tool Calling, Web Search, Memory và các tính năng AI đầy đủ của ShinaYuu 2.4.0.', action: null, engine: 'local-demo', model: '' };
+  return { reply: 'AI Local Demo đang hoạt động. Bạn có thể cấu hình AI trực tiếp trong package.json (khối shinayuuAI) hoặc dùng ai-config.json trong AppData để dùng model thật để dùng Smart Search, Tool Calling, Web Search, Memory và các tính năng AI đầy đủ của ShinaYuu 2.5.0.', action: null, engine: 'local-demo', model: '' };
 }
 
 
@@ -256,6 +341,13 @@ function createAiCore(options = {}) {
   const webSearchEnabled = !!aiConfig.webSearch;
   const toolCallingEnabled = !!aiConfig.toolCalling;
   const memoryEnabled = !!aiConfig.memory;
+  const adaptiveMemoryEnabled = memoryEnabled && aiConfig.adaptiveMemory !== false;
+  const conversationMemoryEnabled = memoryEnabled && aiConfig.conversationMemory !== false;
+  const preferenceRerankingEnabled = memoryEnabled && aiConfig.preferenceReranking !== false;
+  const smartNextEnabled = aiConfig.smartNext !== false;
+  const agentPlanningEnabled = memoryEnabled && aiConfig.agentPlanning !== false;
+  const agentVerificationEnabled = aiConfig.agentVerification !== false;
+  const agentMaxToolRounds = Math.max(4, Math.min(10, Number(aiConfig.agentMaxToolRounds) || 8));
   const cacheEnabled = !!aiConfig.cache;
   const failoverEnabled = !!aiConfig.failover;
   const latencyMode = String(aiConfig.latencyMode || 'balanced').toLowerCase();
@@ -271,6 +363,19 @@ function createAiCore(options = {}) {
   }
   function getMemorySnapshot() { return memoryEnabled ? memoryEngine.snapshot() : {}; }
   function getMemoryPrompt() { return memoryEnabled ? memoryEngine.promptProfile() : ''; }
+  function getConversationPrompt() { return conversationMemoryEnabled && typeof memoryEngine.conversationPrompt === 'function' ? memoryEngine.conversationPrompt() : ''; }
+  function rememberConversation(role, content) {
+    if (!conversationMemoryEnabled || typeof memoryEngine.recordConversation !== 'function') return { ok:false, reason:'conversation-memory-disabled' };
+    return memoryEngine.recordConversation(role, content);
+  }
+  function learnFromMessage(message, context) {
+    const track = context && context.currentTrack && typeof context.currentTrack === 'object' ? context.currentTrack : null;
+    if (!adaptiveMemoryEnabled || !track || (!track.title && !track.name)) return null;
+    const q = String(message || '').toLowerCase();
+    if (/(không thích|ghét|skip bài này|đừng phát kiểu này)/i.test(q)) return recordMemory({ type:'dislike', track });
+    if (/(thích bài này|thích bài|like bài này|good song)/i.test(q)) return recordMemory({ type:'like', track });
+    return null;
+  }
   function cached(key) {
     if (!cacheEnabled) return null;
     const hit = cache.get(key); if (!hit) return null;
@@ -283,7 +388,7 @@ function createAiCore(options = {}) {
     while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
   }
   function cacheKey(message, context) {
-    return crypto.createHash('sha256').update(JSON.stringify({ message, track: context.currentTrack || null, mode: context.searchMode || '', memory: getMemorySnapshot().profile })).digest('hex');
+    return crypto.createHash('sha256').update(JSON.stringify({ message, track: context.currentTrack || null, mode: context.searchMode || '', memory: getMemorySnapshot().profile, conversation: getConversationPrompt() })).digest('hex');
   }
 
   const hasGemini = !!geminiKey;
@@ -318,7 +423,9 @@ function createAiCore(options = {}) {
       provider: cfg.provider, selectedProvider: providerPreference, activeProvider: active,
       configured: cfg.configured, apiUrl: cfg.apiUrl, model: cfg.model, hasApiKey: cfg.hasApiKey,
       timeoutMs, responsesApi: cfg.responsesApi, reasoningDefault, webSearchEnabled, toolCallingEnabled,
-      memoryEnabled, cacheEnabled, failoverEnabled, latencyMode, fastThinking, normalThinking, complexThinking,
+      memoryEnabled, adaptiveMemoryEnabled, conversationMemoryEnabled, preferenceRerankingEnabled, smartNextEnabled,
+      agentVersion: AGENT_VERSION, agentPlanningEnabled, agentVerificationEnabled, agentMaxToolRounds,
+      cacheEnabled, failoverEnabled, latencyMode, fastThinking, normalThinking, complexThinking,
       availableProviders: { gemini: hasGemini, openai: hasOpenAI, local: true },
       configSource: aiConfig.source, userConfigPath: aiConfig.userConfigPath, packageConfigPath: aiConfig.packagePath,
       geminiFallbackModels, openAiFallbackModels,
@@ -336,7 +443,8 @@ function createAiCore(options = {}) {
     add('youtube-music', providers.youtubeMusicSearch); add('soundcloud', providers.soundcloudSearch); add('spotify', providers.spotifySearch);
     const settled = await Promise.all(jobs);
     const normalized = dedupeSongs(settled.flatMap(item => item.rows.map(row => normalizeSong(row, item.name)).filter(Boolean)));
-    normalized.sort((a,b) => scoreMusicCandidate(b, intent) - scoreMusicCandidate(a, intent));
+    const profile = preferenceRerankingEnabled ? (getMemorySnapshot().profile || {}) : {};
+    normalized.sort((a,b) => scoreMusicCandidate(b, intent, profile) - scoreMusicCandidate(a, intent, profile));
     const songs = normalized.slice(0, limit);
     return { query: q, searchQuery: intent.expanded, intent, songs, providers: Object.fromEntries(settled.map(item => [item.name, { count: item.rows.length, error: item.error || '' }])) };
   }
@@ -375,10 +483,29 @@ function createAiCore(options = {}) {
   function currentTrackResult(context) { return { ok: true, track: context.currentTrack || null, playing: !!context.playing, volume: normalizeNumber(context.volume, 0), currentIndex: normalizeNumber(context.currentIndex, -1) }; }
   function queueResult(context) { return { ok: true, queueLength: normalizeNumber(context.queueLength, 0), currentIndex: normalizeNumber(context.currentIndex, -1), queuePreview: Array.isArray(context.queuePreview) ? context.queuePreview.slice(0, 18) : [] }; }
   function analyzeTrack(context) { return { ok: true, ...(inferTrackFeatures(context.currentTrack || {})), track: context.currentTrack || null }; }
+  function pickSmartNext(context) {
+    const rows = Array.isArray(context.queuePreview) ? context.queuePreview : [];
+    if (!rows.length) return null;
+    const current = context.currentTrack || {};
+    const intent = parseMusicIntent(`${current.artist || ''} ${current.title || ''}`);
+    let best = null;
+    rows.forEach((song, index) => {
+      if (!song || index === Number(context.currentIndex)) return;
+      let score = scoreMusicCandidate(song, intent, getMemorySnapshot().profile);
+      const sameArtist = String(song.artist || song.artists || '').toLowerCase() === String(current.artist || current.artists || '').toLowerCase();
+      if (sameArtist) score += 2;
+      if (current && song && /remix|nightcore|sped up|slowed|reverb/i.test(String(current.title || current.name || '')) && /remix|nightcore|sped up|slowed|reverb/i.test(String(song.title || song.name || ''))) score += 4;
+      score += Math.max(0, 3 - index * 0.1);
+      if (!best || score > best.score) best = { index, score, track:song };
+    });
+    return best;
+  }
 
   const toolDefinitions = [
+    { type: 'function', name: 'get_agent_plan', description: 'Đọc kế hoạch suy luận hiện tại của ShinaYuu AI 4.1 cho yêu cầu người dùng.', parameters: { type: 'object', properties: {}, additionalProperties: false } },
     { type: 'function', name: 'get_current_track', description: 'Lấy bài hát đang phát và trạng thái player.', parameters: { type: 'object', properties: {}, additionalProperties: false } },
     { type: 'function', name: 'get_queue', description: 'Lấy queue hiện tại và preview các bài.', parameters: { type: 'object', properties: {}, additionalProperties: false } },
+    { type: 'function', name: 'get_playback_health', description: 'Kiểm tra player có thực sự đang phát, đang kẹt hay đã mất nguồn âm thanh hay không.', parameters: { type: 'object', properties: {}, additionalProperties: false } },
     { type: 'function', name: 'search_music', description: 'Tìm bài qua Search Engine của ShinaYuu mà không tự phát.', parameters: { type: 'object', properties: { query: { type: 'string' }, limit: { type: 'integer', minimum: 3, maximum: 20 } }, required: ['query'], additionalProperties: false } },
     { type: 'function', name: 'play_music', description: 'Tìm đúng bài hát người dùng yêu cầu và phát ngay kết quả phù hợp nhất. Dùng cho các yêu cầu như mở/phát/bật bài X.', parameters: { type: 'object', properties: { query: { type: 'string' }, artist: { type: 'string' } }, required: ['query'], additionalProperties: false } },
     { type: 'function', name: 'create_smart_playlist', description: 'Tìm và tạo danh sách bài theo yêu cầu tự nhiên.', parameters: { type: 'object', properties: { query: { type: 'string' }, count: { type: 'integer', minimum: 3, maximum: 30 } }, required: ['query'], additionalProperties: false } },
@@ -386,14 +513,27 @@ function createAiCore(options = {}) {
     { type: 'function', name: 'analyze_track', description: 'Phân tích metadata/ngữ nghĩa cơ bản của bài đang phát.', parameters: { type: 'object', properties: {}, additionalProperties: false } },
     { type: 'function', name: 'verify_lyrics', description: 'Kiểm tra lyrics hiện tại với Lyrics Engine và AI.', parameters: { type: 'object', properties: {}, additionalProperties: false } },
     { type: 'function', name: 'remember_music_preference', description: 'Lưu một sở thích nghe nhạc bền vững do người dùng vừa nói rõ.', parameters: { type: 'object', properties: { key: { type: 'string' }, value: { type: 'string' } }, required: ['key','value'], additionalProperties: false } },
-    { type: 'function', name: 'get_music_memory', description: 'Đọc các sở thích nghe nhạc đã lưu của người dùng.', parameters: { type: 'object', properties: {}, additionalProperties: false } }
+    { type: 'function', name: 'get_music_memory', description: 'Đọc các sở thích nghe nhạc đã lưu của người dùng.', parameters: { type: 'object', properties: {}, additionalProperties: false } },
+    { type: 'function', name: 'rate_current_track', description: 'Ghi nhận người dùng thích hoặc không thích bài đang phát để AI học sở thích.', parameters: { type: 'object', properties: { rating: { type: 'string', enum: ['like','dislike'] } }, required: ['rating'], additionalProperties: false } },
+    { type: 'function', name: 'recommend_music', description: 'Tìm nhạc và xếp hạng lại theo sở thích học được, mood, năng lượng, ngôn ngữ, version và các tín hiệu tránh.', parameters: { type: 'object', properties: { query: { type: 'string' }, limit: { type: 'integer', minimum: 3, maximum: 20 } }, required: ['query'], additionalProperties: false } },
+    { type: 'function', name: 'verify_recommendations', description: 'Kiểm tra chất lượng một tập bài đã tìm: đủ số lượng, không trùng và có đáp ứng ràng buộc cơ bản hay không.', parameters: { type: 'object', properties: { query: { type: 'string' }, limit: { type: 'integer', minimum: 3, maximum: 20 } }, required: ['query'], additionalProperties: false } }
   ];
 
-  async function runTool(name, args, context) {
+  async function runToolInternal(name, args, context) {
     const a = args && typeof args === 'object' ? args : {};
     switch (name) {
+      case 'get_agent_plan': return { ok: true, plan: buildPlan(context.__aiMessage || '', context, getMemorySnapshot()) };
       case 'get_current_track': return currentTrackResult(context);
       case 'get_queue': return queueResult(context);
+      case 'get_playback_health': return {
+        ok: true, playing: context.playing === true,
+        currentIndex: normalizeNumber(context.currentIndex, -1),
+        currentTrack: context.currentTrack || null,
+        elapsedSec: normalizeNumber(context.elapsedSec || context.position, 0),
+        durationSec: normalizeNumber(context.durationSec || context.duration, 0),
+        stalled: context.playbackHealth && context.playbackHealth.stalled === true,
+        source: safeText(context.currentTrack && (context.currentTrack.source || context.currentTrack.provider || ''), 64)
+      };
       case 'play_music': {
         const q = safeText([a.query || '', a.artist || ''].filter(Boolean).join(' '), 240);
         const result = await discover(q, { limit: 12 });
@@ -402,23 +542,66 @@ function createAiCore(options = {}) {
         return { ...result, ok: !!best, selectedTrack: best, queuedAction: best ? { type: 'play_track', track: best } : null };
       }
       case 'search_music': return { ...(await discover(a.query || '', { limit: a.limit || 12 })), suggestedAction: { type: 'search', query: safeText(a.query || '', 240), mode: 'song' } };
-      case 'create_smart_playlist': return { ...(await discover(a.query || '', { limit: a.count || 12 })), suggestedAction: { type: 'smart_playlist', query: safeText(a.query || '', 240), count: Math.max(3, Math.min(30, Math.round(normalizeNumber(a.count, 12)))), autoplay: false } };
+      case 'create_smart_playlist': {
+        const count = Math.max(3, Math.min(30, Math.round(normalizeNumber(a.count, 12))));
+        let result = await discover(a.query || '', { limit: count });
+        let quality = critiqueRecommendation(result, buildPlan(context.__aiMessage || a.query || '', context, getMemorySnapshot()));
+        if (!quality.ok && count < 24) {
+          const retry = await discover(`${a.query || ''} varied`, { limit: Math.min(24, count * 2) });
+          const retryQuality = critiqueRecommendation(retry, buildPlan(context.__aiMessage || a.query || '', context, getMemorySnapshot()));
+          if (retryQuality.qualityScore > quality.qualityScore) { result = retry; quality = retryQuality; }
+        }
+        return { ...result, quality, suggestedAction: { type: 'smart_playlist', query: safeText(a.query || '', 240), count, autoplay: false } };
+      }
       case 'analyze_track': return { ...(analyzeTrack(context)), suggestedAction: { type: 'analyze_track' } };
       case 'verify_lyrics': return { ...(await verifyLyrics(context)), suggestedAction: { type: 'lyrics_verify' } };
       case 'remember_music_preference': return rememberPreference(a.key, a.value);
       case 'get_music_memory': return { ok: true, memory: getMemorySnapshot() };
+      case 'rate_current_track': {
+        const rating = String(a.rating || '').toLowerCase();
+        if (!['like','dislike'].includes(rating)) return { ok:false, error:'INVALID_RATING' };
+        return recordMemory({ type: rating, track: context.currentTrack || {} });
+      }
+      case 'recommend_music': {
+        const limit = Math.max(3, Math.min(24, Math.round(normalizeNumber(a.limit, 12))));
+        let result = await discover(a.query || '', { limit });
+        let quality = critiqueRecommendation(result, buildPlan(context.__aiMessage || a.query || '', context, getMemorySnapshot()));
+        if (!quality.ok && limit < 24) {
+          const retry = await discover(`${a.query || ''} alternatives`, { limit: Math.min(24, limit * 2) });
+          const retryQuality = critiqueRecommendation(retry, buildPlan(context.__aiMessage || a.query || '', context, getMemorySnapshot()));
+          if (retryQuality.qualityScore > quality.qualityScore) { result = retry; quality = retryQuality; }
+        }
+        return { ...result, quality, recommendationBasis: getMemorySnapshot().profile, personalized: true };
+      }
+      case 'verify_recommendations': {
+        const query = safeText(a.query || '', 240);
+        const result = await discover(query, { limit: a.limit || 12 });
+        return { ...result, quality: critiqueRecommendation(result, buildPlan(context.__aiMessage || query, context, getMemorySnapshot())), verifiedFor: query };
+      }
       case 'control_player': {
         const action = String(a.action || '').toLowerCase();
         if (!TOOL_ACTIONS.has(action)) return { ok: false, error: 'ACTION_NOT_ALLOWED' };
         let normalized;
         if (action === 'set_volume') normalized = normalizeAction({ type: action, value: a.value });
-        else if (action === 'play_index' || action === 'smart_next') normalized = normalizeAction({ type: action, index: a.index });
-        else if (action === 'ai_radio') normalized = normalizeAction({ type: action, enabled: a.enabled });
+        else if (action === 'play_index') normalized = normalizeAction({ type: action, index: a.index });
+        else if (action === 'smart_next') {
+          const picked = smartNextEnabled ? pickSmartNext(context) : null;
+          normalized = picked ? { type:'play_index', index:picked.index } : null;
+          return normalized ? { ok:true, queuedAction:normalized, decision:{ index:picked.index, score:picked.score, track:picked.track } } : { ok:false, error:'SMART_NEXT_NO_CANDIDATE' };
+        } else if (action === 'ai_radio') normalized = normalizeAction({ type: action, enabled: a.enabled });
         else normalized = normalizeAction({ type: action });
         return normalized ? { ok: true, queuedAction: normalized } : { ok: false, error: 'INVALID_ACTION_ARGUMENTS' };
       }
       default: return { ok: false, error: 'UNKNOWN_TOOL' };
     }
+  }
+
+  async function runTool(name, args, context, agentPlan = null) {
+    const result = await runToolInternal(name, args, context);
+    const enriched = { ...(result && typeof result === 'object' ? result : { value: result }) };
+    if (Array.isArray(enriched.songs)) enriched.recommendationQuality = critiqueRecommendation(enriched, agentPlan || {});
+    if (agentVerificationEnabled) enriched.agentVerification = verifyToolResult(name, enriched, agentPlan || {}, context || {});
+    return enriched;
   }
 
   function extractGeminiText(response) {
@@ -441,6 +624,8 @@ function createAiCore(options = {}) {
   async function callModel(backend, spec) {
     if (backend === 'openai') {
       const responsesApi = isResponsesApiUrl(openAiUrl);
+      const intent = spec.latencyIntent || classifyLatencyIntent(spec.prompt || '');
+      const thinkingLevel = intent === 'quick' || intent === 'quick-command' ? fastThinking : intent === 'complex' ? complexThinking : normalThinking;
       if (!openAiKey || !openAiUrl || !openAiModel) throw Object.assign(new Error('OPENAI_NOT_CONFIGURED'), { status: 503 });
       if (!responsesApi) throw Object.assign(new Error('OPENAI_COMPATIBLE_TOOLS_UNSUPPORTED'), { status: 501 });
       const tools = toolCallingEnabled ? [...toolDefinitions] : [];
@@ -455,11 +640,11 @@ function createAiCore(options = {}) {
         responseId = '';
         pendingAction = null;
         try {
-        for (let round = 0; round < 4; round++) {
+        for (let round = 0; round < agentMaxToolRounds; round++) {
         const payload = {
           model: modelName,
           reasoning: { effort: thinkingLevel },
-          max_output_tokens: spec.kind === 'lyrics-verify' ? 300 : 1200,
+          max_output_tokens: spec.kind === 'lyrics-verify' ? 300 : (spec.kind === 'chat' && spec.latencyIntent === 'complex' ? 2200 : 1500),
           instructions: spec.system,
           input,
           tools,
@@ -467,22 +652,22 @@ function createAiCore(options = {}) {
           store: true,
           ...(responseId ? { previous_response_id: responseId } : {}),
           text: { format: { type: 'json_object' } },
-          prompt_cache_key: 'shinayuu-ai-core-v0-6'
+          prompt_cache_key: 'shinayuu-ai-core-v4-0'
         };
         const response = await requestJson(openAiUrl, payload, { Authorization: `Bearer ${openAiKey}` }, timeoutMs);
         responseId = response.id || responseId;
         const calls = extractFunctionCalls(response);
-        if (!calls.length) return { text: extractResponsesText(response), responseId, backend, action: pendingAction };
+        if (!calls.length) return { text: extractResponsesText(response), responseId, backend, verifiedAction: pendingAction };
         const outputs = [];
         for (const call of calls) {
           let args = {}; try { args = JSON.parse(call.arguments || '{}'); } catch (_) {}
-          const result = await runTool(call.name, args, spec.context || {});
+          const result = await runTool(call.name, args, spec.context || {}, spec.agentPlan || null);
           if (result && (result.queuedAction || result.suggestedAction)) pendingAction = result.queuedAction || result.suggestedAction;
           outputs.push({ type: 'function_call_output', call_id: call.call_id, output: JSON.stringify(result) });
         }
         input = outputs;
         }
-        return { text: JSON.stringify({ reply: 'AI chưa hoàn tất được yêu cầu.', action: pendingAction }), responseId, backend, model: modelName };
+        return { text: JSON.stringify({ reply: 'AI chưa hoàn tất được yêu cầu.', action: null }), responseId, backend, model: modelName, verifiedAction: pendingAction };
         } catch (error) {
           lastOpenAiError = error;
           const code = Number(error && error.status);
@@ -508,7 +693,7 @@ function createAiCore(options = {}) {
         let pendingAction = null;
         let input = `JSON output required. Current ShinaYuu context: ${JSON.stringify(spec.context || {})}\n\nUser request: ${safeText(spec.prompt || '', 4000)}`;
         try {
-          for (let round = 0; round < 4; round++) {
+          for (let round = 0; round < agentMaxToolRounds; round++) {
             const payload = {
               model: modelName,
               input,
@@ -519,10 +704,10 @@ function createAiCore(options = {}) {
             const response = await requestJson(geminiUrl, payload, { 'x-goog-api-key': geminiKey, 'Api-Revision': '2026-05-20' }, timeoutMs);
             previousInteractionId = response.id || previousInteractionId;
             const calls = extractGeminiCalls(response);
-            if (!calls.length) return { text: extractGeminiText(response), responseId: previousInteractionId, backend, model: modelName, action: pendingAction };
+            if (!calls.length) return { text: extractGeminiText(response), responseId: previousInteractionId, backend, model: modelName, verifiedAction: pendingAction };
             const results = [];
             for (const call of calls) {
-              const result = await runTool(call.name, call.arguments, spec.context || {});
+              const result = await runTool(call.name, call.arguments, spec.context || {}, spec.agentPlan || null);
               if (result && (result.queuedAction || result.suggestedAction)) pendingAction = result.queuedAction || result.suggestedAction;
               results.push({ type: 'function_result', name: call.name, call_id: call.call_id, result: [{ type: 'text', text: JSON.stringify(result) }] });
             }
@@ -571,30 +756,37 @@ function createAiCore(options = {}) {
     const parsedReply = humanizeModelObject(parsed);
     const fallbackText = safeText(modelResult.text || '', 4000);
     const reply = parsedReply || fallbackText || 'Đã xử lý yêu cầu.';
-    return { reply, action: normalizeAction(parsed.action) || normalizeAction(modelResult.action), engine: modelResult.backend === 'gemini' ? 'gemini-interactions' : 'openai-responses', model: modelResult.model || (modelResult.backend === 'gemini' ? geminiModel : openAiModel), responseId: modelResult.responseId || '' };
+    const direct = normalizeAction(parsed.action);
+    const verified = normalizeAction(modelResult.verifiedAction || modelResult.action);
+    const safeDirect = direct && ['play_pause','next','previous','set_volume','search','smart_playlist','analyze_track','lyrics_verify','ai_radio'].includes(direct.type) ? direct : null;
+    return { reply, action: verified || safeDirect, engine: modelResult.backend === 'gemini' ? 'gemini-interactions' : 'openai-responses', model: modelResult.model || (modelResult.backend === 'gemini' ? geminiModel : openAiModel), responseId: modelResult.responseId || '' };
   }
 
   async function chat(message, context = {}) {
     const cleanMessage = safeText(message, 4000); if (!cleanMessage) throw Object.assign(new Error('AI_EMPTY_MESSAGE'), { status: 400 });
     const latencyIntent = classifyLatencyIntent(cleanMessage);
+    const agentPlan = agentPlanningEnabled ? buildPlan(cleanMessage, context, getMemorySnapshot()) : null;
     try { recordMemory({ type: 'interaction', query: cleanMessage }); } catch (_) {}
+    try { rememberConversation('user', cleanMessage); learnFromMessage(cleanMessage, context); } catch (_) {}
     const greetingOnly = /^(xin chào|chào|hello|hi|hey|alo|cảm ơn|thank|thanks|ok|okay|được|tốt|ừ|uh|👍|👋)[!.? ]*$/iu.test(cleanMessage);
     // Keep only deterministic player controls on the local fast path.
     // A real provider should answer conversational messages such as greetings so that
     // a configured Gemini/OpenAI account is actually used instead of the Local Demo banner.
     if (latencyIntent === 'quick-command' || (latencyIntent === 'quick' && !greetingOnly)) {
       const quick = quickLocalResponse(cleanMessage, context);
-      if (quick && (quick.action || latencyIntent === 'quick')) return quick;
+      if (quick && (quick.action || latencyIntent === 'quick')) { try { rememberConversation('assistant', quick.reply); } catch (_) {} return quick; }
     }
     // Obvious search commands can use the existing ShinaYuu search engine directly.
     // This avoids a model round-trip for a very common latency-sensitive action.
     const directSearch = cleanMessage.match(/^(?:tìm|search|find|tìm kiếm)\s+(.+)$/i);
     if (directSearch && directSearch[1]) {
-      return {
+      const result = {
         reply: `Mình sẽ dùng Search Engine của ShinaYuu để tìm “${safeText(directSearch[1], 220)}”.`,
         action: { type: 'search', query: safeText(directSearch[1], 220), mode: 'song' },
         engine: 'local-fast', fastPath: true, model: ''
       };
+      try { rememberConversation('assistant', result.reply); } catch (_) {}
+      return result;
     }
     // Natural-language play/open requests can skip an unnecessary model round-trip while still
     // accepting a long, human-style sentence. The query itself is sent to the real discovery engine.
@@ -604,20 +796,33 @@ function createAiCore(options = {}) {
       try {
         const found = await discover(query, { limit: 12 });
         const best = Array.isArray(found.songs) ? found.songs[0] : null;
-        if (best) return { reply: `Đang mở “${safeText(best.title || best.name, 180)}”${best.artist ? ` — ${safeText(best.artist, 140)}` : ''}.`, action: { type: 'play_track', track: best }, engine: 'local-fast', fastPath: true, model: '' };
+        if (best) {
+          const result = { reply: `Đang mở “${safeText(best.title || best.name, 180)}”${best.artist ? ` — ${safeText(best.artist, 140)}` : ''}.`, action: { type: 'play_track', track: best }, engine: 'local-fast', fastPath: true, model: '' };
+          try { rememberConversation('assistant', result.reply); } catch (_) {}
+          return result;
+        }
       } catch (_) {}
     }
     const order = providerOrder();
-    if (order[0] === 'local') return localBrain(cleanMessage, context);
+    if (order[0] === 'local') {
+      const result = localBrain(cleanMessage, context);
+      try { rememberConversation('assistant', result.reply); } catch (_) {}
+      return result;
+    }
     const key = cacheKey(cleanMessage, context);
     const hit = cached(key); if (hit && !hit.action) return { ...hit, cached: true };
     const contextPayload = {
-      app: 'ShinaYuu Music 2.4.0', aiVersion: AI_VERSION,
+      app: 'ShinaYuu Music 2.5.0', aiVersion: AI_VERSION, agentVersion: AGENT_VERSION, __aiMessage: cleanMessage,
       currentTrack: context.currentTrack || null, playing: !!context.playing,
       volume: Number.isFinite(Number(context.volume)) ? Number(context.volume) : null,
+      elapsedSec: Number.isFinite(Number(context.elapsedSec || context.position)) ? Number(context.elapsedSec || context.position) : null,
+      durationSec: Number.isFinite(Number(context.durationSec || context.duration)) ? Number(context.durationSec || context.duration) : null,
+      playbackHealth: context.playbackHealth && typeof context.playbackHealth === 'object' ? { stalled: context.playbackHealth.stalled === true, reason: safeText(context.playbackHealth.reason || '', 120) } : null,
       queueLength: Number(context.queueLength || 0), currentIndex: Number(context.currentIndex == null ? -1 : context.currentIndex),
       queuePreview: Array.isArray(context.queuePreview) ? context.queuePreview.slice(0, 18) : [],
       searchMode: safeText(context.searchMode || '', 40),
+      recentConversation: getConversationPrompt(),
+      runtimeMemory: getMemoryPrompt(),
       runtimeContext: context.runtimeContext && typeof context.runtimeContext === 'object' ? {
         now: safeText(context.runtimeContext.now || '', 80),
         date: safeText(context.runtimeContext.date || '', 32),
@@ -634,26 +839,39 @@ function createAiCore(options = {}) {
           source: safeText(context.runtimeContext.location.source || '', 32)
         } : null
       } : null,
-      ...(latencyIntent !== 'quick-command' ? { musicMemory: getMemoryPrompt() } : {})
+      ...(latencyIntent !== 'quick-command' ? { musicMemory: getMemoryPrompt() } : {}),
+      ...(agentPlan ? { agentPlan } : {})
     };
     const instructions = [
-      `You are ShinaYuu AI v${AI_VERSION}, embedded in the desktop music player ShinaYuu Music 2.4.0.`,
+      `You are ShinaYuu AI v${AI_VERSION}, embedded in the desktop music player ShinaYuu Music 2.5.0. You are a super-intelligent Personal Music Agent with planning, verification, personalization and recovery abilities, not only a chatbot.`,
       'Answer in Vietnamese unless the user asks otherwise. Understand natural Vietnamese, English, mixed-language and conversational commands; do not require rigid command syntax.',
+      'Work from the provided agentPlan when present: understand the goal first, execute only the minimum necessary tools, verify important results, then respond.',
+      'Treat the current player state, queue and memory as ground truth. Do not invent tracks, queue entries, playback outcomes, memories or provider results.',
+      'For complex requests, reason in stages: interpret intent → gather facts/tools → evaluate result → execute safe action → report what actually happened.',
+      'You are a supervised music agent: you may decide WHAT should happen, but deterministic ShinaYuu playback code decides WHEN a track changes. Never invent or request an early transition point, never cut a currently playing track mid-song merely to improve a mix, and never skip queue order unless the user explicitly asks to skip or the player reports that the immediate successor failed.',
+      'For AutoMix, optimize compatibility using mood, energy, BPM, structure, lyrics and learned taste, but treat end-of-track timing, fade safety, queue ownership and playback recovery as hard invariants owned by the player.',
+      'When a playback operation looks stuck, call get_playback_health/get_current_track before issuing another transport command. Prefer recovery of the current verified track over repeatedly starting different tracks.',
+      'When a tool result contains agentVerification or recommendationQuality, use it as a quality gate. If verification fails, adjust the query or use another tool rather than pretending success.',
       'Use ShinaYuu tools whenever they improve accuracy or can execute the user request.',
       'For player actions, ALWAYS use control_player for transport/volume/radio controls. For an explicit named-song play/open request, use play_music; it searches the real ShinaYuu sources and returns the exact playable track.',
-      'For music lookup use search_music or create_smart_playlist; do not fabricate songs. For an explicit request to open/play a named song, use play_music and then treat its selectedTrack/queued action as the actual playback target.',
+      'For music lookup use search_music or create_smart_playlist; do not fabricate songs. For an explicit request to open/play a named song, use play_music and then treat its selectedTrack/queued action as the actual playback target. Use verify_recommendations when the request has quality/constraint requirements and the first candidate set may need another pass.',
       'For lyrics use verify_lyrics instead of inventing lyrics.',
-      'Use the remembered music profile to personalize recommendations. Treat EDM as a broad Vietnamese user label: infer musical intent from reference artists, mood, energy, melody, vocals, atmosphere, danceability, remix status and style rather than requiring a strict genre tag. Use reference artists such as DEAMN, TheFatRat, Avicii or Alan Walker as style anchors, not as genres. Prefer the user learned profile when it conflicts with generic assumptions. Do not invent personal traits beyond observed app/music behavior. For durable music preferences use remember_music_preference only when the user clearly asks to remember or states a stable preference.',
+      'Use the remembered music profile to personalize recommendations. Treat EDM as a broad Vietnamese user label: infer musical intent from reference artists, mood, energy, melody, vocals, atmosphere, danceability, remix status and style rather than requiring a strict genre tag. Use reference artists such as DEAMN, TheFatRat, Avicii or Alan Walker as style anchors, not as genres. Prefer the learned profile when it conflicts with generic assumptions. Penalize signals the user repeatedly skips or dislikes. When the user says like/dislike about the current track, use rate_current_track. When recommending songs, use recommend_music so ranking incorporates learned taste.',
+      'Resolve natural follow-ups such as "bài này", "bài đó", "như lúc nãy", "giống cái này", "thêm vài bài", "đừng remix", "bản gốc" from the current track and recent conversation before asking unnecessary clarification. Do not claim to remember anything that is not present in runtimeMemory or recentConversation.',
       'Use runtimeContext date/time/timezone/location when relevant. Location is coarse human-readable locality only; never request or expose raw latitude/longitude. Never access files, OS commands, credentials, secrets, or playback internals except through declared tools.',
-      'Never claim an action happened unless the corresponding tool returned ok:true.',
+      'Never claim an action happened unless the corresponding tool returned ok:true. A model-generated action without a verified tool result is only a suggestion, not completed execution.',
       'Return ONLY valid JSON. The JSON must contain reply:string and action:null or an action object.',
-      'Allowed action values: play_pause, next, previous, set_volume, search, smart_playlist, play_index, play_track, analyze_track, lyrics_verify, smart_next, ai_radio.'
+      'For ambiguous follow-ups, first use get_current_track or get_queue when needed instead of guessing. For "bài tiếp theo", smart_next must choose a candidate from queue using the deterministic smart selector rather than inventing an index.',
+      'Allowed action values: play_pause, next, previous, set_volume, search, smart_playlist, play_index, play_track, analyze_track, lyrics_verify, smart_next, ai_radio. Playback health is a tool query, not a final player action.'
     ].join(' ');
     let lastError = null;
     for (const backend of order) {
       try {
-        const modelResult = await callModel(backend, { kind: 'chat', prompt: cleanMessage, system: instructions, context: contextPayload });
-        const result = { ...normalizeModelResult(modelResult), cached: false };
+        const modelResult = await callModel(backend, { kind: 'chat', prompt: cleanMessage, system: instructions, context: contextPayload, agentPlan, latencyIntent });
+        const normalized = normalizeModelResult(modelResult);
+        const actionAudit = agentVerificationEnabled ? verifyFinalAction(normalized.action, ALLOWED_ACTIONS, context, modelResult.verifiedAction || modelResult.action) : { ok: true, action: normalized.action, source: 'verification-disabled' };
+        const result = { ...normalized, action: actionAudit.ok ? actionAudit.action : null, actionAudit, agentPlan, cached: false };
+        try { rememberConversation('assistant', result.reply); } catch (_) {}
         if (!result.action) putCache(key, result);
         return result;
       } catch (error) {
@@ -664,7 +882,7 @@ function createAiCore(options = {}) {
     throw lastError || new Error('AI_PROVIDER_UNAVAILABLE');
   }
 
-  return { status, chat, discover, verifyLyrics, version: AI_VERSION, getMemory: getMemorySnapshot, recordMemory };
+  return { status, chat, discover, verifyLyrics, version: AI_VERSION, agentVersion: AGENT_VERSION, getMemory: getMemorySnapshot, recordMemory, rememberPreference, getConversation: getConversationPrompt, buildPlan: (message, context) => buildPlan(message, context, getMemorySnapshot()) };
 }
 
 module.exports = { createAiCore, AI_VERSION, inferTrackFeatures };

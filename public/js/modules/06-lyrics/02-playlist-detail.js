@@ -120,13 +120,20 @@ function bindMiniQueueLazyRender() {
   }, { passive: true });
 }
 function normalizePlaylistProvider(provider) {
-  return String(provider || '').toLowerCase() === 'spotify' ? 'spotify' : 'youtube';
+  provider = String(provider || '').toLowerCase();
+  if (provider === 'shinayuu' || provider === 'mineradio') return 'shinayuu';
+  if (provider === 'spotify') return 'spotify';
+  return 'youtube';
 }
 function playlistProviderLabel(provider) {
-  return normalizePlaylistProvider(provider) === 'spotify' ? 'SP' : 'YT';
+  provider = normalizePlaylistProvider(provider);
+  if (provider === 'shinayuu') return 'SY';
+  return provider === 'spotify' ? 'SP' : 'YT';
 }
 function playlistProviderName(provider) {
-  return normalizePlaylistProvider(provider) === 'spotify' ? 'Spotify' : 'YouTube Music';
+  provider = normalizePlaylistProvider(provider);
+  if (provider === 'shinayuu') return 'ShinaYuu';
+  return provider === 'spotify' ? 'Spotify' : 'YouTube Music';
 }
 function playlistPanelKey(provider, id) {
   provider = normalizePlaylistProvider(provider);
@@ -258,6 +265,7 @@ function playlistTracksEndpoint(provider, id, params) {
       query += '&' + encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
     });
   }
+  if (provider === 'shinayuu') return '';
   return provider === 'spotify' ? '/api/spotify/playlist/tracks?' + query : '/api/youtube-music/playlist/tracks?' + query;
 }
 function playlistPanelDetailHtml(pl, provider, detailWindow) {
@@ -353,6 +361,34 @@ async function loadMorePlaylistPanelDetailTracks(reason) {
   var pid = parts.slice(1).join(':');
   var offset = reason === 'initial' ? 0 : Math.max(0, Number(st.nextOffset) || st.tracks.length);
   var token = st.token;
+  if (provider === 'shinayuu' && typeof builtInPlaylistTracksPage === 'function') {
+    try {
+      var localResult = await builtInPlaylistTracksPage(pid, { limit: PLAYLIST_DETAIL_BATCH_SIZE, offset: offset });
+      if (playlistPanelDetailState.token !== token || playlistPanelDetailState.key !== st.key) return false;
+      var localTracks = (localResult && localResult.tracks) || [];
+      var localMapped = localTracks.map(cloneSong);
+      var localAdded = appendPlaylistPanelDetailTracks(st.tracks, localMapped);
+      st.total = Math.max(st.total || 0, Number(localResult && localResult.total) || 0, st.tracks.length);
+      st.nextOffset = Math.max(offset + localTracks.length, Number(localResult && localResult.nextOffset) || 0);
+      st.hasMore = !!(localResult && localResult.hasMore);
+      st.loading = false;
+      st.loadingMore = false;
+      st.error = localResult && localResult.error || '';
+      st.message = localResult && (localResult.message || '') || '';
+      if (localResult && localResult.playlist) st.playlist = Object.assign({}, st.playlist || {}, localResult.playlist);
+      if (reason === 'initial') { renderPlaylistPanelDetailState(); scrollPlaylistPanelDetailIntoView(st.key); }
+      else renderPlaylistPanelDetailRows();
+      return localAdded > 0;
+    } catch (localError) {
+      st.loading = false;
+      st.loadingMore = false;
+      st.hasMore = false;
+      st.error = 'BUILT_IN_PLAYLIST_PAGE_FAILED';
+      st.message = 'Không tải được playlist ShinaYuu.';
+      if (reason === 'initial') renderPlaylistPanelDetailState(); else renderPlaylistPanelDetailRows();
+      return false;
+    }
+  }
   var controller = window.AbortController ? new AbortController() : null;
   var timer = controller ? setTimeout(function () { controller.abort(); }, 12000) : 0;
   st.controller = controller;
@@ -529,9 +565,9 @@ function playlistPanelBuildVirtualEntries() {
   if (playlistPanelVirtualCache.revision === playlistCatalogRevision &&
       playlistPanelVirtualCache.detailKey === playlistPanelDetailState.key &&
       playlistPanelVirtualCache.detailSig === detailSig) return playlistPanelVirtualCache;
-  var labels = { youtube: 'Playlist YouTube Music', spotify: 'Playlist Spotify' };
-  var order = ['youtube', 'spotify'];
-  var groups = { youtube: [], spotify: [] };
+  var labels = { shinayuu: 'Playlist ShinaYuu', youtube: 'Playlist YouTube Music', spotify: 'Playlist Spotify' };
+  var order = ['shinayuu', 'youtube', 'spotify'];
+  var groups = { shinayuu: [], youtube: [], spotify: [] };
   userPlaylists.forEach(function (pl, sourceIndex) {
     var key = playlistPanelGroupKey(pl);
     if (!groups[key]) groups[key] = [];

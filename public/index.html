@@ -47,7 +47,7 @@
 
 
 
-<link rel="stylesheet" href="css/shinayuu-ai-v01.css?v=2.4.0-ai24">
+<link rel="stylesheet" href="css/shinayuu-ai-v01.css?v=2.5.0-ai40">
 </head>
 <body>
 <div id="desktop-window-shell">
@@ -781,6 +781,17 @@
 <div class="fx-seg" id="cam-seg">
 <button class="active" data-cam="off">Tắt</button>
 <button data-cam="gesture">Chạm bằng cử chỉ</button>
+</div>
+<div class="fx-section-label">Cử chỉ người chơi</div>
+<div class="fx-toggle-grid">
+<div class="fx-toggle on" id="t-gesturePlayerActions" onclick="toggleGesturePlayerActions()"><span>Điều khiển trình phát</span><span class="dot"></span></div>
+<div class="fx-toggle on" id="t-gestureHandOverlay" onclick="toggleGestureHandOverlay()"><span>Hiệu ứng bàn tay</span><span class="dot"></span></div>
+</div>
+<div class="fx-section-label">Độ nhạy nhận diện</div>
+<div class="fx-seg gesture-sensitivity-seg" id="gesture-sensitivity-seg">
+<button data-gesture-sensitivity="steady" onclick="setGestureSensitivity('steady')">Ổn định</button>
+<button data-gesture-sensitivity="balanced" class="active" onclick="setGestureSensitivity('balanced')">Cân bằng</button>
+<button data-gesture-sensitivity="quick" onclick="setGestureSensitivity('quick')">Nhanh</button>
 </div>
 </div>
 </div>
@@ -1632,6 +1643,6 @@ Có thể không dùng mốc thời gian; mỗi dòng sẽ tự dàn theo thời
 <script src="js/shinayuu-2.0.15-foreground-prewarm.js?v=2.1.10"></script>
 <script src="js/shinayuu-alpha3.0.4-ui.js?v=2.1.10"></script>
 <script src="js/shinayuu-alpha3.0.5-fixes.js?v=2.1.10"></script>
-<script src="js/shinayuu-ai-v01.js?v=2.4.0-ai24"></script>
+<script src="js/shinayuu-ai-v01.js?v=2.5.0-ai40"></script>
 </body>
 </html>
