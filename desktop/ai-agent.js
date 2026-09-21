@@ -1,7 +1,7 @@
-/* ShinaYuu AI 4.1 — Personal Music Agent planning/verification layer */
+/* ShinaYuu AI 4.1.1 — Transaction-safe Personal Music Agent planning/verification layer */
 'use strict';
 
-const AGENT_VERSION = '4.1.0';
+const AGENT_VERSION = '4.1.1';
 
 function text(v, max = 240) { return String(v == null ? '' : v).trim().slice(0, max); }
 function clamp(n, min, max) { const x = Number(n); return Number.isFinite(x) ? Math.max(min, Math.min(max, x)) : min; }
@@ -43,6 +43,19 @@ function extractConstraints(message) {
   };
 }
 
+function inferPlaylistMutation(message, context = {}) {
+  const q = text(message, 2000).toLowerCase();
+  const playlistIntent = /playlist|danh sách phát|queue|hàng chờ/i.test(q);
+  const preserveCurrent = /giữ(?: lại)?\s+(?:bài\s+)?(?:đang phát|hiện tại)|giữ\s+bài\s+đang\s+phát|preserve\s+(?:the\s+)?current(?:\s+track)?|keep\s+(?:the\s+)?current(?:\s+track)?/i.test(q);
+  const replaceCurrent = /thay(?: đổi)?\s+(?:playlist|danh sách phát|queue|hàng chờ)\s*(?:hiện tại|current)?|replace\s+(?:the\s+)?(?:current\s+)?(?:playlist|queue)|đổi\s+(?:playlist|danh sách phát)\s*(?:hiện tại)?/i.test(q);
+  return {
+    requested: playlistIntent,
+    preserveCurrent: playlistIntent && preserveCurrent,
+    replaceCurrent: playlistIntent && replaceCurrent,
+    mode: playlistIntent && preserveCurrent && replaceCurrent ? 'replace-upcoming-preserve-current' : 'normal'
+  };
+}
+
 function inferIntent(message, context = {}) {
   const q = text(message, 2000).toLowerCase();
   const intent = {
@@ -56,6 +69,7 @@ function inferIntent(message, context = {}) {
     canUseQueue: Number(context.queueLength || 0) > 0 || Array.isArray(context.queuePreview) && context.queuePreview.length > 0,
     time: '',
     constraints: extractConstraints(message),
+    playlistMutation: inferPlaylistMutation(message, context),
     playbackSafety: {
       transitionAuthority: 'deterministic-player',
       minPlayedRatio: 0.88,
@@ -97,6 +111,7 @@ function buildPlan(message, context = {}, memory = {}) {
       'respond_and_record_outcome'
     ],
     constraints: intent.constraints,
+    playlistMutation: intent.playlistMutation,
     playbackSafety: intent.playbackSafety,
     context: {
       currentTrack: intent.canUseCurrentTrack ? text((context.currentTrack && (context.currentTrack.title || context.currentTrack.name)) || '', 180) : '',

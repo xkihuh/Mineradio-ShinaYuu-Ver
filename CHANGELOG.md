@@ -1,3 +1,14 @@
+## 2.5.1 — AI Transaction Safety + Playlist Reliability (2026-09-19 UTC+7)
+
+- Added AI 4.1.1 transaction-safe music planning with atomic queue replacement support.
+- Added `replace_playlist_preserve_current` so the current track, playback position and audible media are not restarted while the upcoming queue is replaced.
+- Added provider search deadlines (7s default per provider) so one slow source cannot consume the whole AI request timeout.
+- Added deterministic fast-path handling for explicit requests to replace the current playlist while keeping the playing track.
+- Added verified-track payloads to Smart Playlist actions so the renderer does not perform a second search after AI has already verified the candidates.
+- Added AutoMix release barrier around AI playlist transactions and rollback protection if queue mutation/rendering fails.
+- Changed AI timeout handling for transactional playlist requests from all-or-nothing model orchestration to provider-isolated search plus deterministic queue execution.
+- Kept Wallpaper Engine runtime on the AI 4.0 baseline as requested; this release does not change Scene loading behavior.
+
 ## 2.5.0 — Stability Hotfix (2026-09-18 UTC+7)
 
 - Fixed empty playlist shelf flashing/rebuild loops during asynchronous provider search/loading.

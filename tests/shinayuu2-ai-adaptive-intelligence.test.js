@@ -18,7 +18,7 @@ test('AI adaptive intelligence learns taste, keeps conversation memory and reran
     spotifySearch: async () => []
   }});
 
-  assert.equal(AI_VERSION, '4.1.0');
+  assert.equal(AI_VERSION, '4.1.1');
   const before = await ai.discover('nhạc electronic', { limit: 3 });
   assert.equal(before.songs.length, 3);
 

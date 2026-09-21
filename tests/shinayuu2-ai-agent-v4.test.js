@@ -20,7 +20,7 @@ test('AI 4.1 builds a contextual multi-step plan', () => {
       recentTracks: [{ title: 'Recent Track' }]
     }
   });
-  assert.equal(AGENT_VERSION, '4.1.0');
+  assert.equal(AGENT_VERSION, '4.1.1');
   assert.equal(plan.task, 'playlist');
   assert.equal(plan.constraints.minutes, 45);
   assert.equal(plan.constraints.requiresNoRemix, true);
@@ -31,6 +31,10 @@ test('AI 4.1 builds a contextual multi-step plan', () => {
   assert.equal(plan.playbackSafety.allowEarlyCut, false);
   assert.equal(plan.context.playbackSafety.queueAuthority, 'player-order');
   assert.equal(plan.context.time, 'night');
+  const mutation = buildPlan('Thay đổi playlist hiện tại nhưng giữ lại bài đang phát, cho mình chill Việt không lofi buồn', { currentTrack: { title:'Current Song', artist:'Artist' }, queueLength: 6 });
+  assert.equal(mutation.playlistMutation.mode, 'replace-upcoming-preserve-current');
+  assert.equal(mutation.playlistMutation.preserveCurrent, true);
+  assert.equal(mutation.playlistMutation.replaceCurrent, true);
 });
 
 test('AI 4.1 rejects an unverified playback target', () => {
@@ -65,8 +69,8 @@ test('AI core exposes AI 4.1 agent status and remains local-fast without credent
     spotifySearch: async () => []
   }});
   const status = ai.status();
-  assert.equal(AI_VERSION, '4.1.0');
-  assert.equal(status.agentVersion, '4.1.0');
+  assert.equal(AI_VERSION, '4.1.1');
+  assert.equal(status.agentVersion, '4.1.1');
   assert.equal(status.agentPlanningEnabled, true);
   assert.equal(status.agentVerificationEnabled, true);
   assert.equal(status.agentMaxToolRounds, 8);

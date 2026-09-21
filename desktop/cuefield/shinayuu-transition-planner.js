@@ -253,7 +253,7 @@ function upgradedPlan(from, to, opts) {
       to: to.track,
       chosen,
       version: {
-        plannerVersion: ((buildCuefieldVersion({ root: process.cwd(), appVersion: '2.5.0' }) || {}).plannerVersion || 'mineradio-2.2.0'),
+        plannerVersion: ((buildCuefieldVersion({ root: process.cwd(), appVersion: '2.5.1' }) || {}).plannerVersion || 'mineradio-2.2.0'),
         runtimeVersion: 'shinayuu-cuefield-2.4',
         capabilityLevel: 'structure-aware-transition',
         auditionCohort: 'shinayuu',
@@ -274,7 +274,7 @@ function upgradedPlan(from, to, opts) {
     diagnostics: {
       ...(windowPlan.diagnostics || {}),
       upgradedPlanner: true,
-      upstreamCuefieldVersion: ((buildCuefieldVersion({ root: process.cwd(), appVersion: '2.5.0' }) || {}).plannerVersion || '2.2.0'),
+      upstreamCuefieldVersion: ((buildCuefieldVersion({ root: process.cwd(), appVersion: '2.5.1' }) || {}).plannerVersion || '2.2.0'),
       route: route ? route.route : '',
     },
     policy: windowPlan.policy || route || null,

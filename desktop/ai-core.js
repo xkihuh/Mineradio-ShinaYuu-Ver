@@ -1,4 +1,4 @@
-/* ShinaYuu AI Core 4.1 — 2.5.0 Personal Music Agent */
+/* ShinaYuu AI Core 4.1.1 — 2.5.1 Transaction-Safe Personal Music Agent */
 'use strict';
 
 const fs = require('fs');
@@ -11,13 +11,14 @@ const { AGENT_VERSION, buildPlan, verifyToolResult, verifyFinalAction, critiqueR
 const http = require('http');
 const https = require('https');
 
-const AI_VERSION = '4.1.0';
+const AI_VERSION = '4.1.1';
 const DEFAULT_MODEL = 'gpt-5.6';
 const PREMIUM_OPENAI_MODEL = 'gpt-6-astra';
 const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
 const DEFAULT_GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/interactions';
 const DEFAULT_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const PROVIDER_SEARCH_TIMEOUT_MS = 7000;
 const CACHE_MAX = 120;
 const ALLOWED_ACTIONS = new Set([
   'play_pause', 'next', 'previous', 'set_volume', 'search',
@@ -63,7 +64,7 @@ function normalizeAction(action) {
     return { type, value: Math.max(0, Math.min(1, raw > 1 ? raw / 100 : raw)) };
   }
   if (type === 'search') return { type, query: safeText(action.query || action.keywords || '', 240), mode: safeText(action.mode || 'song', 32) || 'song' };
-  if (type === 'smart_playlist') return { type, query: safeText(action.query || '', 240), count: Math.max(3, Math.min(30, Math.round(normalizeNumber(action.count, 10)))), autoplay: !!action.autoplay };
+  if (type === 'smart_playlist') return { type, query: safeText(action.query || '', 240), count: Math.max(3, Math.min(30, Math.round(normalizeNumber(action.count, 10)))), autoplay: !!action.autoplay, preserveCurrent: action.preserveCurrent === true, replaceCurrent: action.replaceCurrent === true, replaceMode: safeText(action.replaceMode || '', 64) || ((action.preserveCurrent === true && action.replaceCurrent === true) ? 'replace-upcoming-preserve-current' : 'normal'), tracks: Array.isArray(action.tracks) ? action.tracks.slice(0, 30).map(t => t && typeof t === 'object' ? { ...t } : null).filter(Boolean) : [] };
   if (type === 'play_track') {
     const track = action.track && typeof action.track === 'object' ? action.track : null;
     if (!track || !safeText(track.title || track.name, 180)) return null;
@@ -299,7 +300,7 @@ function localBrain(message, context) {
     if (!track.title && !track.name) return { reply: 'Hiện chưa có bài hát nào đang phát.', action: null, engine: 'local-demo', model: '' };
     return { reply: track.artist ? `Hiện đang phát “${safeText(track.title || track.name,180)}” — ${safeText(track.artist,160)}.` : `Hiện đang phát “${safeText(track.title || track.name,180)}”.`, action: null, engine: 'local-demo', model: '' };
   }
-  return { reply: 'AI Local Demo đang hoạt động. Bạn có thể cấu hình AI trực tiếp trong package.json (khối shinayuuAI) hoặc dùng ai-config.json trong AppData để dùng model thật để dùng Smart Search, Tool Calling, Web Search, Memory và các tính năng AI đầy đủ của ShinaYuu 2.5.0.', action: null, engine: 'local-demo', model: '' };
+  return { reply: 'AI Local Demo đang hoạt động. Bạn có thể cấu hình AI trực tiếp trong package.json (khối shinayuuAI) hoặc dùng ai-config.json trong AppData để dùng model thật để dùng Smart Search, Tool Calling, Web Search, Memory và các tính năng AI đầy đủ của ShinaYuu 2.5.1.', action: null, engine: 'local-demo', model: '' };
 }
 
 
@@ -319,6 +320,24 @@ function quickLocalResponse(message, context) {
   const result = localBrain(message, context);
   if (result && result.engine === 'local-demo') return { ...result, engine: 'local-fast', fastPath: true };
   return null;
+}
+
+function withTimeout(promise, timeoutMs, code = 'AI_OPERATION_TIMEOUT') {
+  const ms = Math.max(500, Number(timeoutMs) || 7000);
+  let timer = null;
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(Object.assign(new Error(code), { code })), ms);
+    })
+  ]).finally(() => { if (timer) clearTimeout(timer); });
+}
+
+function playlistReplacementRequested(message) {
+  const q = String(message || '').toLowerCase();
+  return /playlist|danh sách phát|queue|hàng chờ/.test(q) &&
+    /thay(?: đổi)?|đổi|replace/.test(q) &&
+    /giữ(?: lại)?\s+(?:bài\s+)?(?:đang phát|hiện tại)|preserve\s+(?:the\s+)?current|keep\s+(?:the\s+)?current/.test(q);
 }
 
 function createAiCore(options = {}) {
@@ -424,7 +443,7 @@ function createAiCore(options = {}) {
       configured: cfg.configured, apiUrl: cfg.apiUrl, model: cfg.model, hasApiKey: cfg.hasApiKey,
       timeoutMs, responsesApi: cfg.responsesApi, reasoningDefault, webSearchEnabled, toolCallingEnabled,
       memoryEnabled, adaptiveMemoryEnabled, conversationMemoryEnabled, preferenceRerankingEnabled, smartNextEnabled,
-      agentVersion: AGENT_VERSION, agentPlanningEnabled, agentVerificationEnabled, agentMaxToolRounds,
+      agentVersion: AGENT_VERSION, agentPlanningEnabled, agentVerificationEnabled, agentMaxToolRounds, playlistTransactionSafety: true, providerSearchTimeoutMs: PROVIDER_SEARCH_TIMEOUT_MS,
       cacheEnabled, failoverEnabled, latencyMode, fastThinking, normalThinking, complexThinking,
       availableProviders: { gemini: hasGemini, openai: hasOpenAI, local: true },
       configSource: aiConfig.source, userConfigPath: aiConfig.userConfigPath, packageConfigPath: aiConfig.packagePath,
@@ -439,7 +458,7 @@ function createAiCore(options = {}) {
     const intent = parseMusicIntent(query); const q = intent.original; if (!q) return { query: '', songs: [], providers: {}, intent };
     const limit = Math.max(1, Math.min(30, Math.round(normalizeNumber(opts.limit, 18))));
     const jobs = [];
-    const add = (name, fn) => { if (typeof fn === 'function') jobs.push(Promise.resolve().then(() => fn(intent.expanded, Math.min(24, Math.max(limit, 18)))).then(rows => ({ name, rows: Array.isArray(rows) ? rows : [] })).catch(error => ({ name, rows: [], error: error.message }))); };
+    const add = (name, fn) => { if (typeof fn === 'function') jobs.push(withTimeout(Promise.resolve().then(() => fn(intent.expanded, Math.min(24, Math.max(limit, 18))),), opts.providerTimeoutMs || PROVIDER_SEARCH_TIMEOUT_MS, 'AI_PROVIDER_SEARCH_TIMEOUT').then(rows => ({ name, rows: Array.isArray(rows) ? rows : [] })).catch(error => ({ name, rows: [], error: error.message }))); };
     add('youtube-music', providers.youtubeMusicSearch); add('soundcloud', providers.soundcloudSearch); add('spotify', providers.spotifySearch);
     const settled = await Promise.all(jobs);
     const normalized = dedupeSongs(settled.flatMap(item => item.rows.map(row => normalizeSong(row, item.name)).filter(Boolean)));
@@ -502,13 +521,14 @@ function createAiCore(options = {}) {
   }
 
   const toolDefinitions = [
-    { type: 'function', name: 'get_agent_plan', description: 'Đọc kế hoạch suy luận hiện tại của ShinaYuu AI 4.1 cho yêu cầu người dùng.', parameters: { type: 'object', properties: {}, additionalProperties: false } },
+    { type: 'function', name: 'get_agent_plan', description: 'Đọc kế hoạch suy luận hiện tại của ShinaYuu AI 4.1.1 cho yêu cầu người dùng.', parameters: { type: 'object', properties: {}, additionalProperties: false } },
     { type: 'function', name: 'get_current_track', description: 'Lấy bài hát đang phát và trạng thái player.', parameters: { type: 'object', properties: {}, additionalProperties: false } },
     { type: 'function', name: 'get_queue', description: 'Lấy queue hiện tại và preview các bài.', parameters: { type: 'object', properties: {}, additionalProperties: false } },
     { type: 'function', name: 'get_playback_health', description: 'Kiểm tra player có thực sự đang phát, đang kẹt hay đã mất nguồn âm thanh hay không.', parameters: { type: 'object', properties: {}, additionalProperties: false } },
     { type: 'function', name: 'search_music', description: 'Tìm bài qua Search Engine của ShinaYuu mà không tự phát.', parameters: { type: 'object', properties: { query: { type: 'string' }, limit: { type: 'integer', minimum: 3, maximum: 20 } }, required: ['query'], additionalProperties: false } },
     { type: 'function', name: 'play_music', description: 'Tìm đúng bài hát người dùng yêu cầu và phát ngay kết quả phù hợp nhất. Dùng cho các yêu cầu như mở/phát/bật bài X.', parameters: { type: 'object', properties: { query: { type: 'string' }, artist: { type: 'string' } }, required: ['query'], additionalProperties: false } },
-    { type: 'function', name: 'create_smart_playlist', description: 'Tìm và tạo danh sách bài theo yêu cầu tự nhiên.', parameters: { type: 'object', properties: { query: { type: 'string' }, count: { type: 'integer', minimum: 3, maximum: 30 } }, required: ['query'], additionalProperties: false } },
+    { type: 'function', name: 'create_smart_playlist', description: 'Tìm và tạo danh sách bài theo yêu cầu tự nhiên. Có thể thay phần queue sắp tới nhưng giữ nguyên bài đang phát trong một transaction duy nhất.', parameters: { type: 'object', properties: { query: { type: 'string' }, count: { type: 'integer', minimum: 3, maximum: 30 }, preserveCurrent: { type: 'boolean' }, replaceCurrent: { type: 'boolean' } }, required: ['query'], additionalProperties: false } },
+    { type: 'function', name: 'replace_playlist_preserve_current', description: 'Tạo queue mới từ kết quả search đã xác minh, thay toàn bộ phần sắp phát nhưng giữ nguyên track đang phát và vị trí phát hiện tại. Đây là transaction nguyên tử, không được tự phát lại track hiện tại.', parameters: { type: 'object', properties: { query: { type: 'string' }, count: { type: 'integer', minimum: 3, maximum: 30 } }, required: ['query'], additionalProperties: false } },
     { type: 'function', name: 'control_player', description: 'Thực hiện một lệnh điều khiển player an toàn.', parameters: { type: 'object', properties: { action: { type: 'string', enum: ['play_pause','next','previous','set_volume','play_index','smart_next','ai_radio'] }, value: { type: 'number' }, index: { type: 'integer', minimum: 0 }, enabled: { type: 'boolean' } }, required: ['action'], additionalProperties: false } },
     { type: 'function', name: 'analyze_track', description: 'Phân tích metadata/ngữ nghĩa cơ bản của bài đang phát.', parameters: { type: 'object', properties: {}, additionalProperties: false } },
     { type: 'function', name: 'verify_lyrics', description: 'Kiểm tra lyrics hiện tại với Lyrics Engine và AI.', parameters: { type: 'object', properties: {}, additionalProperties: false } },
@@ -551,7 +571,7 @@ function createAiCore(options = {}) {
           const retryQuality = critiqueRecommendation(retry, buildPlan(context.__aiMessage || a.query || '', context, getMemorySnapshot()));
           if (retryQuality.qualityScore > quality.qualityScore) { result = retry; quality = retryQuality; }
         }
-        return { ...result, quality, suggestedAction: { type: 'smart_playlist', query: safeText(a.query || '', 240), count, autoplay: false } };
+        return { ...result, quality, suggestedAction: { type: 'smart_playlist', query: safeText(a.query || '', 240), count, autoplay: false, preserveCurrent: !!a.preserveCurrent, replaceCurrent: !!a.replaceCurrent, replaceMode: a.preserveCurrent && a.replaceCurrent ? 'replace-upcoming-preserve-current' : 'normal', tracks: result.songs.slice(0, count) } };
       }
       case 'analyze_track': return { ...(analyzeTrack(context)), suggestedAction: { type: 'analyze_track' } };
       case 'verify_lyrics': return { ...(await verifyLyrics(context)), suggestedAction: { type: 'lyrics_verify' } };
@@ -577,6 +597,14 @@ function createAiCore(options = {}) {
         const query = safeText(a.query || '', 240);
         const result = await discover(query, { limit: a.limit || 12 });
         return { ...result, quality: critiqueRecommendation(result, buildPlan(context.__aiMessage || query, context, getMemorySnapshot())), verifiedFor: query };
+      }
+      case 'replace_playlist_preserve_current': {
+        const count = Math.max(3, Math.min(30, Math.round(normalizeNumber(a.count, 12))));
+        const result = await discover(a.query || '', { limit: count, providerTimeoutMs: PROVIDER_SEARCH_TIMEOUT_MS });
+        const plan = buildPlan(context.__aiMessage || a.query || '', context, getMemorySnapshot());
+        const quality = critiqueRecommendation(result, plan);
+        if (!result.songs.length) return { ...result, ok: false, quality, error: 'NO_VERIFIED_SONGS' };
+        return { ...result, ok: true, quality, transaction: 'replace-upcoming-preserve-current', suggestedAction: { type: 'smart_playlist', query: safeText(a.query || '', 240), count, autoplay: false, preserveCurrent: true, replaceCurrent: true, replaceMode: 'replace-upcoming-preserve-current', tracks: result.songs.slice(0, count) } };
       }
       case 'control_player': {
         const action = String(a.action || '').toLowerCase();
@@ -652,7 +680,7 @@ function createAiCore(options = {}) {
           store: true,
           ...(responseId ? { previous_response_id: responseId } : {}),
           text: { format: { type: 'json_object' } },
-          prompt_cache_key: 'shinayuu-ai-core-v4-0'
+          prompt_cache_key: 'shinayuu-ai-core-v4-1-transaction-safe'
         };
         const response = await requestJson(openAiUrl, payload, { Authorization: `Bearer ${openAiKey}` }, timeoutMs);
         responseId = response.id || responseId;
@@ -803,6 +831,27 @@ function createAiCore(options = {}) {
         }
       } catch (_) {}
     }
+    // Transactional playlist replacement is deterministic by design: let the AI choose/search the music,
+    // but never make the model orchestrate destructive queue mutations one tool call at a time.
+    if (playlistReplacementRequested(cleanMessage)) {
+      const desired = agentPlan && agentPlan.constraints && agentPlan.constraints.count ? agentPlan.constraints.count : 12;
+      try {
+        const found = await discover(cleanMessage, { limit: desired, providerTimeoutMs: PROVIDER_SEARCH_TIMEOUT_MS });
+        const songs = Array.isArray(found.songs) ? found.songs : [];
+        const quality = critiqueRecommendation(found, agentPlan || {});
+        if (songs.length) {
+          const result = {
+            reply: `Mình đã tìm ${songs.length} bài phù hợp. Mình sẽ thay phần queue sắp phát và giữ nguyên bài đang phát.`,
+            action: { type: 'smart_playlist', query: cleanMessage, count: songs.length, autoplay: false, preserveCurrent: true, replaceCurrent: true, replaceMode: 'replace-upcoming-preserve-current', tracks: songs },
+            engine: 'local-transaction', fastPath: true, verified: true, quality, model: ''
+          };
+          try { rememberConversation('assistant', result.reply); } catch (_) {}
+          return result;
+        }
+      } catch (_) {
+        // fall through to the model path; provider timeout isolation still applies there.
+      }
+    }
     const order = providerOrder();
     if (order[0] === 'local') {
       const result = localBrain(cleanMessage, context);
@@ -812,7 +861,7 @@ function createAiCore(options = {}) {
     const key = cacheKey(cleanMessage, context);
     const hit = cached(key); if (hit && !hit.action) return { ...hit, cached: true };
     const contextPayload = {
-      app: 'ShinaYuu Music 2.5.0', aiVersion: AI_VERSION, agentVersion: AGENT_VERSION, __aiMessage: cleanMessage,
+      app: 'ShinaYuu Music 2.5.1', aiVersion: AI_VERSION, agentVersion: AGENT_VERSION, __aiMessage: cleanMessage,
       currentTrack: context.currentTrack || null, playing: !!context.playing,
       volume: Number.isFinite(Number(context.volume)) ? Number(context.volume) : null,
       elapsedSec: Number.isFinite(Number(context.elapsedSec || context.position)) ? Number(context.elapsedSec || context.position) : null,
@@ -843,7 +892,7 @@ function createAiCore(options = {}) {
       ...(agentPlan ? { agentPlan } : {})
     };
     const instructions = [
-      `You are ShinaYuu AI v${AI_VERSION}, embedded in the desktop music player ShinaYuu Music 2.5.0. You are a super-intelligent Personal Music Agent with planning, verification, personalization and recovery abilities, not only a chatbot.`,
+      `You are ShinaYuu AI v${AI_VERSION}, embedded in the desktop music player ShinaYuu Music 2.5.1. You are a super-intelligent Personal Music Agent with planning, verification, personalization and recovery abilities, not only a chatbot.`,
       'Answer in Vietnamese unless the user asks otherwise. Understand natural Vietnamese, English, mixed-language and conversational commands; do not require rigid command syntax.',
       'Work from the provided agentPlan when present: understand the goal first, execute only the minimum necessary tools, verify important results, then respond.',
       'Treat the current player state, queue and memory as ground truth. Do not invent tracks, queue entries, playback outcomes, memories or provider results.',
@@ -852,6 +901,7 @@ function createAiCore(options = {}) {
       'For AutoMix, optimize compatibility using mood, energy, BPM, structure, lyrics and learned taste, but treat end-of-track timing, fade safety, queue ownership and playback recovery as hard invariants owned by the player.',
       'When a playback operation looks stuck, call get_playback_health/get_current_track before issuing another transport command. Prefer recovery of the current verified track over repeatedly starting different tracks.',
       'When a tool result contains agentVerification or recommendationQuality, use it as a quality gate. If verification fails, adjust the query or use another tool rather than pretending success.',
+      'For a request to replace the current playlist while keeping the playing track, use replace_playlist_preserve_current or create_smart_playlist with preserveCurrent=true/replaceCurrent=true. Treat the returned smart_playlist action as an atomic queue transaction. Never clear or rebuild the queue through separate control calls.',
       'Use ShinaYuu tools whenever they improve accuracy or can execute the user request.',
       'For player actions, ALWAYS use control_player for transport/volume/radio controls. For an explicit named-song play/open request, use play_music; it searches the real ShinaYuu sources and returns the exact playable track.',
       'For music lookup use search_music or create_smart_playlist; do not fabricate songs. For an explicit request to open/play a named song, use play_music and then treat its selectedTrack/queued action as the actual playback target. Use verify_recommendations when the request has quality/constraint requirements and the first candidate set may need another pass.',

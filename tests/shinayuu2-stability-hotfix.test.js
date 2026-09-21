@@ -49,10 +49,10 @@ test('AI/Cuefield AutoMix cannot cut a track early or skip the immediate queue s
   assert.match(mix, /var hardFloor = safeMixTriggerAt\(knownDuration, pending\.triggerAt/);
 });
 
-test('release stays on app version 2.5.0 while the hotfix remains a same-version stability patch', () => {
+test('release advances to app version 2.5.1 for the transaction-safe AI patch', () => {
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
-  assert.equal(pkg.version, '2.5.0');
-  assert.equal(lock.packages[''].version, '2.5.0');
+  assert.equal(pkg.version, '2.5.1');
+  assert.equal(lock.packages[''].version, '2.5.1');
   assert.match(read('CHANGELOG.md'), /^## 2\.5\.0 — Stability Hotfix/m);
 });

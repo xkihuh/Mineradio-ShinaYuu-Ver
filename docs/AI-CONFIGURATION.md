@@ -1,4 +1,4 @@
-# ShinaYuu AI 2.5.0 — One-key configuration
+# ShinaYuu AI 2.5.1 — One-key configuration
 
 For a personal/internal build, you only need to edit `package.json` and put the provider key in `shinayuuAI.apiKey`.
 
@@ -55,10 +55,14 @@ A real API key placed in `package.json` becomes part of the application distribu
 Environment variables are still supported and override package/user configuration for advanced setups.
 
 
-## AI 4.1 Personal Music Agent
+## AI 4.1.1 Personal Music Agent
 
-ShinaYuu Music 2.5.0 stores a bounded local conversation window, learns non-sensitive music preferences from likes/skips/completions and explicit interactions, re-ranks real provider search results using those signals, and chooses Smart Next from the actual queue. The adaptive layer stays outside the playback critical path. AI 4.1 adds intent planning, multi-step tool execution, recommendation verification, and safe final-action verification without taking ownership of playback internals.
+ShinaYuu Music 2.5.1 stores a bounded local conversation window, learns non-sensitive music preferences from likes/skips/completions and explicit interactions, re-ranks real provider search results using those signals, and chooses Smart Next from the actual queue. The adaptive layer stays outside the playback critical path. AI 4.1.1 adds intent planning, multi-step tool execution, recommendation verification, and safe final-action verification without taking ownership of playback internals.
 
 
-### AI 4.1 agent controls
+### AI 4.1.1 agent controls
 `agentPlanning` enables deterministic intent planning. `agentVerification` enables tool/result and final-action verification. `agentMaxToolRounds` limits the model tool loop to prevent unbounded execution. Environment variables: `SHINAYUU_AI_AGENT_PLANNING`, `SHINAYUU_AI_AGENT_VERIFICATION`, `SHINAYUU_AI_AGENT_MAX_TOOL_ROUNDS`.
+
+
+### AI 4.1.1 transaction safety
+AI 4.1.1 treats playlist replacement as a supervised music transaction. A request to replace the current queue while keeping the current track uses provider-isolated search, verified track payloads, an AutoMix release barrier and a single queue mutation. The current media element is not restarted by the transaction.
