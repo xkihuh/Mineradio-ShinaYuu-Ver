@@ -237,8 +237,8 @@ async function handle(req, res, url, pathname) {
   if (pathname === '/api/youtube-music/user/playlists' || pathname === '/api/qq/user/playlists') {
     try {
       const playlists = await musicProviders.youtubeAccountPlaylists(normalizeLimit(url, 50, 200));
-      sendJson(res, { ok: true, provider: 'qq', realProvider: 'youtube', loggedIn: true, playlists });
-    } catch (error) { providerError(res, error); }
+      sendJson(res, { ok: true, provider: 'youtube', realProvider: 'youtube', loggedIn: true, playlists, total: playlists.length, nextOffset: playlists.length, hasMore: false });
+    } catch (error) { providerError(res, error, 401); }
     return true;
   }
 
@@ -327,9 +327,14 @@ async function handle(req, res, url, pathname) {
 
   if (pathname === '/api/spotify/user/playlists') {
     try {
-      const playlists = await musicProviders.spotifyUserPlaylists(normalizeLimit(url, 50, 50));
-      sendJson(res, { ok: true, provider: 'spotify', loggedIn: true, playlists });
-    } catch (error) { providerError(res, error, 401); }
+      const page = await musicProviders.spotifyUserPlaylistsPage(
+        normalizeLimit(url, 50, 50),
+        Math.max(0, Number(url.searchParams.get('offset') || 0) || 0),
+      );
+      sendJson(res, { ok: true, provider: 'spotify', loggedIn: true, ...page });
+    } catch (error) {
+      providerError(res, error, 401);
+    }
     return true;
   }
 

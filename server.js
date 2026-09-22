@@ -4235,8 +4235,11 @@ async function handleModernMusicRoute(req, res, url, pn) {
     try {
       const status = await musicProviders.spotifyLoginStatus(baseUrl);
       if (!status.loggedIn) { sendJSON(res, { loggedIn: false, provider: 'spotify', playlists: [] }); return true; }
-      const playlists = await musicProviders.spotifyUserPlaylists(parseInt(url.searchParams.get('limit') || '50', 10) || 50);
-      sendJSON(res, { loggedIn: true, provider: 'spotify', userId: status.userId, playlists });
+      const page = await musicProviders.spotifyUserPlaylistsPage(
+        Math.max(1, Math.min(50, parseInt(url.searchParams.get('limit') || '50', 10) || 50)),
+        Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0),
+      );
+      sendJSON(res, { loggedIn: true, provider: 'spotify', userId: status.userId, ...page });
     } catch (error) { modernProviderError(res, error); }
     return true;
   }
@@ -4247,7 +4250,7 @@ async function handleModernMusicRoute(req, res, url, pn) {
       if (!status.loggedIn) { sendJSON(res, { loggedIn: false, provider: 'youtube', configured: status.configured, playlists: [] }); return true; }
       const playlists = await musicProviders.youtubeAccountPlaylists(parseInt(url.searchParams.get('limit') || '200', 10) || 200);
       const diagnostics = typeof musicProviders.youtubePlaylistSyncDiagnostics === 'function' ? musicProviders.youtubePlaylistSyncDiagnostics() : null;
-      sendJSON(res, { loggedIn: true, provider: 'youtube', userId: status.userId, nickname: status.nickname, avatar: status.avatar, playlists, diagnostics });
+      sendJSON(res, { loggedIn: true, provider: 'youtube', userId: status.userId, nickname: status.nickname, avatar: status.avatar, playlists, total: playlists.length, nextOffset: playlists.length, hasMore: false, diagnostics });
     } catch (error) { modernProviderError(res, error); }
     return true;
   }

@@ -538,7 +538,8 @@ function ensurePlaylistShelfVisibleAfterCatalog(reason) {
     console.warn('[PlaylistShelfVisibility]', reason || 'playlist-catalog', error);
   }
 }
-function playlistCatalogProviderLoggedIn(provider) {
+function playlistCatalogProviderLoggedIn(provider, allowProbe) {
+  if (allowProbe === true) return true;
   return provider === 'spotify' ? !!spotifyLoginStatus.loggedIn : !!youtubeLoginStatus.loggedIn;
 }
 function playlistCatalogPageUrl(provider, offset, limit) {
@@ -573,7 +574,7 @@ function rebuildUserPlaylistsFromCatalog(opts) {
 async function loadPlaylistCatalogProviderPage(provider, reason) {
   var root = playlistCatalogSyncState;
   var state = root.providers && root.providers[provider];
-  if (!state || state.loading || !state.hasMore || !playlistCatalogProviderLoggedIn(provider)) return false;
+  if (!state || state.loading || !state.hasMore || !state.enabled) return false;
   var token = root.token;
   var first = state.firstRequest !== false;
   var limit = first ? PLAYLIST_CATALOG_FIRST_PAGE_SIZE : PLAYLIST_CATALOG_BACKGROUND_PAGE_SIZE;
@@ -584,6 +585,13 @@ async function loadPlaylistCatalogProviderPage(provider, reason) {
   try {
     var r = await apiJson(url, { timeoutMs: 15000 });
     if (playlistCatalogSyncState.token !== token) return false;
+    if (r && r.loggedIn === false) {
+      state.enabled = false;
+      state.hasMore = false;
+      state.error = 'PLAYLIST_PROVIDER_NOT_CONNECTED';
+      state.firstRequest = false;
+      return false;
+    }
     var incoming = validPlaylistCatalogRows(r && r.playlists || [], provider);
     if (r && r.error && !incoming.length) throw new Error(r.message || r.error);
     // Replace a provider only after its first successful non-empty response.
@@ -612,11 +620,22 @@ async function loadPlaylistCatalogProviderPage(provider, reason) {
   } catch (e) {
     if (playlistCatalogSyncState.token !== token) return false;
     console.warn('[PlaylistCatalogPage]', provider, e);
+    var errorData = e && e.data || {};
     state.error = e && e.message || 'PLAYLIST_CATALOG_PAGE_FAILED';
+    state.reauthRequired = !!errorData.reauthRequired || /SCOPE_REQUIRED|AUTH_REQUIRED|REAUTH/i.test(String(state.error));
     state.firstRequest = false;
     state.hasMore = false;
+    state.enabled = false;
     playlistCatalogSyncState.error = state.error;
+    playlistCatalogSyncState.providers[provider] = state;
     if (userPlaylists.length) renderUserPlaylistsList({ preserveScroll: true });
+    else {
+      var message = state.reauthRequired
+        ? localizeUiMessage('Hãy đăng nhập lại trước khi thay đổi trạng thái yêu thích của playlist')
+        : localizeUiMessage('Không thể đọc dữ liệu');
+      var empty = document.getElementById('pl-list');
+      if (empty) empty.innerHTML = '<div class="playlist-empty-state">' + escHtml(message) + '</div>';
+    }
     scheduleShelfRebuild('playlist-catalog-error-' + provider, true);
     ensurePlaylistShelfVisibleAfterCatalog('playlist-catalog-error-' + provider);
     return false;
@@ -659,7 +678,8 @@ function requestNextPlaylistCatalogPage(reason) {
 }
 async function refreshUserPlaylists(force) {
   if (typeof refreshBuiltInPlaylists === 'function') await refreshBuiltInPlaylists(!!force);
-  if (!youtubeLoginStatus.loggedIn && !spotifyLoginStatus.loggedIn) {
+  var allowProviderProbe = !!force;
+  if (!youtubeLoginStatus.loggedIn && !spotifyLoginStatus.loggedIn && !allowProviderProbe) {
     resetPlaylistPanelRenderLimit();
     if (Array.isArray(builtInPlaylists) && builtInPlaylists.length) {
       rebuildUserPlaylistsFromCatalog({ animate: false, reset: true, preserveScroll: true, reason: 'built-in-only-playlists' });
@@ -695,11 +715,11 @@ async function refreshUserPlaylists(force) {
   playlistCatalogSyncState = { token: token, loading: true, timer: 0, providers: {}, error: '', startedAt: Date.now() };
   ['youtube', 'spotify'].forEach(function (provider) {
     playlistCatalogSyncState.providers[provider] = {
-      enabled: playlistCatalogProviderLoggedIn(provider),
+      enabled: playlistCatalogProviderLoggedIn(provider, allowProviderProbe),
       loaded: playlistCatalogProviderArray(provider).length,
       total: playlistCatalogProviderArray(provider).length,
       nextOffset: 0,
-      hasMore: playlistCatalogProviderLoggedIn(provider),
+      hasMore: playlistCatalogProviderLoggedIn(provider, allowProviderProbe),
       loading: false,
       error: '',
       firstRequest: true,
@@ -709,7 +729,7 @@ async function refreshUserPlaylists(force) {
   });
   // Never clear userPlaylists before the network result arrives. Clearing here
   // was the direct reason the authenticated right shelf disappeared.
-  var firstPageTasks = Object.keys(playlistCatalogSyncState.providers).filter(playlistCatalogProviderLoggedIn).map(function (provider) {
+  var firstPageTasks = Object.keys(playlistCatalogSyncState.providers).filter(function (provider) { return playlistCatalogSyncState.providers[provider].enabled; }).map(function (provider) {
     return loadPlaylistCatalogProviderPage(provider, 'first-page');
   });
   await Promise.allSettled(firstPageTasks);

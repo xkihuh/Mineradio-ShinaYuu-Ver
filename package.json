@@ -113,9 +113,7 @@
         "repo": "Mineradio-ShinaYuu-Ver",
         "releaseType": "release"
       }
-    ],
-    "displayVersion": "2.5.1",
-    "edition": "ShinaYuu Music 2.5.1 — AI 4.1 Transaction Safety + Cuefield Intelligence Release"
+    ]
   },
   "dependencies": {
     "7zip-bin": "^5.2.0",

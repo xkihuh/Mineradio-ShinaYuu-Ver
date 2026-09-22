@@ -1360,7 +1360,15 @@ function parseIsoDurationMs(value) {
 
 async function youtubeAccountPlaylists(limit = 50) {
   const status = await youtubeLoginStatus();
-  if (!status.loggedIn || status.authMode !== 'official') return [];
+  if (!status.loggedIn || status.authMode !== 'official') {
+    const error = new Error('YOUTUBE_PLAYLIST_AUTH_REQUIRED');
+    error.code = 'YOUTUBE_PLAYLIST_AUTH_REQUIRED';
+    error.status = 401;
+    error.provider = 'youtube';
+    error.reauthRequired = true;
+    error.requiredScope = 'https://www.googleapis.com/auth/youtube.readonly';
+    throw error;
+  }
   const maxItems = Math.max(1, Math.min(500, Number(limit) || 50));
   const results = [];
   let pageToken = '';
@@ -3497,7 +3505,10 @@ function spotifyPlaylistContextUri(value) {
 
 function spotifyPlaylistReadScopesReady(token) {
   const granted = new Set(String(token && token.scope || '').split(/\s+/).filter(Boolean));
-  return granted.has('playlist-read-private') && granted.has('playlist-read-collaborative');
+  // /me/playlists requires playlist-read-private. The collaborative scope is
+  // additive: without it Spotify may omit collaborative playlists, but normal
+  // owned/followed playlists should still synchronize.
+  return granted.has('playlist-read-private');
 }
 
 function spotifyTrackHasPlaylistMetadata(track) {
@@ -3672,10 +3683,32 @@ async function spotifySearch(query, limit = 18) {
   return songs.slice(0, target);
 }
 
-async function spotifyUserPlaylists(limit = 50) {
-  const data = await spotifyApi(`/me/playlists?limit=${Math.max(1, Math.min(50, Number(limit) || 50))}`);
-  const profile = cachedSpotifyProfile(spotifyToken());
-  return ((data && data.items) || []).map((playlist) => {
+async function spotifyUserPlaylistsPage(limit = 50, offset = 0) {
+  const token = await validSpotifyToken(false);
+  if (!token || !token.access_token) {
+    const error = new Error('SPOTIFY_PLAYLIST_AUTH_REQUIRED');
+    error.code = 'SPOTIFY_PLAYLIST_AUTH_REQUIRED';
+    error.status = 401;
+    error.provider = 'spotify';
+    error.reauthRequired = true;
+    throw error;
+  }
+  if (!spotifyPlaylistReadScopesReady(token)) {
+    const error = new Error('SPOTIFY_PLAYLIST_READ_SCOPE_REQUIRED');
+    error.code = 'SPOTIFY_PLAYLIST_READ_SCOPE_REQUIRED';
+    error.status = 403;
+    error.provider = 'spotify';
+    error.reauthRequired = true;
+    error.requiredScopes = ['playlist-read-private'];
+    error.optionalScopes = ['playlist-read-collaborative'];
+    error.grantedScopes = String(token.scope || '').split(/\s+/).filter(Boolean);
+    throw error;
+  }
+  const safeLimit = Math.max(1, Math.min(50, Number(limit) || 50));
+  const safeOffset = Math.max(0, Number(offset) || 0);
+  const data = await spotifyApi(`/me/playlists?limit=${safeLimit}&offset=${safeOffset}`);
+  const profile = cachedSpotifyProfile(token);
+  const playlists = ((data && data.items) || []).map((playlist) => {
     const id = String(playlist.id || '');
     const ownerId = String(playlist.owner && playlist.owner.id || '');
     return {
@@ -3700,6 +3733,21 @@ async function spotifyUserPlaylists(limit = 50) {
       externalUrl: String(playlist.external_urls && playlist.external_urls.spotify || ''),
     };
   }).filter((playlist) => playlist.id);
+  const total = Math.max(playlists.length, Number(data && data.total) || 0);
+  const nextOffset = safeOffset + playlists.length;
+  return {
+    playlists,
+    total,
+    offset: safeOffset,
+    limit: safeLimit,
+    nextOffset,
+    hasMore: !!(data && data.next) || nextOffset < total,
+  };
+}
+
+async function spotifyUserPlaylists(limit = 50) {
+  const page = await spotifyUserPlaylistsPage(limit, 0);
+  return page.playlists;
 }
 
 async function spotifyPlaylistTracks(id, limit = 100) {

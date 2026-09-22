@@ -1,3 +1,8 @@
+## 2.5.1 — Release/Playlist Sync Build Fix
+
+- Fixed electron-builder 26.15.3 schema errors caused by unsupported `build.displayVersion` and `build.edition` fields.
+- Hardened YouTube/Spotify playlist catalog sync with forced provider probing, explicit reauthorization diagnostics, and paged Spotify `/me/playlists` metadata.
+
 ## 2.5.1 — AI Transaction Safety + Playlist Reliability (2026-09-19 UTC+7)
 
 - Added AI 4.1.1 transaction-safe music planning with atomic queue replacement support.
