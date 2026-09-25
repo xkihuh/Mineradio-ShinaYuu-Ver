@@ -1,8 +1,8 @@
-# ShinaYuu Music 2.5.2
+# ShinaYuu Music 2.5.0
 
 ## ShinaYuu 2.5.0 — AI Intelligence + Cuefield Intelligence
 
-ShinaYuu Music 2.5.2 is the Desktop evolution of the 2.3.x AI line. It keeps the existing Spotify, YouTube, YouTube Music, SoundCloud, lyrics, Discord and Castlabs playback architecture while adding two intelligence layers: a persistent user-aware AI layer and a structure-aware Cuefield transition engine selectively ported from Mineradio v2.2.0.
+ShinaYuu Music 2.5.0 is the Desktop evolution of the 2.3.x AI line. It keeps the existing Spotify, YouTube, YouTube Music, SoundCloud, lyrics, Discord and Castlabs playback architecture while adding two intelligence layers: a persistent user-aware AI layer and a structure-aware Cuefield transition engine selectively ported from Mineradio v2.2.0.
 
 ### AI Intelligence
 
@@ -74,8 +74,8 @@ SoundCloud remains a discovery/search source. ShinaYuu keeps the selected canoni
 
 ## Release identity
 
-- Desktop version: **2.5.2**
-- Build identity: **2.5.2 / 2.5.2.0**
+- Desktop version: **2.5.0**
+- Build identity: **2.5.0 / 2.5.0.0**
 - Current release line: **Desktop 2.4.x**
 - Previous release: **2.3.0 AI Intelligence + upstream Cuefield integration**
 
@@ -83,8 +83,8 @@ SoundCloud remains a discovery/search source. ShinaYuu keeps the selected canoni
 
 - [`RELEASE.md`](./RELEASE.md) — 2.5.0 release overview
 - [`CHANGELOG.md`](./CHANGELOG.md) — release history
-- [`AI-SETUP-2.5.2.md`](./AI-SETUP-2.5.2.md) — AI provider setup
-- [`AI-LOCATION-AND-FAST-RESPONSE-2.5.2.md`](./AI-LOCATION-AND-FAST-RESPONSE-2.5.2.md) — location, weather, time and latency behavior
+- [`AI-SETUP-2.5.0.md`](./AI-SETUP-2.5.0.md) — AI provider setup
+- [`AI-LOCATION-AND-FAST-RESPONSE-2.5.0.md`](./AI-LOCATION-AND-FAST-RESPONSE-2.5.0.md) — location, weather, time and latency behavior
 - [`docs/AI-CONFIGURATION.md`](./docs/AI-CONFIGURATION.md) — persistent AI configuration
 - [`SOUNDCLOUD-2.2.0-IMPLEMENTATION.md`](./SOUNDCLOUD-2.2.0-IMPLEMENTATION.md) — historical SoundCloud implementation
 
