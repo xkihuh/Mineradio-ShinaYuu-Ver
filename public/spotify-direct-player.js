@@ -91,6 +91,7 @@
     recoveryLoopCount: 0,
     recoveryLoopReason: '',
     lastGestureAt: 0,
+    needsActivation: false,
     startupPrewarmScheduled: false,
     externalStopSerial: 0,
     ownershipSerial: 0,
@@ -1330,7 +1331,10 @@
     if (!event || event.type === 'keydown' && event.key !== 'Enter' && event.key !== ' ') return;
     spotifyDirectState.lastGestureAt = Date.now();
     if (spotifyDirectState.sdkPlayer) activateSpotifyAudioFromGesture();
-    else if (!spotifyDirectState.prewarmPromise) prewarmSpotifyDirectPlayer();
+    else {
+      spotifyDirectState.needsActivation = true;
+      if (!spotifyDirectState.prewarmPromise) prewarmSpotifyDirectPlayer();
+    }
   }
   document.addEventListener('pointerdown', captureSpotifyMediaActivation, true);
   document.addEventListener('keydown', captureSpotifyMediaActivation, true);
@@ -1826,6 +1830,10 @@
             spotifyDirectState.sdkPlaybackError = '';
             spotifyDirectState.deviceId = payload && payload.device_id || '';
             spotifyDirectState.deviceName = 'ShinaYuu Music';
+            if (spotifyDirectState.needsActivation || (Date.now() - Number(spotifyDirectState.lastGestureAt || 0) < 3500)) {
+              activateSpotifyAudioFromGesture();
+              spotifyDirectState.needsActivation = false;
+            }
             reportSpotifySdkEvent('ready', '', { deviceId: spotifyDirectState.deviceId, deviceName: spotifyDirectState.deviceName });
             applySpotifySdkVolume(player).catch(function (error) { console.warn('[SpotifyVolume ready]', error); });
             if (spotifyDirectState.sdkResolve) spotifyDirectState.sdkResolve({ id: spotifyDirectState.deviceId, name: spotifyDirectState.deviceName, mode: 'sdk' });
@@ -1898,6 +1906,7 @@
           player.addListener('autoplay_failed', function () {
             spotifyDirectState.sdkError = 'SPOTIFY_AUTOPLAY_FAILED';
             spotifyDirectState.audioActivated = false;
+            spotifyDirectState.needsActivation = true;
             if (typeof window.showToast === 'function') {
               window.showToast(localized('Nhấn nút Phát thêm một lần để kích hoạt âm thanh Spotify trong ứng dụng.', 'Press Play once more to activate Spotify audio inside the app.'));
             }
@@ -2737,7 +2746,7 @@
     // and leave the selected track permanently paused. Visual capture is now
     // started only after audible Spotify playback has been confirmed.
     if (spotifyDirectState.sdkPlayer) activateSpotifyAudioFromGesture();
-    else prewarmSpotifyDirectPlayer();
+    else { spotifyDirectState.needsActivation = true; prewarmSpotifyDirectPlayer(); }
     var phase = 'start';
     try {
       phase = 'preflight';
@@ -3183,7 +3192,7 @@
 
   document.addEventListener('pointerdown', function () {
     if (spotifyDirectState.sdkPlayer) activateSpotifyAudioFromGesture();
-    else prewarmSpotifyDirectPlayer();
+    else { spotifyDirectState.needsActivation = true; prewarmSpotifyDirectPlayer(); }
   }, true);
   document.addEventListener('keydown', function () {
     if (spotifyDirectState.sdkPlayer) activateSpotifyAudioFromGesture();
@@ -3197,9 +3206,9 @@
     setTimeout(prewarmSpotifyDirectPlayer, 0);
   });
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { setTimeout(prewarmSpotifyDirectPlayer, 1200); }, { once: true });
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(prewarmSpotifyDirectPlayer, 250); }, { once: true });
   } else {
-    setTimeout(prewarmSpotifyDirectPlayer, 1200);
+    setTimeout(prewarmSpotifyDirectPlayer, 250);
   }
   async function waitForSpotifyContextTrack(timeoutMs) {
     var started = Date.now();

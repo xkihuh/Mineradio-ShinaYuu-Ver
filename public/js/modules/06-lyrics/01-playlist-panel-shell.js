@@ -539,8 +539,12 @@ function ensurePlaylistShelfVisibleAfterCatalog(reason) {
   }
 }
 function playlistCatalogProviderLoggedIn(provider, allowProbe) {
-  if (allowProbe === true) return true;
-  return provider === 'spotify' ? !!spotifyLoginStatus.loggedIn : !!youtubeLoginStatus.loggedIn;
+  var status = provider === 'spotify' ? spotifyLoginStatus : youtubeLoginStatus;
+  // `allowProbe` no longer means "pretend logged in". The provider session
+  // has already been refreshed by refreshUserPlaylists(true). This prevents a
+  // forced refresh from issuing guaranteed 401 requests and then incorrectly
+  // clearing the catalog.
+  return !!(status && status.loggedIn);
 }
 function playlistCatalogPageUrl(provider, offset, limit) {
   offset = Math.max(0, Number(offset) || 0);
@@ -625,7 +629,9 @@ async function loadPlaylistCatalogProviderPage(provider, reason) {
     state.reauthRequired = !!errorData.reauthRequired || /SCOPE_REQUIRED|AUTH_REQUIRED|REAUTH/i.test(String(state.error));
     state.firstRequest = false;
     state.hasMore = false;
-    state.enabled = false;
+    // Do not permanently disable a connected provider after one transient
+    // network/rate-limit failure; the next explicit refresh must be able to retry.
+    state.enabled = !!(provider === 'spotify' ? spotifyLoginStatus.loggedIn : youtubeLoginStatus.loggedIn);
     playlistCatalogSyncState.error = state.error;
     playlistCatalogSyncState.providers[provider] = state;
     if (userPlaylists.length) renderUserPlaylistsList({ preserveScroll: true });
@@ -678,7 +684,21 @@ function requestNextPlaylistCatalogPage(reason) {
 }
 async function refreshUserPlaylists(force) {
   if (typeof refreshBuiltInPlaylists === 'function') await refreshBuiltInPlaylists(!!force);
+  // The playlist panel can be opened before the startup account probes finish.
+  // Never render the logged-out empty state from that transient window.
+  if (!force && !loginStatusChecked && typeof refreshLoginStatus === 'function') {
+    await refreshLoginStatus();
+  }
   var allowProviderProbe = !!force;
+  // A forced refresh is an explicit user request to synchronize remote catalogs.
+  // Refresh the authoritative provider sessions first so a stale renderer status
+  // cannot make us skip a valid YouTube/Spotify catalog request.
+  if (force) {
+    await Promise.allSettled([
+      (typeof refreshYouTubeLoginStatus === 'function' ? refreshYouTubeLoginStatus({ force: true }) : Promise.resolve()),
+      (typeof refreshSpotifyLoginStatus === 'function' ? refreshSpotifyLoginStatus() : Promise.resolve())
+    ]);
+  }
   if (!youtubeLoginStatus.loggedIn && !spotifyLoginStatus.loggedIn && !allowProviderProbe) {
     resetPlaylistPanelRenderLimit();
     if (Array.isArray(builtInPlaylists) && builtInPlaylists.length) {
@@ -737,6 +757,24 @@ async function refreshUserPlaylists(force) {
   playlistCatalogSyncState.loading = playlistCatalogHasPendingPages();
   if ($pl) $pl.classList.remove('playlist-catalog-refreshing');
   if (userPlaylists.length) renderUserPlaylistsList({ animate: isPlaylistPanelVisibleForRender(), preserveScroll: true });
+  else {
+    var providerStates = playlistCatalogSyncState.providers || {};
+    var spotifyState = providerStates.spotify || {};
+    var youtubeState = providerStates.youtube || {};
+    var messages = [];
+    if (spotifyState.reauthRequired || /SCOPE_REQUIRED|AUTH_REQUIRED|REAUTH/i.test(String(spotifyState.error || ''))) {
+      messages.push(localizeUiMessage('Hãy đăng nhập lại trước khi thay đổi trạng thái yêu thích của playlist'));
+    } else if (spotifyLoginStatus.loggedIn && spotifyState.error) {
+      messages.push(localizeUiMessage('Spotify: ') + String(spotifyState.error));
+    }
+    if (youtubeState.reauthRequired || /SCOPE_REQUIRED|AUTH_REQUIRED|REAUTH/i.test(String(youtubeState.error || ''))) {
+      messages.push(localizeUiMessage('Hãy đăng nhập lại trước khi thay đổi trạng thái yêu thích của playlist'));
+    } else if (youtubeLoginStatus.loggedIn && youtubeState.error) {
+      messages.push(localizeUiMessage('YouTube: ') + String(youtubeState.error));
+    }
+    var empty = document.getElementById('pl-list');
+    if (empty) empty.innerHTML = '<div class=\"playlist-empty-state\">' + escHtml(messages.length ? messages.join(' · ') : localizeUiMessage('Kết nối YouTube Music hoặc Spotify để hiển thị playlist của bạn.')) + '</div>';
+  }
   scheduleShelfRebuild('playlist-catalog-all-settled', true);
   ensurePlaylistShelfVisibleAfterCatalog('playlist-catalog-all-settled');
   if (playlistCatalogSyncState.loading) requestNextPlaylistCatalogPage('after-first-pages');

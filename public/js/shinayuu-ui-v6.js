@@ -27,7 +27,10 @@
     if (!body) return;
     var width = Math.max(0, window.innerWidth || root.clientWidth || 0);
     var height = Math.max(0, window.innerHeight || root.clientHeight || 0);
+    var dpr = Math.max(1, Number(window.devicePixelRatio) || 1);
     var fullscreen = detectFullscreen();
+    var hiDpi = dpr >= 1.15;
+    var denseWindow = !fullscreen && (hiDpi || width < 1360 || height < 820);
     setClass('ui-ultrawide', width >= 1800);
     setClass('ui-wide', width >= 1440);
     setClass('ui-compact', width < 1280 && width >= 900);
@@ -36,6 +39,9 @@
     setClass('ui-very-short', height < 640);
     setClass('ui-windowed', !fullscreen);
     setClass('ui-fullscreen', fullscreen);
+    setClass('ui-hi-dpi', hiDpi);
+    setClass('ui-dense-window', denseWindow);
+    root.style.setProperty('--sy-device-pixel-ratio', dpr.toFixed(3));
     root.style.setProperty('--sy-viewport-width', width + 'px');
     root.style.setProperty('--sy-viewport-height', height + 'px');
   }
@@ -120,6 +126,7 @@
 
   function installGlobalHooks() {
     window.addEventListener('resize', queueViewportUpdate, { passive: true });
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', queueViewportUpdate, { passive: true });
     window.addEventListener('orientationchange', queueViewportUpdate, { passive: true });
     document.addEventListener('fullscreenchange', queueViewportUpdate);
     document.addEventListener('webkitfullscreenchange', queueViewportUpdate);

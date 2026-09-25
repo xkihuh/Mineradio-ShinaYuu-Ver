@@ -4248,9 +4248,22 @@ async function handleModernMusicRoute(req, res, url, pn) {
     try {
       const status = await musicProviders.youtubeLoginStatus(baseUrl);
       if (!status.loggedIn) { sendJSON(res, { loggedIn: false, provider: 'youtube', configured: status.configured, playlists: [] }); return true; }
-      const playlists = await musicProviders.youtubeAccountPlaylists(parseInt(url.searchParams.get('limit') || '200', 10) || 200);
+      const limit = parseInt(url.searchParams.get('limit') || '200', 10) || 200;
+      let playlists = await musicProviders.youtubeAccountPlaylists(limit);
+      let fallbackUsed = false;
+      if (!playlists.length && typeof musicProviders.youtubeDevicePlaylists === 'function') {
+        try {
+          const fallback = await musicProviders.youtubeDevicePlaylists(limit);
+          if (Array.isArray(fallback) && fallback.length) {
+            playlists = fallback;
+            fallbackUsed = true;
+          }
+        } catch (fallbackError) {
+          console.warn('[YouTubePlaylistSync] device/cookie fallback failed:', fallbackError.message || fallbackError);
+        }
+      }
       const diagnostics = typeof musicProviders.youtubePlaylistSyncDiagnostics === 'function' ? musicProviders.youtubePlaylistSyncDiagnostics() : null;
-      sendJSON(res, { loggedIn: true, provider: 'youtube', userId: status.userId, nickname: status.nickname, avatar: status.avatar, playlists, total: playlists.length, nextOffset: playlists.length, hasMore: false, diagnostics });
+      sendJSON(res, { loggedIn: true, provider: 'youtube', userId: status.userId, nickname: status.nickname, avatar: status.avatar, playlists, total: playlists.length, nextOffset: playlists.length, hasMore: false, fallbackUsed, diagnostics });
     } catch (error) { modernProviderError(res, error); }
     return true;
   }

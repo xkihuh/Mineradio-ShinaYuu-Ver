@@ -1343,6 +1343,21 @@ async function youtubeLoginStatus(baseUrl = '') {
     }
   }
 
+  const deviceStatus = await youtubeDeviceLoginStatus().catch((error) => {
+    console.warn('[YouTubeDeviceAuth] status probe failed:', error.message || error);
+    return null;
+  });
+  if (deviceStatus && deviceStatus.loggedIn) {
+    return {
+      ...deviceStatus,
+      configured: true,
+      quickLoginAvailable: true,
+      advancedConfigured: !!config.youtubeClientId || deviceStatus.authMode === 'cookie',
+      redirectUri: youtubeRedirectUri(baseUrl),
+      message: deviceStatus.authMode === 'cookie' ? 'YOUTUBE_COOKIE_SESSION_READY' : 'YOUTUBE_DEVICE_SESSION_READY',
+    };
+  }
+
   return {
     provider: 'youtube', loggedIn: false, configured: !!config.youtubeClientId,
     quickLoginAvailable: !!config.youtubeClientId, advancedConfigured: !!config.youtubeClientId,
@@ -1360,13 +1375,23 @@ function parseIsoDurationMs(value) {
 
 async function youtubeAccountPlaylists(limit = 50) {
   const status = await youtubeLoginStatus();
-  if (!status.loggedIn || status.authMode !== 'official') {
+  if (!status.loggedIn) {
     const error = new Error('YOUTUBE_PLAYLIST_AUTH_REQUIRED');
     error.code = 'YOUTUBE_PLAYLIST_AUTH_REQUIRED';
     error.status = 401;
     error.provider = 'youtube';
     error.reauthRequired = true;
     error.requiredScope = 'https://www.googleapis.com/auth/youtube.readonly';
+    throw error;
+  }
+  if (status.authMode === 'cookie' || status.authMode === 'device') {
+    return youtubeDevicePlaylists(limit);
+  }
+  if (status.authMode !== 'official') {
+    const error = new Error('YOUTUBE_PLAYLIST_AUTH_MODE_UNSUPPORTED');
+    error.status = 401;
+    error.provider = 'youtube';
+    error.reauthRequired = true;
     throw error;
   }
   const maxItems = Math.max(1, Math.min(500, Number(limit) || 50));
@@ -1429,7 +1454,9 @@ async function youtubeAccountPlaylistTracks(playlistId, limit = 200) {
   const id = String(playlistId || '').trim();
   if (!id) throw Object.assign(new Error('YOUTUBE_PLAYLIST_ID_REQUIRED'), { status: 400 });
   const status = await youtubeLoginStatus();
-  if (!status.loggedIn || status.authMode !== 'official') throw Object.assign(new Error('YOUTUBE_LOGIN_REQUIRED'), { status: 401 });
+  if (!status.loggedIn) throw Object.assign(new Error('YOUTUBE_LOGIN_REQUIRED'), { status: 401 });
+  if (status.authMode === 'cookie' || status.authMode === 'device') return youtubeDevicePlaylistTracks(id, limit);
+  if (status.authMode !== 'official') throw Object.assign(new Error('YOUTUBE_LOGIN_REQUIRED'), { status: 401 });
   const rawItems = [];
   let pageToken = '';
   while (rawItems.length < limit) {
@@ -3572,7 +3599,7 @@ async function normalizeSpotifyPlaylistTrack(entry, market) {
   });
   if (!spotifyTrackHasPlaylistMetadata(track)) {
     try {
-      const full = await spotifyApi(`/tracks/${encodeURIComponent(id)}?market=${encodeURIComponent(market)}`, { required: true });
+      const full = await spotifyApi(`/tracks/${encodeURIComponent(id)}?market=${encodeURIComponent(market)}`, { required: true, ignoreRateLimit: true });
       track = mergeSpotifyTrackPayload(track, full);
     } catch (error) {
       console.warn('[SpotifyPlaylist] track hydration failed:', id, error && (error.message || error));
@@ -3706,7 +3733,7 @@ async function spotifyUserPlaylistsPage(limit = 50, offset = 0) {
   }
   const safeLimit = Math.max(1, Math.min(50, Number(limit) || 50));
   const safeOffset = Math.max(0, Number(offset) || 0);
-  const data = await spotifyApi(`/me/playlists?limit=${safeLimit}&offset=${safeOffset}`);
+  const data = await spotifyApi(`/me/playlists?limit=${safeLimit}&offset=${safeOffset}`, { ignoreRateLimit: true });
   const profile = cachedSpotifyProfile(token);
   const playlists = ((data && data.items) || []).map((playlist) => {
     const id = String(playlist.id || '');
@@ -3756,7 +3783,7 @@ async function spotifyPlaylistTracks(id, limit = 100) {
   const encodedMarket = encodeURIComponent(market);
   const token = await validSpotifyToken(true);
   const profile = cachedSpotifyProfile(token);
-  const playlist = await spotifyApi(`/playlists/${encodedId}?market=${encodedMarket}`);
+  const playlist = await spotifyApi(`/playlists/${encodedId}?market=${encodedMarket}`, { ignoreRateLimit: true });
   const embeddedPage = spotifyPlaylistEmbeddedPage(playlist);
   const declaredTotal = spotifyPlaylistPageTotal(embeddedPage)
     || Number(playlist && playlist.items && playlist.items.total || playlist && playlist.tracks && playlist.tracks.total || 0);
@@ -3770,7 +3797,7 @@ async function spotifyPlaylistTracks(id, limit = 100) {
     : `/playlists/${encodedId}/items?market=${encodedMarket}&additional_types=track&limit=50`;
 
   try {
-    firstPage = await spotifyApi(itemEndpoint);
+    firstPage = await spotifyApi(itemEndpoint, { ignoreRateLimit: true });
     itemSource = spotifyPlaylistPageItems(firstPage).length ? 'items-endpoint' : 'items-endpoint-empty';
   } catch (error) {
     itemEndpointError = error;
@@ -3792,7 +3819,7 @@ async function spotifyPlaylistTracks(id, limit = 100) {
   // request returns an empty page.
   if ((!firstPage || !spotifyPlaylistPageItems(firstPage).length) && declaredTotal > 0 && !itemEndpointError) {
     try {
-      const retryPage = await spotifyApi(`/playlists/${encodedId}/items?limit=50`);
+      const retryPage = await spotifyApi(`/playlists/${encodedId}/items?limit=50`, { ignoreRateLimit: true });
       if (spotifyPlaylistPageItems(retryPage).length) {
         firstPage = retryPage;
         itemSource = 'items-endpoint-retry';
@@ -3818,7 +3845,7 @@ async function spotifyPlaylistTracks(id, limit = 100) {
     seenPages.add(nextUrl);
     try {
       const next = new URL(nextUrl);
-      page = await spotifyApi(next.pathname.replace(/^\/v1/, '') + next.search);
+      page = await spotifyApi(next.pathname.replace(/^\/v1/, '') + next.search, { ignoreRateLimit: true });
     } catch (error) {
       itemEndpointError = itemEndpointError || error;
       console.warn('[SpotifyPlaylist] pagination failed:', id, error && (error.message || error));
@@ -4771,7 +4798,7 @@ async function spotifyPlayerToken() {
 }
 
 async function spotifyDevices() {
-  const data = await spotifyApi('/me/player/devices');
+  const data = await spotifyApi('/me/player/devices', { ignoreRateLimit: true });
   return (data && data.devices || []).map((device) => ({
     id: device.id || '',
     name: device.name || 'Spotify',
@@ -4785,7 +4812,7 @@ async function spotifyDevices() {
 }
 
 async function spotifyPlaybackState() {
-  const data = await spotifyApi('/me/player', { required: true });
+  const data = await spotifyApi('/me/player', { required: true, ignoreRateLimit: true });
   if (!data || !data.item) return { active: false, isPlaying: false, progressMs: 0, durationMs: 0, device: data && data.device || null };
   return {
     active: true,
@@ -4802,6 +4829,7 @@ async function spotifyPlaybackState() {
 async function spotifyTransferPlayback(deviceId, play = false) {
   if (!deviceId) throw Object.assign(new Error('SPOTIFY_DEVICE_REQUIRED'), { status: 400 });
   await spotifyApi('/me/player', {
+    ignoreRateLimit: true,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ device_ids: [String(deviceId)], play: !!play }),
@@ -4825,6 +4853,7 @@ async function spotifyStartPlayback({ deviceId, uri, contextUri, offsetUri, posi
       }
     : { uris: [normalizedUri], position_ms: normalizedPositionMs };
   await spotifyApi(`/me/player/play${query}`, {
+    ignoreRateLimit: true,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -4839,7 +4868,7 @@ async function spotifyStartPlayback({ deviceId, uri, contextUri, offsetUri, posi
 
 async function spotifyPausePlayback(deviceId = '') {
   const query = deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : '';
-  await spotifyApi(`/me/player/pause${query}`, { method: 'PUT' });
+  await spotifyApi(`/me/player/pause${query}`, { ignoreRateLimit: true, method: 'PUT' });
   return true;
 }
 
@@ -4854,14 +4883,14 @@ async function spotifySeekPlayback(positionMs, deviceId = '') {
   const normalizedDeviceId = String(deviceId || '');
   const params = new URLSearchParams({ position_ms: String(normalizedPositionMs) });
   if (normalizedDeviceId) params.set('device_id', normalizedDeviceId);
-  await spotifyApi(`/me/player/seek?${params.toString()}`, { method: 'PUT' });
+  await spotifyApi(`/me/player/seek?${params.toString()}`, { ignoreRateLimit: true, method: 'PUT' });
   return { positionMs: normalizedPositionMs, deviceId: normalizedDeviceId };
 }
 
 async function spotifySetPlaybackVolume(volumePercent, deviceId = '') {
   const params = new URLSearchParams({ volume_percent: String(Math.max(0, Math.min(100, Math.round(Number(volumePercent) || 0)))) });
   if (deviceId) params.set('device_id', deviceId);
-  await spotifyApi(`/me/player/volume?${params.toString()}`, { method: 'PUT' });
+  await spotifyApi(`/me/player/volume?${params.toString()}`, { ignoreRateLimit: true, method: 'PUT' });
   return true;
 }
 
@@ -4909,7 +4938,7 @@ async function resolveSpotifyPlayback(trackId, quality) {
   }
   let track = spotifyTrackCache.get(String(trackId));
   if (!track) {
-    track = mapSpotifyTrack(await spotifyApi(`/tracks/${encodeURIComponent(trackId)}?market=${encodeURIComponent(providerConfig().spotifyMarket)}`));
+    track = mapSpotifyTrack(await spotifyApi(`/tracks/${encodeURIComponent(trackId)}?market=${encodeURIComponent(providerConfig().spotifyMarket)}`, { ignoreRateLimit: true }));
   }
   if (!track || !track.spotifyUri) {
     return {
@@ -5053,11 +5082,11 @@ async function spotifyTrackVisualBackground(trackId) {
   const market = providerConfig().spotifyMarket;
   let track = spotifyTrackCache.get(id);
   if (!track || !track.cover || !track.artistId) {
-    track = mapSpotifyTrack(await spotifyApi(`/tracks/${encodeURIComponent(id)}?market=${encodeURIComponent(market)}`, { required: true }));
+    track = mapSpotifyTrack(await spotifyApi(`/tracks/${encodeURIComponent(id)}?market=${encodeURIComponent(market)}`, { required: true, ignoreRateLimit: true }));
   }
   let artist = null;
   if (track && track.artistId) {
-    artist = await spotifyApi(`/artists/${encodeURIComponent(track.artistId)}`, { required: true }).catch(() => null);
+    artist = await spotifyApi(`/artists/${encodeURIComponent(track.artistId)}`, { required: true, ignoreRateLimit: true }).catch(() => null);
   }
   const artistImages = Array.isArray(artist && artist.images) ? artist.images.map((item) => item && item.url).filter(Boolean) : [];
   const albumImage = String(track && track.cover || '');
@@ -6374,6 +6403,7 @@ module.exports = {
   setYouTubeCookieHeader,
   clearYouTubeCookieHeader,
   invalidateYouTubeAccountSession,
+  youtubeDevicePlaylists,
   youtubeAccountPlaylists,
   youtubeAccountPlaylistTracks,
   youtubePlaylistSyncDiagnostics,

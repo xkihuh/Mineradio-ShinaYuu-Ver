@@ -6,13 +6,13 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('2.5.1 electron-builder config has no unsupported root displayVersion or edition fields', () => {
+test('2.5.2 electron-builder config has no unsupported root displayVersion or edition fields', () => {
   const pkg = JSON.parse(read('package.json'));
-  assert.equal(pkg.version, '2.5.1');
+  assert.equal(pkg.version, '2.5.2');
   assert.equal(pkg.build.displayVersion, undefined);
   assert.equal(pkg.build.edition, undefined);
-  assert.equal(pkg.shinayuu.displayVersion, '2.5.1');
-  assert.match(String(pkg.shinayuu.edition), /2\.5\.1/);
+  assert.equal(pkg.shinayuu.displayVersion, '2.5.2');
+  assert.match(String(pkg.shinayuu.edition), /2\.5\.2/);
 });
 
 test('Spotify playlist sync uses the current paged /me/playlists API and explicit read-scope checks', () => {
@@ -41,3 +41,27 @@ test('Spotify and YouTube playlist catalog routes return pagination metadata', (
   assert.match(server, /spotifyUserPlaylistsPage/);
   assert.match(server, /nextOffset: playlists\.length/);
 });
+
+test('forced playlist refresh uses fresh provider sessions instead of treating allowProbe as logged-in', () => {
+  const panel = read('public/js/modules/06-lyrics/01-playlist-panel-shell.js');
+  assert.match(panel, /if \(force\) \{[\s\S]*refreshYouTubeLoginStatus\(\{ force: true \}\)[\s\S]*refreshSpotifyLoginStatus\(\)/);
+  assert.match(panel, /function playlistCatalogProviderLoggedIn\(provider, allowProbe\) \{[\s\S]*return !!\(status && status\.loggedIn\);/);
+  assert.match(panel, /var allowProviderProbe = !!force;/);
+});
+
+test('YouTube playlist route has an authenticated device/cookie fallback and exposes diagnostics', () => {
+  const server = read('server.js');
+  const providers = read('music-providers.js');
+  assert.match(providers, /async function youtubeDevicePlaylists\(limit = 50\)/);
+  assert.match(server, /musicProviders\.youtubeDevicePlaylists\(limit\)/);
+  assert.match(server, /fallbackUsed/);
+  assert.match(server, /youtubePlaylistSyncDiagnostics/);
+});
+
+test('Spotify playlist failures expose reauth and granted-scope diagnostics instead of a generic 401 body', () => {
+  const routes = read('modern-music-routes.js');
+  assert.match(routes, /reauthRequired: !!\(error && error\.reauthRequired\)/);
+  assert.match(routes, /requiredScopes: error && error\.requiredScopes/);
+  assert.match(routes, /grantedScopes: error && error\.grantedScopes/);
+});
+

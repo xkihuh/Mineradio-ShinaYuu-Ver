@@ -1,3 +1,15 @@
+# Changelog
+
+## 2.5.2 — Provider Sync + Hi-DPI Playback Stability
+
+- Fixed Spotify user-critical playback and playlist requests being blocked by a background rate-limit cooldown.
+- Preserved valid Spotify/YouTube connection state across transient status-request failures.
+- Restored YouTube cookie/device sessions as valid authenticated playlist catalogs.
+- Made startup playlist tab wait for provider authentication status before showing the disconnected state.
+- Added Hi-DPI-aware windowed density classes and targeted Full HD/windowed compaction without globally zooming the UI.
+- Reduced Spotify Web Playback SDK startup race by prewarming earlier and retaining a pending audio-activation gesture.
+- Kept Wallpaper Engine on the AI 4.0 baseline implementation.
+
 ## 2.5.1 — Release/Playlist Sync Build Fix
 
 - Fixed electron-builder 26.15.3 schema errors caused by unsupported `build.displayVersion` and `build.edition` fields.

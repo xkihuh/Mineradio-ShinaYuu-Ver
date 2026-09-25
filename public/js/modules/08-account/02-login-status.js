@@ -114,7 +114,11 @@ async function refreshYouTubeLoginStatus() {
     return youtubeLoginStatus;
   } catch (error) {
     console.warn('YouTube login status failed:', error);
-    youtubeLoginStatus = normalizeYouTubeLoginStatus(null);
+    if (youtubeLoginStatus && youtubeLoginStatus.loggedIn) {
+      youtubeLoginStatus = normalizeYouTubeLoginStatus(Object.assign({}, youtubeLoginStatus, { stale: true, statusError: String(error && (error.message || error) || 'YOUTUBE_STATUS_UNAVAILABLE') }));
+    } else {
+      youtubeLoginStatus = normalizeYouTubeLoginStatus(null);
+    }
     loginStatus = Object.assign({}, youtubeLoginStatus);
     renderUserBtn();
     return youtubeLoginStatus;
@@ -207,7 +211,13 @@ async function refreshSpotifyLoginStatus() {
     return spotifyLoginStatus;
   } catch (error) {
     console.warn('Spotify login status failed:', error);
-    spotifyLoginStatus = normalizeSpotifyLoginStatus(null);
+    // A transient status request failure must not erase a previously valid
+    // OAuth session and make Playlist / Playback appear logged out.
+    if (spotifyLoginStatus && spotifyLoginStatus.loggedIn) {
+      spotifyLoginStatus = normalizeSpotifyLoginStatus(Object.assign({}, spotifyLoginStatus, { stale: true, statusError: String(error && (error.message || error) || 'SPOTIFY_STATUS_UNAVAILABLE') }));
+    } else {
+      spotifyLoginStatus = normalizeSpotifyLoginStatus(null);
+    }
     renderUserBtn();
     return spotifyLoginStatus;
   }

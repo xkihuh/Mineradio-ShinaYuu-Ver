@@ -331,9 +331,19 @@ async function handle(req, res, url, pathname) {
         normalizeLimit(url, 50, 50),
         Math.max(0, Number(url.searchParams.get('offset') || 0) || 0),
       );
-      sendJson(res, { ok: true, provider: 'spotify', loggedIn: true, ...page });
+      sendJson(res, { ok: true, provider: 'spotify', loggedIn: true, reauthRequired: false, ...page });
     } catch (error) {
-      providerError(res, error, 401);
+      sendJson(res, {
+        ok: false,
+        provider: 'spotify',
+        loggedIn: false,
+        reauthRequired: !!(error && error.reauthRequired),
+        error: error && (error.code || error.message) || 'SPOTIFY_PLAYLIST_SYNC_FAILED',
+        message: error && error.message || 'Spotify playlist sync failed',
+        requiredScopes: error && error.requiredScopes || ['playlist-read-private'],
+        optionalScopes: error && error.optionalScopes || ['playlist-read-collaborative'],
+        grantedScopes: error && error.grantedScopes || [],
+      }, Number(error && error.status) || 502);
     }
     return true;
   }

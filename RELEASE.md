@@ -1,8 +1,8 @@
-# ShinaYuu Music 2.5.1 — AI + Cuefield Intelligence Release
+# ShinaYuu Music 2.5.2 — AI + Cuefield Intelligence Release
 
 ## Overview
 
-ShinaYuu Music 2.5.1 is a controlled evolution of the 2.3.x AI line. It preserves the existing provider and playback ownership architecture while combining AI user intelligence with the selectively ported Cuefield transition-planning layer derived from Mineradio v2.2.0.
+ShinaYuu Music 2.5.2 is a controlled evolution of the 2.3.x AI line. It preserves the existing provider and playback ownership architecture while combining AI user intelligence with the selectively ported Cuefield transition-planning layer derived from Mineradio v2.2.0.
 
 ## AI Intelligence
 
@@ -46,8 +46,8 @@ A Cuefield planning failure must not become a playback failure. The upgraded pla
 
 ## Release identity
 
-- Desktop version: **2.5.1**
-- Build identity: **2.5.1 / 2.5.1.0**
+- Desktop version: **2.5.2**
+- Build identity: **2.5.2 / 2.5.2.0**
 - Previous release: **2.3.0**
 
 ## Historical documentation

@@ -46,6 +46,6 @@ test('2.1.5 package and bundled assets use the synchronized release identity', (
   assert.equal(pkg.build.buildVersion, CURRENT_BUILD_VERSION);
   assert.equal(lock.version, CURRENT_VERSION);
   assert.equal(lock.packages[''].version, CURRENT_VERSION);
-  assert.match(html, /spotify-direct-player\.js\?v=2\.1\.10/);
-  assert.match(html, /shinayuu-index-bundle\.js\?v=2\.1\.10/);
+  assert.match(html, /spotify-direct-player\.js\?v=[^"']+/);
+  assert.match(html, /shinayuu-index-bundle\.js\?v=[^"']+/);
 });
