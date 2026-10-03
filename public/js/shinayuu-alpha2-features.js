@@ -267,7 +267,23 @@
   function renderDiscord(state) {
     state = state || discordState || {}; discordState = state;
     var card = byId('discord-advanced-card'); if (!card) return;
-    card.classList.toggle('connected', !!state.connected); card.classList.toggle('configured', !!state.configured);
+    card.classList.add('sy-discord-settings-card');
+    card.setAttribute('data-discord-settings-trigger', '1');
+    var openButton = byId('discord-open-settings');
+    if (!openButton) {
+      openButton = document.createElement('button');
+      openButton.id = 'discord-open-settings';
+      openButton.type = 'button';
+      openButton.className = 'sy-discord-settings-open';
+      openButton.textContent = '⚙ Thiết lập Discord';
+      card.appendChild(openButton);
+    }
+    if (openButton.dataset.shinayuuDiscordOpenBound !== '1') {
+      openButton.dataset.shinayuuDiscordOpenBound = '1';
+      openButton.addEventListener('click', function (event) { event.preventDefault(); event.stopPropagation(); window.openShinaYuuDiscordLiquidSettings(); });
+    }
+    card.classList.toggle('connected', !!state.connected);
+    card.classList.toggle('configured', !!state.configured);
     var config = state.config || {};
     var name = byId('discord-profile-name'); if (name) name.textContent = discordProfileName(state);
     var activity = state.activity || {};
@@ -276,12 +292,9 @@
     var appId = byId('discord-application-id'); if (appId && document.activeElement !== appId) appId.value = config.applicationId || state.applicationId || '';
     var imageKey = byId('discord-large-image-key'); if (imageKey && document.activeElement !== imageKey) imageKey.value = config.largeImageKey || 'shinayuu';
     var coverToggle = byId('discord-prefer-track-cover'); if (coverToggle && document.activeElement !== coverToggle) coverToggle.checked = config.preferTrackCover !== false;
-    var enabledToggle = byId('discord-enabled'); if (enabledToggle && document.activeElement !== enabledToggle) enabledToggle.checked = config.enabled !== false;
-    var lyricToggle = byId('discord-show-visible-lyric'); if (lyricToggle && document.activeElement !== lyricToggle) lyricToggle.checked = config.showVisibleLyric !== false;
     var nowTitle = byId('discord-now-title'); if (nowTitle) nowTitle.textContent = activity.title || 'ShinaYuu Music';
     var nowMeta = byId('discord-now-meta'); if (nowMeta) nowMeta.textContent = activity.title ? ([activity.artist, activity.source].filter(Boolean).join(' · ') || 'ShinaYuu Music') : 'Visual Music Experience';
     var nowProgress = byId('discord-now-progress'); if (nowProgress) nowProgress.textContent = activity.isPlaying ? text('Đang phát', 'Playing') : (activity.title ? text('Tạm dừng', 'Paused') : 'Live');
-    var liveLyric = byId('discord-live-lyric'); if (liveLyric) liveLyric.textContent = activity.visibleLyric || discordVisibleLyricText() || text('Chưa có câu lyrics đang hiển thị', 'No visible lyric line');
     var avatar = byId('discord-profile-avatar'), fallback = byId('discord-profile-avatar-fallback');
     var avatarUrl = state.profile && (state.profile.avatarUrl || state.profile.avatar);
     if (avatar && avatarUrl) { avatar.src = avatarUrl; avatar.hidden = false; if (fallback) fallback.hidden = true; }
@@ -296,8 +309,8 @@
     if (fields && fields[1]) fields[1].textContent = 'Large Image Key';
     var toggleStrong = card.querySelector('.sy-discord-toggle-copy strong, .fx-discord-inline-toggle strong'); if (toggleStrong) toggleStrong.textContent = text('Ưu tiên ảnh bìa bài hát', 'Prefer track cover art');
     var toggleSmall = card.querySelector('.sy-discord-toggle-copy small, .fx-discord-inline-toggle small'); if (toggleSmall) toggleSmall.textContent = text('Tự dùng asset ShinaYuu nếu Discord từ chối ảnh ngoài.', 'Automatically use the ShinaYuu asset if Discord rejects external cover art.');
-    var buttons = card.querySelectorAll('.sy-discord-actions button, .fx-discord-inline-actions button, .sy219-actions button');
-    if (buttons[0]) buttons[0].textContent = text('Lưu & kết nối', 'Save & connect');
+    var buttons = card.querySelectorAll('.sy-discord-actions button, .fx-discord-inline-actions button');
+    if (buttons[0]) buttons[0].textContent = text('Lưu và kết nối', 'Save & connect');
     if (buttons[1]) buttons[1].textContent = text('Kết nối lại', 'Reconnect');
     if (buttons[2]) buttons[2].textContent = text('Developer Portal', 'Developer Portal');
     if (buttons[3]) buttons[3].textContent = text('Sao chép User ID', 'Copy User ID');
@@ -311,12 +324,10 @@
   window.saveDiscordAdvancedSettings = async function () {
     var appId = String(byId('discord-application-id') && byId('discord-application-id').value || '').replace(/\D/g, '');
     var imageKey = String(byId('discord-large-image-key') && byId('discord-large-image-key').value || 'shinayuu').trim() || 'shinayuu';
-    var enabled = !!(byId('discord-enabled') ? byId('discord-enabled').checked : true);
-    var showVisibleLyric = !!(byId('discord-show-visible-lyric') ? byId('discord-show-visible-lyric').checked : true);
-    if (enabled && !appId) { toast('Hãy nhập Discord Application ID.', 'Enter the Discord Application ID.'); return; }
+    if (!appId) { toast('Hãy nhập Discord Application ID.', 'Enter the Discord Application ID.'); return; }
     try {
       var preferTrackCover = !!(byId('discord-prefer-track-cover') && byId('discord-prefer-track-cover').checked);
-      if (typeof bridge.configureDiscord === 'function') renderDiscord(await bridge.configureDiscord({ enabled: enabled, applicationId: appId, largeImageKey: imageKey, largeImageText: 'ShinaYuu Music', showTrack: true, preferTrackCover: preferTrackCover, showVisibleLyric: showVisibleLyric }));
+      if (typeof bridge.configureDiscord === 'function') renderDiscord(await bridge.configureDiscord({ enabled: true, applicationId: appId, largeImageKey: imageKey, largeImageText: 'ShinaYuu Music', showTrack: true, preferTrackCover: preferTrackCover }));
       toast('Đã lưu cấu hình Discord.', 'Discord settings saved.');
     } catch (error) { console.warn('[DiscordConfigure]', error); toast('Không thể lưu cấu hình Discord.', 'Could not save Discord settings.'); }
   };

@@ -1,153 +1,215 @@
 # Changelog
 
-## 2.5.2 — Provider Sync + Hi-DPI Playback Stability
+## 2.2.0 — Stability Final
 
-- Fixed Spotify user-critical playback and playlist requests being blocked by a background rate-limit cooldown.
-- Preserved valid Spotify/YouTube connection state across transient status-request failures.
-- Restored YouTube cookie/device sessions as valid authenticated playlist catalogs.
-- Made startup playlist tab wait for provider authentication status before showing the disconnected state.
-- Added Hi-DPI-aware windowed density classes and targeted Full HD/windowed compaction without globally zooming the UI.
-- Reduced Spotify Web Playback SDK startup race by prewarming earlier and retaining a pending audio-activation gesture.
-- Kept Wallpaper Engine on the AI 4.0 baseline implementation.
+- Finalized the 2.1.7-based stability line without replacing the working YouTube or Spotify playback engines.
+- Discord settings now open in the native Liquid Glass modal stack used by the application, with a capture-level settings trigger for packaged builds.
+- Kept lyric retrieval aligned with the lyric-only 2.1.10 implementation.
+- Retained runtime display/DPI adaptation for resolution and Windows scale changes.
+- Retained local ShinaYuu playlists and local liked-music behavior.
+- Release identity bumped to 2.2.0 / 2.2.0.0.
+- Release tooling supports a full NSIS installer and an optional 2.1.7 → 2.2.0 resource patch.
 
-## 2.5.1 — Release/Playlist Sync Build Fix
+# ShinaYuu Music 2.1.6
 
-- Fixed electron-builder 26.15.3 schema errors caused by unsupported `build.displayVersion` and `build.edition` fields.
-- Hardened YouTube/Spotify playlist catalog sync with forced provider probing, explicit reauthorization diagnostics, and paged Spotify `/me/playlists` metadata.
+- Sửa quyền DRM Electron: cho phép `mediaKeySystem` chỉ khi ShinaYuu local hoặc frame Spotify tin cậy yêu cầu.
+- Bắt buộc chờ `components.whenReady()` trước khi tạo BrowserWindow đầu tiên để Widevine CDM hoàn tất cài đặt/cập nhật.
+- Sửa bridge runtime bị gọi sai tên và trả `widevineReady` thật từ main process sang renderer.
+- Cập nhật Castlabs Electron ECS từ 42.5.2+wvcus lên 42.8.0+wvcus.
+- Thêm `Permissions-Policy` cho autoplay và encrypted-media trên trang loopback local của ứng dụng.
+- Đưa `initialization_error`, `authentication_error`, `account_error`, `playback_error` ra terminal bằng log `[SpotifyHost]`.
+- Không retry playback với `authentication_error`/`account_error`; hiển thị hướng kiểm tra Premium và Users Management thay vì tạo vòng lặp phát.
+- Log lỗi Spotify Web API bổ sung endpoint, HTTP status và reason; 403 có chẩn đoán Development Mode/allowlist.
+- Công cụ setup/verify phát hiện `node_modules/electron` cũ và yêu cầu cài lại dependency thay vì âm thầm chạy 42.5.2.
+- Giữ nguyên Spotify start-loop guard 2.1.5, YouTube, AutoMix, lyrics, Discord và toàn bộ UI/UX.
+- Đồng bộ package/display/build identity lên 2.1.6 / 2.1.6.0.
 
-## 2.5.1 — AI Transaction Safety + Playlist Reliability (2026-09-19 UTC+7)
+# ShinaYuu Music 2.1.3
 
-- Added AI 4.1.1 transaction-safe music planning with atomic queue replacement support.
-- Added `replace_playlist_preserve_current` so the current track, playback position and audible media are not restarted while the upcoming queue is replaced.
-- Added provider search deadlines (7s default per provider) so one slow source cannot consume the whole AI request timeout.
-- Added deterministic fast-path handling for explicit requests to replace the current playlist while keeping the playing track.
-- Added verified-track payloads to Smart Playlist actions so the renderer does not perform a second search after AI has already verified the candidates.
-- Added AutoMix release barrier around AI playlist transactions and rollback protection if queue mutation/rendering fails.
-- Changed AI timeout handling for transactional playlist requests from all-or-nothing model orchestration to provider-isolated search plus deterministic queue execution.
-- Kept Wallpaper Engine runtime on the AI 4.0 baseline as requested; this release does not change Scene loading behavior.
+- Giữ dòng lyrics hiện tại trên stage khi tạm dừng, kể cả khi provider không dùng HTMLAudioElement có `src`.
+- Thêm nhận biết pause/ended theo provider cho Spotify SDK, AutoMix handoff và HTML audio.
+- Khôi phục mesh lyrics ngay tại clock hiện tại khi phát tiếp; không cần đổi chế độ Lyrics để ép render lại.
+- Kết nối sự kiện pause/play của HTML audio và toggle pause/resume của Spotify với cùng một lifecycle lyrics.
+- Giữ nguyên nguồn lyrics, parser, Delay lyrics, offset từng bài, YouTube MV timing và AutoMix/provider liveness của 2.1.2.
+- Đồng bộ package/display/build identity lên 2.1.3 / 2.1.3.0.
 
-## 2.5.0 — Stability Hotfix (2026-09-18 UTC+7)
+# ShinaYuu Music 2.1.2
 
-- Fixed empty playlist shelf flashing/rebuild loops during asynchronous provider search/loading.
-- Fixed renderer reload/Desktop Mode rehydration so the native Wallpaper Engine/desktop session stays resident across refresh.
-- Scene wallpapers now suppress the external Wallpaper Engine source window from Alt-Tab/task-switcher while preserving the live DWM composition surface.
-- Hardened AI 4.1 playback safety: AI can select successors but cannot cut the current track early or skip queue order.
-- Hardened AI chat panel viewport geometry at small and medium desktop widths.
-- Kept video wallpapers on the existing in-app path.
+- Ưu tiên caption có timestamp của đúng YouTube MV trước timestamp mượn từ bản album.
+- Không dựng timeline giả chia đều khi forced alignment của MV còn đang xử lý.
+- Timestamp exact/aligned không còn bị kéo giãn theo chênh lệch duration metadata.
+- Mở rộng thời gian polling forced alignment ở nền cho máy xử lý chậm.
+- Sửa race provider-stop cũ có thể pause một yêu cầu Spotify mới ở trạng thái `spotify-pending`.
+- Giữ provider-stop promise đến khi thực sự hoàn tất; không làm mất barrier sau timeout HTML.
+- AutoMix dùng timeout transaction thích ứng: 11,5 giây cho handoff provider và tối đa 15,5 giây cho crossfade hai deck dài; khi vượt giới hạn, app rollback về nguồn đang phát thay vì giữ máy phát ở trạng thái khóa.
 
-## [2.5.0]
+# Changelog
 
-### AI 4.0 Personal Music Agent
-- Added deterministic intent/context planning before model execution.
-- Added bounded multi-step tool orchestration (6 rounds by default).
-- Added recommendation quality gates and verification.
-- Added final action verification so unverified playback targets are not executed.
-- Added `get_agent_plan` and `verify_recommendations` tools.
-- Kept all agent logic outside the playback critical path.
+## 2.1.1
 
-## 2.5.0 — Stability + Mineradio 2.2.0 Integration Consolidation
+- Fixed the Discord Connect panel falling back to native white inputs and oversized SVG/button rendering when the external fixes stylesheet was missing, stale or incompletely uploaded.
+- Added a critical inline Liquid Glass style layer and intrinsic SVG dimensions while retaining the normal external stylesheet and 2 × 2 action grid.
+- Removed the former 2.8-second AutoMix release wait from manual track selection; stale AutoMix work is invalidated immediately and can no longer delay the selected row.
+- Added a concrete Spotify provider-stop barrier so a new Spotify request waits only for an actual in-flight old pause, rather than the complete AutoMix execution.
+- Added non-blocking Spotify SDK prewarm after the UI becomes interactive when a saved login session exists.
+- Retained the selective Mineradio 2.1.0 ports introduced by ShinaYuu 2.1.0: local-library persistence, bounded runtime recovery, Wallpaper Engine/fullscreen lifecycle guards, bounded provider fallback, lyrics layer ordering and pointer-aware 3D shelf ownership.
+- Preserved ShinaYuu Spotify/YouTube engines, lyrics providers, bilingual UI and patch/full-installer updater flow.
+- Bumped package/display/build identity to 2.1.1 / 2.1.1.0.
 
-### AI 4.0 Personal Music Agent (foundation)
-- Upgraded the internal AI Core from 2.0.0 to 2.1.0 without changing the ShinaYuu playback ownership model.
-- Added short-term conversational memory so follow-up requests can resolve references such as “bài này”, “bài đó”, “như lúc nãy” and “thêm vài bài”.
-- Added behavioral preference learning from likes, skips, completions, searches and explicit music interactions.
-- Added personalized discovery re-ranking using artist, style, mood, language, version and negative preference signals.
-- Added deterministic Smart Next selection from the active queue so AI does not invent queue indexes.
-- Added `rate_current_track` and `recommend_music` tools for model-backed AI providers.
-- Added independent configuration switches for adaptive memory, conversation memory, preference re-ranking and Smart Next.
-- Kept all adaptive AI work outside the playback critical path; disabling AI cannot break normal playback.
+## 2.0.17
 
-- Promoted the desktop application identity from 2.4.0 to 2.5.0 across package, build, updater, installer and renderer cache metadata.
-- Kept the ShinaYuu playback/provider architecture unchanged while retaining the validated Mineradio 2.2.0 stability ports.
-- Refreshed current release documentation and AI setup references for the 2.5.0 line.
-- No new experimental playback backend was introduced in this version.
+- Fixed a race where selecting another song during the audible AutoMix overlap could leave the new song unplayable and lock the playback engine.
+- Added an awaited manual-selection release barrier so in-flight AutoMix provider/deck work settles before the selected track starts.
+- Added execution-serial guards before every AutoMix queue commit, provider handoff, prepared-deck adoption and fallback `nextTrack` call.
+- Made stale AutoMix catch paths inert after cancellation so they cannot restore the old deck, overwrite volume or stop a newer provider.
+- Cancels AutoMix handoff UI state, cover ghosts, progress clocks and gain curves when manual playback takes ownership.
+- Preserved the 2.0.15 lyrics system and 2.0.16 updater-logo correction.
+- Bumped package/display/build identity to 2.0.17 / 2.0.17.0.
 
-## 2.4.0 — AI + Cuefield + Mineradio 2.2.0 Reliability Update
+## 2.0.16
 
-### AI
-- Preserved AI Memory 2.0, music intent, reference-artist semantics, Smart Search, Smart Queue and fast-path natural-language control.
-- Kept location, weather, date/time and timezone synchronized and outside the playback critical path.
+- Fixed the updater app logo rendering at its intrinsic image size.
+- Added explicit width, height, min/max constraints and overflow protection for the updater icon.
+- Preserved all lyrics, AutoMix and playback behavior from 2.0.15.
+- Bumped package/display/build identity to 2.0.16 / 2.0.16.0.
 
-### Mineradio 2.2.0-derived updates
-- Ported the structure-aware Cuefield planning layer: musical profiles, structure maps, section candidates, boundary evidence, lyric links, transition windows, routing, bridge/rescue planning, transition artifacts, shadow diagnostics and feedback metadata.
-- Added a ShinaYuu-native compatibility boundary so upstream planning data never takes ownership of ShinaYuu playback/providers.
-- Added safe-plan validation and legacy planner fallback for unsafe/failed transitions.
-- Added persistent built-in ShinaYuu playlist library with create, rename, delete, add/remove/reorder and paged loading.
-- Added gesture lifecycle, camera permission gating, player actions, sensitivity and hand-overlay controls.
-- Added single-repeat media restart handling without rebuilding the provider transaction unnecessarily.
-- Added Wallpaper Engine resident minimize/restore handling instead of forcing a native restart when the host surface remains resident.
-- Adopted Mineradio's current Kugou web playback/retry/VIP hardening while preserving ShinaYuu's provider API surface.
-- Retained ShinaYuu's existing Spotify, YouTube, SoundCloud, lyrics, Discord, Castlabs and AI ownership instead of replacing those subsystems with upstream code.
-- Added/retained visual performance controls and low-spec optimization guidance from the upstream release.
+## 2.0.15
 
-### Reliability / release hygiene
-- Renderer bundle, i18n audit, public npm registry audit and ShinaYuu regression suite pass before release packaging.
-- Current package identity: 2.4.0 / build 2.4.0.0.
+- Restored the complete 2.0.13 lyrics timing/provider system instead of the direct-clock rewrite introduced in 2.0.14.
+- Preserved the global ±15-second lyrics delay, per-track ±15-second progress correction and all quick adjustment buttons.
+- Removed only the configurable 5–15-second song-title fallback wait and its saved preference.
+- Reduced the title fallback to renderer warmup only (110–220 ms); synchronized lyrics still replace it immediately.
+- Kept the 2.0.13 playback core, Spotify Direct Player and AutoMix files unchanged.
+- Bumped package/display/build identity to 2.0.15 / 2.0.15.0.
 
-## 2.3.0 — Cuefield Upstream Integration
+## 2.0.10
 
-### AutoMix / Cuefield
-- Ported the structure-aware Cuefield planning improvements from Mineradio v2.2.0 / commit `9402566`.
-- Added musical-profile compatibility scoring, structure maps, boundary evidence, lyric-link analysis, transition routing, transition-window planning, bridge/rescue planning, transition artifacts and shadow diagnostics.
-- Added an upgraded Cuefield execution path while retaining a legacy planner fallback. A planner failure is therefore isolated from playback.
-- Extended the Cuefield timeline executor for upstream-compatible transition actions without replacing ShinaYuu's provider/playback ownership architecture.
-- Added a dedicated regression test covering the upstream Cuefield port and the legacy fallback.
+- Đưa toàn bộ cấu hình Discord Rich Presence vào panel Liquid Glass trực tiếp trong phần Nâng cao.
+- Thêm note song ngữ và emoji cho trạng thái có/không có bản cập nhật.
+- Đồng bộ package version, display version, build version, installer metadata, README và tài liệu build.
+- Giữ nguyên AutoMix provider ownership, Discord Rich Presence, Lyrics Sync 2.0 và pipeline build/patch.
 
-# ShinaYuu Music 2.3.0
+# ShinaYuu Music 2.0.9
 
-## 2.3.0 — AI Intelligence Upgrade
-- Added persistent AI Memory 2.0 for non-sensitive music listening habits and explicit preferences.
-- Added automatic learning from play starts, skips/completions, searches, AI interactions and volume behavior.
-- Added Vietnamese music-intent understanding: broad EDM terminology, remix language, mood, energy, and reference-artist style anchors.
-- Added synchronized runtime context for date/time, timezone, locality, and current weather.
-- Added a weather-current endpoint using the same geolocation coordinates as the location engine.
-- Kept all AI memory and context off the playback critical path; common commands remain fast-path.
+- Replaced the cramped legacy Discord Application ID controls in Advanced with a definitive Liquid Glass status card and a dedicated Liquid settings modal.
+- The Advanced Discord card no longer exposes raw browser inputs/buttons; all configuration is opened through the styled modal.
+- Replaced the `SY` update/check-update mark with the actual ShinaYuu Music application logo, including success/error status badges.
+- Kept Discord Rich Presence, Lyrics Sync 2.0, provider-owned AutoMix, updater and Windows release pipeline from 2.0.8.
 
-# ShinaYuu Music 2.2.1
+# Changelog
 
-## 2.2.1 — Stable Maintenance Release
+## 2.0.8
 
-- Bumped Desktop release version from 2.2.0 to 2.2.1.
-- Reverted the YouTube Video → YouTube Music lyric alignment experiment to the pre-change legacy lyrics flow.
-- Retained the newer Discord Visible Lyrics validation/short-state fix.
-- Retained SoundCloud exact-URL playback and Media Library/Liquid Glass improvements from 2.2.0.
+- Serialized Spotify SDK/host volume writes during AutoMix so an older low-volume request cannot complete after the final restore and mute later playback.
+- Scoped AutoMix output restoration to the provider that actually owns audio; a successful Spotify-to-YouTube handoff no longer revives Spotify, and a Spotify takeover no longer touches the retired HTML deck.
+- Added explicit Spotify shutdown at the silent boundary before HTML deck adoption, plus an ownership guard so a late Spotify stop cannot clear a newer YouTube/local transport or play state.
+- Made HTML playback await the already-running Spotify stop only at the final audible boundary, avoiding overlap without delaying descriptor resolution.
+- Added AudioContext resume gating before dual-deck and Spotify-to-HTML mixing, and removed no-op global output resets on every ordinary track selection.
+- Retained Discord Rich Presence, Liquid Discord settings, Lyrics Sync 2.0, updater and the signed Windows release/patch pipeline.
+- Bumped package, display, build and installer versions to 2.0.8 / 2.0.8.0.
 
-# ShinaYuu Music 2.2.0
+## 2.0.7
 
-## 2.2.0 — Stable
+- Restored track-aware Discord Rich Presence for Spotify, YouTube Music, YouTube Video and local playback, including title, artist, source, play/pause state and elapsed/end timestamps.
+- Added immediate Discord refresh on track changes, seek, pause/resume and AutoMix handoff, with uploaded application asset fallback when Discord rejects a remote cover URL.
+- Rebuilt both Discord Application ID interfaces as Liquid Glass panels with connection status, activity preview, cover preference, diagnostics and reconnect controls.
+- Added Lyrics Sync 2.0: actual provider playback clocks, LRC offset tags, strict duration compatibility, match-quality scoring and conservative timeline drift correction.
+- Prevented timestamps from a mismatched live/remix/edit from overriding the audible version; text remains available with an adaptive timeline while exact alignment retries.
+- Unified Spotify/YouTube seek and playback discontinuity handling so lyrics and Discord progress re-anchor immediately.
+- Bumped package, display, build and installer versions to 2.0.7 / 2.0.7.0.
 
-### SoundCloud
-- Added SoundCloud search/discovery without requiring user Client ID or Client Secret.
-- Preserve the exact SoundCloud canonical/permalink URL from search results.
-- Resolve and play the selected SoundCloud track through the ShinaYuu playback/proxy path.
-- Do not silently replace a SoundCloud selection with a YouTube or Spotify result.
-- Normalize SoundCloud artwork and duration metadata.
 
-### Lyrics
-- Improved YouTube Video → YouTube Music lyric fallback.
-- Align fallback lyrics to the actual playing YouTube audio/video instead of blindly reusing another video's timeline.
+## 2.0.6
 
-### Discord
-- Hardened Visible Lyrics updates against Discord state-length validation.
-- Preserve short lyric lines instead of dropping or delaying activity updates.
+- Isolated every AutoMix execution with a monotonic transaction serial so stale HTML/Spotify fade loops cannot mute a later user-selected source.
+- Added a root-playback abort hook that immediately releases AutoMix locks, restores HTML/Web Audio/Spotify volume, resets playback rate and preserves the new selection.
+- Added a 24-second stale-execution watchdog and same-track bypass after a failed mix instead of repeatedly retrying and poisoning the queue.
+- Prevented a prepared deck from being paused or unloaded after it has already become the primary media element.
+- Removed destructive pre-fade behavior from unsupported provider handoffs; failed deck preload now keeps the current song audible and lets normal queue advance continue.
+- Bumped package, display, build and installer versions to 2.0.6 / 2.0.6.0.
 
-### Media Library / Liquid Glass
-- Throttled media loading to reduce scroll jank.
-- Added hover video preview behavior for video wallpapers.
-- Reduced unnecessary pointer-driven repaints in the media library.
-- Allowed UI/playlist surfaces to become nearly or fully transparent while keeping borders and glass highlights visible.
+## 2.0.5
+- Replaced the old direct NSIS build path with an official two-stage Windows release pipeline: package `win-unpacked`, complete `afterPack`, VMP sign/verify the packaged app, then create NSIS from `--prepackaged`.
+- Added npm scripts for EVS install/refresh/version, release preflight, unpacked packaging, manual VMP sign/verify, prepackaged installer creation, artifact verification and one-command signed release builds.
+- Added `--patch-from` support so the official release command can create the installer and a version-aware resource patch in the same run.
+- Added a full Vietnamese A-to-Z Windows build and patch guide plus release helper CMD.
+- Removed the real AutoMix boundary restart: an already-audible Cuefield deck is now adopted as the primary deck without calling `HTMLMediaElement.play()` again.
+- Skips `setSinkId()`/output-device routing during seamless adoption, preventing Chromium from briefly rebuilding the audible route at the end of a mix.
+- Preserves the prepared Web Audio gain curve and adopts its analyser/gain graph instead of resetting the new deck's level during ownership transfer.
+- Precommits lightweight title, avatar, cover and progress state at 72% of the overlap while both decks are still audible.
+- Staggers lyrics fetch/reset, artwork analysis, likes, cinema profile, queue hydration and listening-session work after the critical handoff window.
+- Spotify AutoMix no longer opens the loading overlay or starts a second track-switch UI animation during the provider handoff.
+- Spotify volume ramps follow a steady clock without serially waiting for every SDK/host volume acknowledgement.
+- Delays destruction of the outgoing media element so cleanup cannot contend with the incoming deck at the exact ownership boundary.
+- Bumped package, display, build and installer versions to 2.0.5 / 2.0.5.0.
 
-## Historical releases
+## 2.0.4
+- Added monotonic playback-selection intents so stale Spotify/YouTube recovery tasks cannot overwrite or stop a newer user selection.
+- Cancels provider watchdogs, source fallback transactions and resume retries immediately when a new song, queue row or playlist is selected.
+- Spotify preflight, SDK start, rollback and YouTube fallback now verify the active selection intent.
+- Playlist autoplay carries one intent from first-page loading through playback, preventing late responses from hijacking the queue.
+- User-selected failures return an interactive player after cross-source attempts instead of scanning/terminally clearing the queue.
+- Invalidates failed YouTube Music/YouTube Video descriptors before refreshing while keeping provider caches isolated.
+- Expanded lyrics delay correction to ±15 seconds and added a separate per-track playback-progress offset in the same Liquid timing panel.
+- Added a configurable 5–15 second wait before the song-title fallback appears; real synchronized lyrics replace it immediately.
+- Lyric fetch errors no longer force the title fallback ahead of pending alignment/startup retries.
+- Bumped package, display, build and installer versions to 2.0.4 / 2.0.4.0.
 
-Details for 2.1.x and earlier releases remain available in the historical documentation in this repository.
-## 2.3.0 AI Latency Optimization
-- Added fast-path routing for common player commands and explicit search commands.
-- Gemini thinking defaults to low for quick/normal requests and medium for complex requests.
-- Reduced AI context/memory payload on ordinary conversational requests.
-- Preserved full tool-calling path for complex music tasks.
-## 2.5.0 — Wallpaper Engine baseline restore
+## 2.0.3
+- Added a unified runtime playback guardian for Spotify, YouTube Music and YouTube Video.
+- A media error, frozen stream, missing Spotify SDK state, persistent wrong-track state or unexpected Spotify pause now triggers automatic recovery instead of leaving the player stopped.
+- Runtime recovery first refreshes the current playback descriptor while preserving the position, then searches the other two platforms, and finally skips the failed queue item so later songs continue.
+- YouTube Music and YouTube Video are now treated as separate fallback surfaces, allowing YM ↔ MV replacement before or alongside Spotify fallback.
+- Fixed cross-provider fallback to Spotify descriptors that do not expose an HTML audio URL and fixed token validation when the Spotify SDK commits asynchronously.
+- Manual track selection failures now continue through the same recovery pipeline instead of silencing the queue.
+- Added stable-playback budget reset so a recovered track can be refreshed again after it has played normally.
+- Bumped package, display, build and installer versions to 2.0.3 / 2.0.3.0.
 
-- Restored `desktop/wallpaper-engine-runtime.js` to the AI 4.0 baseline behavior.
-- Removed the newer Scene-window suppression/ownership/parking changes from the 2.5.0 stability branch.
-- AI 4.1, AutoMix safety, playlist stability, chat-box layout, and Desktop Mode refresh fixes remain unchanged.
+## 2.0.2
+- Added a Liquid Glass Home wallpaper content customizer with editable built-in quotes and an unrestricted item list for user-created notes/messages.
+- Added per-quote text, signature, color, font family, font size, weight, italic style, alignment, enabled state, effect and speed controls.
+- Added add, edit, duplicate, delete, clear-all and restore-default workflows with local persistence and v1 quote migration.
+- Added smart automatic overflow handling: static for short notes, marquee for long single lines, paged transitions for medium text and vertical scrolling for long text.
+- Added manual Static, Vertical scroll, Horizontal marquee, Paged, Typewriter and Segment fade modes.
+- Added hover pause, sequential/random cycling, reduced-motion support, scrollable static overflow and a full-content Liquid reader.
+- Keeps Home layout stable by animating only the text viewport and preventing frequent Home renders from restarting the active effect.
+- Bumped package, display, build and installer versions to 2.0.2 / 2.0.2.0.
 
+## 2.0.1
+- Restored the ShinaYuu Music 1.1.7.x-style update experience: automatic new-version notification, release notes, current-to-latest version display and explicit Later / Update now actions.
+- Added a visible `Cập nhật ngay / Update now` button after a newer release is detected.
+- Connected the existing updater backend to the UI for quick patch download, progress/speed display, SHA verification, automatic full-installer fallback, restart-after-patch and installer launch followed by app shutdown.
+- Added startup and periodic update checks using the configured `checkDelayMs`, `checkIntervalMs` and `autoPrompt` settings.
+- Added `npm run patch` / `npm run build:patch` to generate a version-aware resource patch and SHA-256 checksum from a previous source ZIP, source folder, or installed `resources/app` directory.
+- Eliminated the one-frame AutoMix UI hitch by pre-decoding the next cover and committing progress/title/artwork in a single compositor frame.
+- Reused the progress handoff ghost instead of inserting/removing DOM at every transition.
+- Deferred heavy cover analysis, badges, likes, cinema profile and panel refresh outside the critical handoff window.
+- Prewarms the Spotify Web Playback SDK immediately after account login, resumes matched-but-paused SDK tracks, activates dormant devices on retry and reconnects the SDK on the final direct-play attempt.
+- Adds a last-resort matched YouTube Music audio fallback when Spotify direct playback is unavailable, so a failed Spotify row no longer leaves the player silent or locks the queue.
+
+# ShinaYuu Music 2.0.0
+
+- Mixed YouTube/Spotify queues now normalize Spotify track identities before playback, preserve the audible source during SDK recovery, and skip a temporarily failed Spotify item instead of locking the rest of the queue.
+- Spotify catalog `playable=false` hints no longer block valid market-relinked tracks before the Web Playback SDK can confirm them.
+- Queue lyric prefetch now remains active during Spotify playback, and high-confidence timed lyrics are duration-calibrated within a safe range to reduce gradual drift across providers.
+- Spotify lyrics now prioritize synchronized QQ and NetEase matches, with Spotify native and duration-checked LRCLIB running in parallel.
+- Spotify stage lyrics now use the Web Playback SDK clock, so timed lines remain visible after seeking instead of falling back to the title.
+- Late or failed Spotify exact-ID lyric retries can no longer overwrite synchronized QQ/NetEase, Spotify-native or LRCLIB lyrics already shown for the active track.
+- The progress bar now runs on a VSync requestAnimationFrame clock and eases the AutoMix deck handoff without resetting through a coarse timer frame.
+- Tracks with real timed lyrics no longer show the song-title intro layer over those lyrics; the title fallback is reserved for lyric-less tracks.
+- AutoMix handoff uses display-synchronized volume animation and defers heavy UI/lyrics rebuilding outside the critical audio handoff frame.
+- The Lyrics display mode uses the song title only as a delayed fallback when every lyrics provider is empty; synchronized lyrics always replace and outrank it.
+- Removed automatic lyrics-mode and lyric-line-count toast notifications.
+- Windows build identity and artwork remain based on ShinaYuu Music 1.1.7.4.
+
+
+## 2.0.10
+- Update checker card now shows a bilingual friendly note with emoji artwork for update / no-update states.
+- Discord Rich Presence setup is now embedded as a Liquid Glass inline panel in Advanced, instead of a separate popup.
+
+
+## 2.0.13
+- Restored the exact 2.0.10 playback/AutoMix base.
+- Removed the 2.0.12 togglePlay foreground-resume wrapper.
+- Rebuilt Discord Connect as guaranteed Liquid Glass in the always-loaded stylesheet.
+- Kept updater note on the same row as the app logo.

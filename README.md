@@ -1,99 +1,67 @@
-# ShinaYuu Music 2.5.0
+# ShinaYuu Music 2.2.0
 
-## ShinaYuu 2.5.0 — AI Intelligence + Cuefield Intelligence
+Bản ổn định hợp nhất phát triển trực tiếp từ ShinaYuu Music 2.1.7, giữ nguyên YouTube/Spotify playback và bổ sung các phần ổn định cho playlist, lyrics, Discord và DPI.
 
-ShinaYuu Music 2.5.0 is the Desktop evolution of the 2.3.x AI line. It keeps the existing Spotify, YouTube, YouTube Music, SoundCloud, lyrics, Discord and Castlabs playback architecture while adding two intelligence layers: a persistent user-aware AI layer and a structure-aware Cuefield transition engine selectively ported from Mineradio v2.2.0.
+## Sửa chính
 
-### AI Intelligence
+- Cho phép quyền Electron `mediaKeySystem` chỉ với tài liệu ShinaYuu local và frame Spotify tin cậy.
+- Chờ `components.whenReady()` của Castlabs trước khi tạo BrowserWindow đầu tiên.
+- Sửa renderer gọi đúng `getShinaYuuRuntimeStatus()` và trả trạng thái `widevineReady` thật qua IPC.
+- Cập nhật Castlabs Electron ECS từ `42.5.2+wvcus` lên `42.8.0+wvcus`.
+- Thêm Permissions-Policy cho autoplay/encrypted-media trên trang loopback của app.
+- Đưa lỗi SDK Spotify ra terminal dưới dạng `[SpotifyHost] <error_type>: <message>`.
+- Giữ nguyên loop guard của 2.1.5, YouTube, AutoMix, lyrics, Discord và UI/UX.
 
-- AI Memory 2.0 aggregates non-sensitive listening habits and explicit preferences in `%APPDATA%\ShinaYuu Music\ai-memory.json`.
-- Smart Search understands broad Vietnamese music language such as `EDM`, `EDM chill`, `EDM buồn`, `nhạc remix`, and reference-artist requests such as Alan Walker, Avicii, TheFatRat and DEAMN.
-- Natural-language commands can use the current player, queue, lyrics, date/time, timezone, locality and weather context.
-- Location, weather and runtime clock share one context; raw coordinates are kept out of AI prompts and memory.
-- Common playback commands stay on deterministic fast paths so AI intelligence does not become a playback dependency.
-
-### Cuefield Intelligence
-
-The 2.5.0 Cuefield layer selectively integrates upstream planning concepts from Mineradio v2.2.0 / commit `9402566`:
-
-- musical-profile compatibility scoring
-- structure maps and section candidates
-- boundary evidence and lyric-aware links
-- transition-window planning and routing
-- bridge/rescue transition planning
-- transition artifacts and shadow diagnostics
-- upgraded transition execution with a legacy ShinaYuu planner fallback
-
-The integration is intentionally isolated: upstream provider/playback ownership is not copied into ShinaYuu. If the upgraded planner throws or cannot produce a safe plan, ShinaYuu falls back to its legacy planner rather than turning a transition problem into a playback failure.
-
-## Mineradio v2.2.0 compatibility layer
-
-ShinaYuu 2.5.0 incorporates the functional improvements from Mineradio v2.2.0 without replacing the ShinaYuu playback architecture. The port is split between direct ports, contract/adapter boundaries and ShinaYuu-native reimplementations where the upstream code is tightly coupled to Mineradio playback state.
-
-Included behavior:
-
-- structure-aware Cuefield and musical-profile transition planning
-- lyric-aware transition linking and bridge/rescue planning
-- built-in ShinaYuu playlist storage and paged queue hydration
-- gesture permission/lifecycle/player actions
-- single-repeat restart safety
-- Wallpaper Engine resident minimize/restore
-- Kugou resilience/retry/VIP hardening
-- visual/performance and low-spec guidance
-
-The upstream planner produces a plan; ShinaYuu remains responsible for provider resolution, playback transactions, lyrics, Discord state and UI ownership. A failed or unsafe upgraded plan falls back to the legacy ShinaYuu transition path instead of propagating a planning failure into playback.
-
-## Playback architecture
+## Log cần thấy
 
 ```text
-Search / AI Intent
-      │
-      ▼
-Unified Track Descriptor
-      │
-      ▼
-ShinaYuu Provider Resolver
-      │
-      ├─ Spotify
-      ├─ YouTube / YouTube Music
-      ├─ SoundCloud
-      └─ Local
-      │
-      ▼
-Playback / Proxy
-      │
-      ▼
-Audio Player
-      │
-      └─ Cuefield transition planner (isolated, with legacy fallback)
+[SpotifyDRM] Castlabs components ready: ...
+[SpotifyDRM] mediaKeySystem allowed requester=... embedder=...
+[SpotifyDRM] runtime ready castlabs=42.8.0+wvcus components=true
+[SpotifyHost] ready device=...
 ```
 
-## SoundCloud
+Nếu terminal hiện `account_error`, hãy kiểm tra tài khoản Spotify Premium, Client ID và Users Management trong Spotify Developer Dashboard.
 
-SoundCloud remains a discovery/search source. ShinaYuu keeps the selected canonical SoundCloud URL and resolves that exact track through its own resolver/yt-dlp playback path without requiring user-provided SoundCloud Client ID or Client Secret. The historical implementation document remains `SOUNDCLOUD-2.2.0-IMPLEMENTATION.md`.
+## Chạy source
 
-## Release identity
+```bat
+npm ci
+npm start
+```
 
-- Desktop version: **2.5.0**
-- Build identity: **2.5.0 / 2.5.0.0**
-- Current release line: **Desktop 2.4.x**
-- Previous release: **2.3.0 AI Intelligence + upstream Cuefield integration**
+Spotify trực tiếp yêu cầu tài khoản Premium, Spotify Client ID đã cấu hình và phiên đăng nhập có đủ các scope playback.
 
-## Documentation
+## Dấu hiệu log đúng
 
-- [`RELEASE.md`](./RELEASE.md) — 2.5.0 release overview
-- [`CHANGELOG.md`](./CHANGELOG.md) — release history
-- [`AI-SETUP-2.5.0.md`](./AI-SETUP-2.5.0.md) — AI provider setup
-- [`AI-LOCATION-AND-FAST-RESPONSE-2.5.0.md`](./AI-LOCATION-AND-FAST-RESPONSE-2.5.0.md) — location, weather, time and latency behavior
-- [`docs/AI-CONFIGURATION.md`](./docs/AI-CONFIGURATION.md) — persistent AI configuration
-- [`SOUNDCLOUD-2.2.0-IMPLEMENTATION.md`](./SOUNDCLOUD-2.2.0-IMPLEMENTATION.md) — historical SoundCloud implementation
+Khi chọn một bài, log bình thường chỉ nên có một dòng tương tự:
 
-Historical 1.x, 2.1.x, 2.2.x and 2.3.x notes remain in the repository as historical documentation and are not current release identity.
+```text
+[SpotifyPlayback] request=... target=spotify:track:... device=... position=0 reason=exact-start
+```
 
-## Testing
+`exact-retry-2` hoặc `exact-retry-3` chỉ xuất hiện khi lần phát trước thực sự không được SDK xác nhận. Không được xuất hiện chuỗi request mới liên tục ở vị trí 0–1000 ms.
 
-Run `npm test` before release packaging. The release pipeline also performs Castlabs, yt-dlp, renderer-bundle and Windows release preflight checks.
+## Build Windows
 
+```bat
+npm ci
+npm run release:win
+```
+
+Installer dự kiến:
+
+```text
+ShinaYuu-Music-2.1.7-Setup.exe
+```
+
+## Phiên bản
+
+```text
+Package version : 2.2.0
+Display version : 2.2.0
+Build version   : 2.2.0.0
+```
 ## Acknowledgments
 
 Mineradio was originally designed and developed by XxHuberrr, and is now being maintained and localized for global users by x.kihuh. Special thanks to **emily**, who co-created early concepts for the visual foundation and inspired the optimization direction for the `emily` visual preset.
@@ -108,3 +76,25 @@ ShinaYuu Music is licensed under `GPL-3.0-only`. Redistribution of source or bin
 This project is licensed under the GPL-3.0 License. See the [LICENSE](./LICENSE) file for details.
 
 The ShinaYuu Logo, the name "ShinaYuu," the UI visual design, and original visual assets belong entirely to the original author. Third-party dependencies and services follow their respective open-source licenses and terms of service.
+
+## Windows release 2.2.0
+
+### Full installer
+
+```powershell
+npm run release:win:skip-tests
+```
+
+### Full installer + patch from the previous source
+
+```powershell
+npm run release:win:patch -- "D:\ShinaYuu\Release-Base\ShinaYuu-Music-2.1.7-SOURCE.zip"
+```
+
+The installer is written to `dist\ShinaYuu-Music-2.2.0-Setup.exe`. Patch files are written to `dist\updates\` and use the `2.1.7-to-2.2.0` naming pattern.
+
+### Patch only
+
+```powershell
+npm run patch -- "D:\ShinaYuu\Release-Base\ShinaYuu-Music-2.1.7-SOURCE.zip"
+```

@@ -16,7 +16,6 @@ const DEFAULT_CONFIG = Object.freeze({
   smallImageText: '',
   showTrack: true,
   preferTrackCover: true,
-  showVisibleLyric: true,
 });
 
 function safeText(value, max = 128) {
@@ -40,7 +39,6 @@ function normalizeConfig(input = {}) {
     smallImageText: safeText(input.smallImageText || '', 128),
     showTrack: safeBoolean(input.showTrack, DEFAULT_CONFIG.showTrack),
     preferTrackCover: safeBoolean(input.preferTrackCover, DEFAULT_CONFIG.preferTrackCover),
-    showVisibleLyric: safeBoolean(input.showVisibleLyric, DEFAULT_CONFIG.showVisibleLyric),
   };
 }
 
@@ -186,8 +184,6 @@ class DiscordPresenceManager extends EventEmitter {
     this.reconnectTimer = null;
     this.activityTimer = null;
     this.activityPayload = null;
-    this.activityDispatchQueue = [];
-    this.activityDispatching = false;
     this.state = {
       configured: isValidApplicationId(this.config.applicationId),
       enabled: !!this.config.enabled,
@@ -418,7 +414,6 @@ class DiscordPresenceManager extends EventEmitter {
       positionSec: Math.max(0, Number(positionSec) || 0),
       durationSec: Math.max(0, Number(durationSec) || 0),
       cover: safeText(payload.cover || '', 500),
-      visibleLyric: safeText(payload.visibleLyric || payload.lyric || '', 128),
       updatedAt: Date.now(),
     };
     this.queueActivityUpdate(!!payload.immediate);
@@ -440,23 +435,15 @@ class DiscordPresenceManager extends EventEmitter {
     const sourceText = this.sourceLabel(p.source);
     const artistText = p.artist || p.album || sourceText;
     const pausedPrefix = p.isPlaying ? '' : 'Tạm dừng · ';
-    const visibleLyric = this.config.showVisibleLyric ? safeText(p.visibleLyric || '', 128) : '';
     const fallbackImage = this.config.largeImageKey || undefined;
     const dynamicCover = !options.forceAppAsset && this.config.preferTrackCover && /^https?:\/\//i.test(p.cover || '')
       ? p.cover
       : undefined;
-    const rawState = this.config.showTrack && hasTrack
-      ? safeText(visibleLyric || `${pausedPrefix}${artistText}${sourceText && artistText !== sourceText ? ` · ${sourceText}` : ''}`, 128)
-      : 'Visual Music Experience';
-    // Discord rejects activity.state values shorter than 2 characters. Keep
-    // one-character lyric lines visible instead of dropping the whole activity
-    // update; only prefix the shortest lines that would otherwise be invalid.
-    const state = rawState.length >= 2
-      ? rawState
-      : (visibleLyric ? safeText(`·${visibleLyric}`, 128) : (safeText(artistText, 128).length >= 2 ? safeText(artistText, 128) : '♪ Music'));
     const activity = {
       details: this.config.showTrack && hasTrack ? safeText(p.title, 128) : 'ShinaYuu Music',
-      state,
+      state: this.config.showTrack && hasTrack
+        ? safeText(`${pausedPrefix}${artistText}${sourceText && artistText !== sourceText ? ` · ${sourceText}` : ''}`, 128)
+        : 'Visual Music Experience',
       largeImageKey: dynamicCover || fallbackImage,
       largeImageText: hasTrack
         ? safeText([p.title, p.artist].filter(Boolean).join(' — ') || this.config.largeImageText || 'ShinaYuu Music', 128)
@@ -475,41 +462,16 @@ class DiscordPresenceManager extends EventEmitter {
   }
 
   queueActivityUpdate(immediate) {
-    const snapshot = this.activityPayload ? { ...this.activityPayload } : null;
-    if (!snapshot) return;
-    if (immediate) {
-      this.activityDispatchQueue.push(snapshot);
-      if (this.activityDispatchQueue.length > 6) this.activityDispatchQueue.splice(0, this.activityDispatchQueue.length - 6);
-      this.processActivityDispatchQueue().catch(() => {});
-      return;
-    }
     if (this.activityTimer) clearTimeout(this.activityTimer);
     this.activityTimer = setTimeout(() => {
       this.activityTimer = null;
-      this.activityDispatchQueue = [this.activityPayload ? { ...this.activityPayload } : snapshot];
-      this.processActivityDispatchQueue().catch(() => {});
-    }, 700);
+      this.applyActivity().catch(() => {});
+    }, immediate ? 0 : 700);
     this.activityTimer.unref?.();
   }
 
-  async processActivityDispatchQueue() {
-    if (this.activityDispatching || !this.activityDispatchQueue.length) return;
-    this.activityDispatching = true;
-    try {
-      while (this.activityDispatchQueue.length) {
-        const snapshot = this.activityDispatchQueue.shift();
-        await this.applyActivity(snapshot);
-        if (this.activityDispatchQueue.length) await new Promise((resolve) => setTimeout(resolve, 35));
-      }
-    } finally {
-      this.activityDispatching = false;
-    }
-  }
-
-  async applyActivity(snapshot) {
+  async applyActivity() {
     if (!this.client || !this.state.connected || !this.config.enabled) return this.publicState();
-    const previous = this.activityPayload;
-    if (snapshot) this.activityPayload = snapshot;
     let activity = this.buildActivity();
     try {
       await this.client.setActivity(activity, this.processId);

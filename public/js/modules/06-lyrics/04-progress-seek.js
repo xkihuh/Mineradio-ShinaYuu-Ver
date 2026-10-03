@@ -144,20 +144,13 @@ function activeAutoMixHandoffClock() {
   return clock;
 }
 function getPlaybackDurationSeconds() {
-  var currentSong = currentCoverSong();
-  var currentProvider = currentSong && String(currentSong.provider || currentSong.source || currentSong.type || '').toLowerCase();
-  var declaredDuration = playbackDurationFromSong(currentSong);
-  // SoundCloud is delivered through a live/transcoded proxy. Chromium and an
-  // AutoMix handoff media element can expose a bogus multi-hour duration for
-  // this kind of stream. The catalog duration is authoritative.
-  if (currentProvider === 'soundcloud' && declaredDuration > 0) return declaredDuration;
   var handoff = activeAutoMixHandoffClock();
   if (handoff) {
     var liveDuration = Number(handoff.media.duration) || Number(handoff.duration) || 0;
     if (liveDuration > 0) return liveDuration;
   }
-  if (audio && isFinite(audio.duration) && audio.duration > 0 && audio.duration < 24 * 60 * 60) return audio.duration;
-  return declaredDuration;
+  if (audio && isFinite(audio.duration) && audio.duration > 0) return audio.duration;
+  return playbackDurationFromSong(currentCoverSong());
 }
 function getPlaybackCurrentSeconds() {
   var handoff = activeAutoMixHandoffClock();
@@ -582,15 +575,6 @@ function primeProgressSeekPlayback(media, mediaSrc, serial) {
     return false;
   }
 }
-function soundCloudSeekMediaUrl(song, targetTime) {
-  song = song || {};
-  var base = String(song.externalUrl || song.soundcloudPermalink || song.soundcloudUrl || '').trim();
-  if (!base) return '';
-  return '/api/soundcloud/media?url=' + encodeURIComponent(base)
-    + '&start=' + encodeURIComponent(Math.max(0, Number(targetTime) || 0).toFixed(3))
-    + '&seekFormat=mp4';
-}
-
 function commitProgressSeek(targetTime, resumeAfterSeek) {
   var spotifyActive = window.spotifyDirectState && window.spotifyDirectState.active && typeof window.seekSpotifyDirect === 'function';
   var media = progressDragState.media || audio;
@@ -623,55 +607,8 @@ function commitProgressSeek(targetTime, resumeAfterSeek) {
   if (!media) return;
   if (!durationSec) return;
   targetTime = clampRange(Number(targetTime) || 0, 0, durationSec);
-  var currentSongForSeek = currentCoverSong();
-  var currentProviderForSeek = currentSongForSeek ? String(currentSongForSeek.provider || currentSongForSeek.source || currentSongForSeek.type || '').toLowerCase() : '';
-  var serial = ++progressDragState.commitSerial;
-  if (currentProviderForSeek === 'soundcloud' && media) {
-    var soundCloudSeekUrl = soundCloudSeekMediaUrl(currentSongForSeek, targetTime);
-    if (!soundCloudSeekUrl) return false;
-    var soundCloudOldPaused = !!media.paused;
-    progressDragState.previewTime = targetTime;
-    progressDragState.previewDuration = durationSec;
-    progressDragState.previewHoldSerial = serial;
-    progressDragState.previewHoldUntil = performance.now() + 1800;
-    progressDragState.previewClockShouldRun = !!resumeAfterSeek;
-    progressDragState.previewClockRunning = !!resumeAfterSeek;
-    progressDragState.previewClockBase = targetTime;
-    progressDragState.previewClockStartedAt = performance.now();
-    if (typeof setAudioOutputGainImmediate === 'function') setAudioOutputGainImmediate(0);
-    try { media.pause(); } catch (_) {}
-    try {
-      audio.__shinayuuSoundCloudSeekOffset = targetTime;
-      audio.src = soundCloudSeekUrl;
-      progressDragState.mediaSrc = soundCloudSeekUrl;
-      media.load();
-      if (typeof onPlaybackClockDiscontinuity === 'function') onPlaybackClockDiscontinuity(targetTime, 'soundcloud-progress-seek');
-    } catch (err) {
-      console.warn('[SoundCloudSeek] source handoff failed:', err && (err.message || err));
-      progressDragState.previewClockRunning = false;
-      finishProgressPreviewHold(serial, 48);
-      if (typeof restorePlaybackGain === 'function') restorePlaybackGain();
-      return false;
-    }
-    renderProgressPreview(targetTime, durationSec);
-    syncBeatMapPlaybackCursor(targetTime, true);
-    saveLastPlaybackSnapshot(true, 'soundcloud-seek');
-    // Start immediately after swapping the source. Waiting for canplay/loadeddata
-    // here adds the stream startup time twice (once in the browser, once in the
-    // handoff gate). HTMLMediaElement will buffer naturally before audible output.
-    if (resumeAfterSeek) {
-      primeProgressSeekPlayback(media, soundCloudSeekUrl, serial);
-    } else {
-      try { media.pause(); } catch (_) {}
-    }
-    waitForProgressSeekReady(media, targetTime, serial, 2400).then(function () {
-      if (serial !== progressDragState.commitSerial || audio !== media) return;
-      if (!soundCloudOldPaused && resumeAfterSeek) primeProgressSeekPlayback(media, soundCloudSeekUrl, serial);
-      finishProgressPreviewHold(serial, 64);
-    });
-    return true;
-  }
   var mediaSrc = progressDragState.mediaSrc || (media.currentSrc || media.src || '');
+  var serial = ++progressDragState.commitSerial;
   if (!progressSeekMediaStillCurrent(media, mediaSrc)) {
     clearProgressPreviewHold();
     progressDragState.resumePlaySerial = 0;
@@ -769,18 +706,9 @@ progressBar.addEventListener('pointercancel', function (e) { endProgressDrag(e, 
 progressBar.addEventListener('lostpointercapture', function (e) { endProgressDrag(e, true); });
 setInterval(function () {
   if (!audio) {
-    var spotifyOwnsProgress = !!(
-      (typeof window.isSpotifyPlaybackActive === 'function' && window.isSpotifyPlaybackActive())
-      || window.activePlaybackTransport === 'spotify'
-      || window.activePlaybackTransport === 'spotify-pending'
-    );
-    // The restore snapshot is only a placeholder before a real transport owns
-    // the clock. Reapplying it every 200 ms while Spotify renders its own clock
-    // made the progress fill oscillate between the previous and current track.
-    if (!spotifyOwnsProgress && restoredLastPlaybackSnapshot && pendingPlaybackResumeAt > 0) applyRestoredPlaybackProgressUi(restoredLastPlaybackSnapshot);
+    if (restoredLastPlaybackSnapshot && pendingPlaybackResumeAt > 0) applyRestoredPlaybackProgressUi(restoredLastPlaybackSnapshot);
     else updatePlaybackProgressUi({ forceText: true });
     if (playbackProgressTickerShouldRun()) startPlaybackProgressTicker();
-    if (spotifyOwnsProgress) saveLastPlaybackSnapshot(false, 'spotify-tick');
     return;
   }
   if (progressDragState.active) {

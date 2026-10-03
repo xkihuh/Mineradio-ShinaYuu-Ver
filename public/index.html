@@ -12,42 +12,84 @@
 <script src="vendor/gsap.min.js"></script>
 <script src="js/preload-mode.js"></script>
 <script src="js/boot-watchdog.js"></script>
-
-<style id="shinayuu-discord-standalone-2-1-10">
-#shinayuu-standalone-tools{display:grid!important;gap:8px!important;margin:12px 0 10px!important}
-#shinayuu-standalone-tools .fx-section-label{margin-top:0!important;margin-bottom:2px!important}
-#shinayuu-standalone-tools .shinayuu-standalone-status-card{min-height:58px!important}
-#shinayuu-standalone-tools .shinayuu-standalone-status-btn{font-weight:760!important;letter-spacing:.01em!important}
-#shinayuu-standalone-tools .shinayuu-standalone-status-btn:focus-visible{outline:none!important;box-shadow:0 0 0 3px rgba(72,189,255,.14)!important}
-#shinayuu-discord-standalone-card{position:relative!important;display:grid!important;grid-template-columns:40px minmax(0,1fr) auto!important;align-items:center!important;gap:10px!important;width:100%!important;box-sizing:border-box!important;padding:10px!important;border:1px solid rgba(128,216,255,.16)!important;border-radius:14px!important;background:linear-gradient(135deg,rgba(62,175,230,.075),rgba(134,91,221,.075))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.055)!important;overflow:hidden!important}
-#shinayuu-discord-standalone-card:before{content:"";position:absolute!important;inset:0!important;pointer-events:none!important;background:radial-gradient(circle at 0 0,rgba(96,213,255,.11),transparent 46%),radial-gradient(circle at 100% 100%,rgba(133,93,255,.09),transparent 45%)!important}
-#shinayuu-discord-standalone-card>*{position:relative!important;z-index:1!important}
-.shinayuu-standalone-status-icon{display:grid!important;place-items:center!important;width:40px!important;height:40px!important;border-radius:12px!important;background:linear-gradient(145deg,rgba(95,88,255,.8),rgba(62,190,255,.68))!important;border:1px solid rgba(197,211,255,.2)!important;box-shadow:0 9px 22px rgba(0,0,0,.24)!important}
-.shinayuu-standalone-status-icon svg{display:block!important;width:22px!important;height:22px!important;fill:#fff!important}
-.shinayuu-standalone-status-copy{display:grid!important;gap:2px!important;min-width:0!important}
-.shinayuu-standalone-kicker{font:800 6.8px/1 Inter,Segoe UI,sans-serif!important;letter-spacing:.14em!important;color:rgba(141,217,255,.65)!important}
-.shinayuu-standalone-status-copy h4{margin:0!important;font:760 10px/1.25 Inter,Segoe UI,sans-serif!important;color:#fff!important}
-.shinayuu-standalone-status-copy p{margin:0!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;font:540 7.8px/1.3 Inter,Segoe UI,sans-serif!important;color:rgba(255,255,255,.45)!important}
-.shinayuu-standalone-status-btn{all:unset!important;box-sizing:border-box!important;display:flex!important;align-items:center!important;justify-content:center!important;min-width:86px!important;height:38px!important;padding:0 12px!important;border:1px solid rgba(99,217,255,.27)!important;border-radius:12px!important;background:linear-gradient(135deg,rgba(61,194,255,.16),rgba(140,94,255,.15))!important;color:#fff!important;font:730 8.6px/1 Inter,Segoe UI,sans-serif!important;cursor:pointer!important;transition:transform .16s ease,border-color .16s ease,background .16s ease!important}
-.shinayuu-standalone-status-btn:hover{transform:translateY(-1px)!important;border-color:rgba(128,213,255,.4)!important;background:linear-gradient(135deg,rgba(61,194,255,.22),rgba(140,94,255,.2))!important}
-#shinayuu-discord-standalone-card.connected{border-color:rgba(88,225,190,.2)!important}
-#shinayuu-discord-standalone-card.connected .shinayuu-standalone-status-btn{background:linear-gradient(135deg,rgba(58,212,180,.14),rgba(89,116,255,.14))!important}
-@media(max-width:520px){#shinayuu-discord-standalone-card{grid-template-columns:40px minmax(0,1fr)!important}.shinayuu-standalone-status-btn{grid-column:2;justify-self:start;min-width:110px!important}}
-</style>
 <link href="css/index.css?v=20260716-we-continuity-vsync" rel="stylesheet"/>
-<link href="css/shinayuu-v6.css?v=20260925-252" rel="stylesheet"/>
+<link href="css/shinayuu-v6.css?v=20260726" rel="stylesheet"/>
 <link href="css/shinayuu-alpha2.css?v=2.0.0-alpha.2" rel="stylesheet"/>
 <link href="css/shinayuu-alpha3.css?v=2.0.0-alpha.3" rel="stylesheet"/>
 <link href="css/shinayuu-alpha3-focused-fix.css?v=2.0.0-alpha.3.0.1" rel="stylesheet"/>
 <link href="css/shinayuu-alpha3.0.2-focused.css?v=2.0.0-alpha.3.0.3" rel="stylesheet"/>
 <link href="css/shinayuu-alpha3.0.3-focused.css?v=2.0.0-alpha.3.0.3" rel="stylesheet"/>
 <link href="css/shinayuu-alpha3.0.4-focused.css?v=2.0.0-alpha.3.0.4" rel="stylesheet"/>
-<link rel="stylesheet" href="css/shinayuu-alpha3.0.5-fixes.css?v=2.1.10">
-
-
-
-
-<link rel="stylesheet" href="css/shinayuu-ai-v01.css?v=2.5.0-ai40">
+<link rel="stylesheet" href="css/shinayuu-alpha3.0.5-fixes.css?v=2.2.0">
+<style id="shinayuu-discord-settings-card-r6">
+.sy-discord-settings-card{position:relative;display:grid;gap:10px;overflow:hidden;margin:8px 0 2px;padding:12px;border:1px solid rgba(153,201,255,.19);border-radius:18px;background:linear-gradient(145deg,rgba(20,27,47,.82),rgba(7,11,21,.84));box-shadow:0 16px 42px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.08);backdrop-filter:blur(26px) saturate(1.35);-webkit-backdrop-filter:blur(26px) saturate(1.35);color:#fff;cursor:pointer}
+.sy-discord-settings-card:hover{border-color:rgba(144,214,255,.34);transform:translateY(-1px)}
+.sy-discord-settings-glow{position:absolute;inset:-60% 15% 45% -20%;background:radial-gradient(circle,rgba(91,119,255,.24),transparent 67%);pointer-events:none}
+.sy-discord-settings-main{position:relative;display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:10px;align-items:center}
+.sy-discord-settings-icon{display:grid;place-items:center;width:40px;height:40px;border-radius:13px;background:linear-gradient(145deg,rgba(113,99,255,.72),rgba(50,177,255,.58));border:1px solid rgba(211,224,255,.18);font:800 20px/1 Inter,Segoe UI,sans-serif}
+.sy-discord-settings-copy{display:grid;gap:2px;min-width:0}
+.sy-discord-settings-copy>span{font:800 7px/1 Inter,Segoe UI,sans-serif;letter-spacing:.14em;color:rgba(174,210,255,.64)}
+.sy-discord-settings-copy strong{font:750 10.5px/1.25 Inter,Segoe UI,sans-serif;color:#fff}
+.sy-discord-settings-copy small,.sy-discord-settings-copy em{font:520 7.7px/1.35 Inter,Segoe UI,sans-serif;color:rgba(255,255,255,.46);font-style:normal}
+.sy-discord-settings-status{display:flex;align-items:center;gap:5px;padding:6px 8px;border:1px solid rgba(255,255,255,.1);border-radius:999px;background:rgba(255,255,255,.05);font:700 7.2px/1 Inter,Segoe UI,sans-serif;color:rgba(255,255,255,.63)}
+.sy-discord-settings-status i{width:6px;height:6px;border-radius:50%;display:block;background:#777}
+.sy-discord-settings-status.online i{background:#6fe4a2;box-shadow:0 0 10px rgba(111,228,162,.38)}
+.sy-discord-settings-preview{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid rgba(255,255,255,.07);border-radius:12px;background:rgba(255,255,255,.028)}
+.sy-discord-settings-preview>span{color:#7de4ff;font-size:9px}.sy-discord-settings-preview div{display:grid;gap:2px;min-width:0;flex:1}.sy-discord-settings-preview strong{font:680 8.7px/1.25 Inter,Segoe UI,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sy-discord-settings-preview small{font:510 7.2px/1.2 Inter,Segoe UI,sans-serif;color:rgba(255,255,255,.4)}.sy-discord-settings-preview em{font:600 7px/1 Inter,Segoe UI,sans-serif;color:rgba(255,255,255,.4);font-style:normal}
+.sy-discord-settings-open{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:7px;height:34px;padding:0 10px;border:1px solid rgba(125,210,255,.28);border-radius:11px;background:linear-gradient(135deg,rgba(62,190,255,.18),rgba(129,97,255,.18));color:#fff;font:700 8px/1 Inter,Segoe UI,sans-serif;cursor:pointer}.sy-discord-settings-open:hover{background:linear-gradient(135deg,rgba(62,190,255,.25),rgba(129,97,255,.25))}
+@media(max-width:560px){.sy-discord-settings-main{grid-template-columns:38px minmax(0,1fr)}.sy-discord-settings-status{grid-column:2;justify-self:start}}
+</style>
+<style id="shinayuu-discord-critical-2-1-1">
+/* Critical inline fallback: this card must remain Liquid Glass even when an
+   older external stylesheet is left behind by a partial GitHub/public update. */
+#discord-advanced-card.sy-discord-card-v213{position:relative!important;display:grid!important;gap:10px!important;overflow:hidden!important;margin:8px 0 2px!important;padding:12px!important;border:1px solid rgba(142,198,255,.22)!important;border-radius:18px!important;background:linear-gradient(145deg,rgba(28,35,59,.94),rgba(7,11,21,.92))!important;box-shadow:0 18px 48px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.1)!important;color:#fff!important;backdrop-filter:blur(28px) saturate(1.35)!important;-webkit-backdrop-filter:blur(28px) saturate(1.35)!important}
+#discord-advanced-card .sy-discord-ambient{position:absolute!important;inset:-65% 25% 45% -20%!important;z-index:-1!important;background:radial-gradient(circle,rgba(103,112,255,.32),transparent 68%)!important;pointer-events:none!important}
+#discord-advanced-card .sy-discord-header,#discord-advanced-card .sy-discord-brand{display:flex!important;align-items:center!important;gap:10px!important;min-width:0!important}
+#discord-advanced-card .sy-discord-header{justify-content:space-between!important}
+#discord-advanced-card .sy-discord-logo{display:grid!important;place-items:center!important;flex:0 0 38px!important;width:38px!important;height:38px!important;border-radius:12px!important;background:linear-gradient(145deg,rgba(100,91,255,.82),rgba(54,174,255,.7))!important;border:1px solid rgba(197,211,255,.22)!important}
+#discord-advanced-card .sy-discord-logo svg{display:block!important;width:22px!important;height:22px!important;fill:#fff!important}
+#discord-advanced-card .sy-discord-brand-copy{display:grid!important;gap:2px!important;min-width:0!important}
+#discord-advanced-card .sy-discord-brand-copy>span{font:800 7px/1 Inter,Segoe UI,sans-serif!important;letter-spacing:.13em!important;color:rgba(174,210,255,.65)!important}
+#discord-advanced-card .sy-discord-brand-copy strong{font:730 10.5px/1.25 Inter,Segoe UI,sans-serif!important;color:#fff!important}
+#discord-advanced-card .sy-discord-brand-copy small,#discord-advanced-card .sy-discord-brand-copy em{font:520 7.8px/1.35 Inter,Segoe UI,sans-serif!important;color:rgba(255,255,255,.46)!important;font-style:normal!important}
+#discord-advanced-card .sy-discord-status{display:flex!important;align-items:center!important;gap:5px!important;flex:0 0 auto!important;padding:6px 8px!important;border:1px solid rgba(255,255,255,.11)!important;border-radius:999px!important;background:rgba(255,255,255,.055)!important;color:rgba(255,255,255,.62)!important;font:700 7.4px/1 Inter,Segoe UI,sans-serif!important}
+#discord-advanced-card .sy-discord-status i{display:block!important;width:6px!important;height:6px!important;border-radius:50%!important;background:#737989!important}
+#discord-advanced-card .sy-discord-preview{display:grid!important;grid-template-columns:38px minmax(0,1fr) auto!important;align-items:center!important;gap:9px!important;padding:9px!important;border:1px solid rgba(255,255,255,.08)!important;border-radius:13px!important;background:rgba(3,7,16,.42)!important}
+#discord-advanced-card .sy-discord-preview-cover{position:relative!important;width:38px!important;height:38px!important;overflow:hidden!important;border-radius:10px!important;background:#111625!important}
+#discord-advanced-card .sy-discord-preview-cover img{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:cover!important}
+#discord-advanced-card .sy-discord-preview-copy{display:grid!important;gap:2px!important;min-width:0!important}
+#discord-advanced-card .sy-discord-preview-copy>span{font:800 6.6px/1 Inter,Segoe UI,sans-serif!important;letter-spacing:.12em!important;color:rgba(141,217,255,.63)!important}
+#discord-advanced-card .sy-discord-preview-copy strong{font:700 9.4px/1.25 Inter,Segoe UI,sans-serif!important;color:#fff!important}
+#discord-advanced-card .sy-discord-preview-copy small,#discord-advanced-card .sy-discord-preview>em{font:520 7.6px/1.3 Inter,Segoe UI,sans-serif!important;color:rgba(255,255,255,.45)!important;font-style:normal!important}
+#discord-advanced-card .sy-discord-connect{display:grid!important;gap:9px!important;padding:10px!important;border:1px solid rgba(166,194,255,.13)!important;border-radius:14px!important;background:linear-gradient(145deg,rgba(255,255,255,.052),rgba(255,255,255,.02))!important}
+#discord-advanced-card .sy-discord-connect-head{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(90px,42%)!important;gap:8px!important;align-items:end!important}
+#discord-advanced-card .sy-discord-connect-head strong{display:block!important;font:740 9px/1.2 Inter,Segoe UI,sans-serif!important;color:#fff!important}
+#discord-advanced-card .sy-discord-connect-head small,#discord-advanced-card .sy-discord-connect-head em{display:block!important;margin-top:2px!important;font:520 7.2px/1.35 Inter,Segoe UI,sans-serif!important;color:rgba(255,255,255,.43)!important;font-style:normal!important}
+#discord-advanced-card .sy-discord-connect-head em{text-align:right!important;color:#9ee5ff!important}
+#discord-advanced-card .sy-discord-fields{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important}
+#discord-advanced-card .sy-discord-field{display:grid!important;gap:5px!important;min-width:0!important}
+#discord-advanced-card .sy-discord-field>span{font:700 7.2px/1 Inter,Segoe UI,sans-serif!important;color:rgba(202,220,255,.7)!important}
+#discord-advanced-card .sy-discord-input-shell{display:grid!important;grid-template-columns:16px minmax(0,1fr)!important;align-items:center!important;gap:7px!important;height:36px!important;padding:0 10px!important;border:1px solid rgba(160,188,255,.2)!important;border-radius:11px!important;background:linear-gradient(145deg,rgba(5,9,20,.78),rgba(18,23,42,.67))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)!important}
+#discord-advanced-card .sy-discord-input-shell:focus-within{border-color:rgba(111,209,255,.58)!important;box-shadow:0 0 0 3px rgba(65,192,255,.11),inset 0 1px 0 rgba(255,255,255,.06)!important}
+#discord-advanced-card .sy-discord-input-shell svg{display:block!important;width:15px!important;height:15px!important;fill:rgba(174,205,255,.65)!important}
+#discord-advanced-card #discord-application-id,#discord-advanced-card #discord-large-image-key{all:unset!important;box-sizing:border-box!important;display:block!important;width:100%!important;min-width:0!important;height:34px!important;color:#fff!important;-webkit-text-fill-color:#fff!important;caret-color:#8fdfff!important;font:620 8.8px/34px Inter,Segoe UI,sans-serif!important}
+#discord-advanced-card #discord-application-id::placeholder,#discord-advanced-card #discord-large-image-key::placeholder{color:rgba(255,255,255,.28)!important;-webkit-text-fill-color:rgba(255,255,255,.28)!important}
+#discord-advanced-card .sy-discord-toggle{position:relative!important;display:grid!important;grid-template-columns:34px minmax(0,1fr)!important;align-items:center!important;gap:9px!important;padding:8px 9px!important;border:1px solid rgba(255,255,255,.075)!important;border-radius:12px!important;background:rgba(255,255,255,.03)!important;cursor:pointer!important}
+#discord-advanced-card .sy-discord-toggle>input{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important}
+#discord-advanced-card .sy-discord-toggle-track{position:relative!important;width:34px!important;height:19px!important;border:1px solid rgba(255,255,255,.12)!important;border-radius:999px!important;background:rgba(7,10,19,.72)!important}
+#discord-advanced-card .sy-discord-toggle-track i{position:absolute!important;left:3px!important;top:3px!important;width:11px!important;height:11px!important;border-radius:50%!important;background:rgba(255,255,255,.72)!important;transition:left .18s ease!important}
+#discord-advanced-card .sy-discord-toggle>input:checked+.sy-discord-toggle-track{background:linear-gradient(90deg,rgba(61,182,255,.5),rgba(128,96,255,.55))!important}
+#discord-advanced-card .sy-discord-toggle>input:checked+.sy-discord-toggle-track i{left:18px!important;background:#fff!important}
+#discord-advanced-card .sy-discord-toggle-copy{display:grid!important;gap:2px!important}
+#discord-advanced-card .sy-discord-toggle-copy strong{font:680 8.2px/1.2 Inter,Segoe UI,sans-serif!important;color:#fff!important}
+#discord-advanced-card .sy-discord-toggle-copy small{font:510 7.2px/1.3 Inter,Segoe UI,sans-serif!important;color:rgba(255,255,255,.42)!important}
+#discord-advanced-card .sy-discord-actions{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;grid-template-rows:repeat(2,34px)!important;gap:7px!important}
+#discord-advanced-card .sy-discord-action{all:unset!important;box-sizing:border-box!important;display:flex!important;align-items:center!important;justify-content:center!important;gap:6px!important;width:100%!important;height:34px!important;min-width:0!important;padding:0 8px!important;border:1px solid rgba(255,255,255,.11)!important;border-radius:11px!important;background:linear-gradient(145deg,rgba(255,255,255,.065),rgba(255,255,255,.03))!important;color:rgba(255,255,255,.91)!important;font:680 7.6px/1 Inter,Segoe UI,sans-serif!important;cursor:pointer!important}
+#discord-advanced-card .sy-discord-action.primary{border-color:rgba(119,209,255,.32)!important;background:linear-gradient(135deg,rgba(58,190,255,.21),rgba(132,91,255,.19))!important}
+#discord-advanced-card .sy-discord-action svg{display:block!important;flex:0 0 13px!important;width:13px!important;height:13px!important;fill:currentColor!important;opacity:.78!important}
+#discord-advanced-card .sy-discord-action span{overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
+@media(max-width:560px){#discord-advanced-card .sy-discord-fields{grid-template-columns:1fr!important}#discord-advanced-card .sy-discord-connect-head{grid-template-columns:1fr!important}#discord-advanced-card .sy-discord-connect-head em{text-align:left!important}}
+</style>
 </head>
 <body>
 <div id="desktop-window-shell">
@@ -84,7 +126,7 @@
 <div aria-hidden="true" id="fullscreen-diy-zone">
 <button aria-label="DIY" aria-pressed="false" class="desktop-mode-btn" id="fullscreen-diy-btn" onclick="toggleDiyMode()" title="DIY" type="button">DIY</button>
 </div>
-<div id="custom-bg"><img id="custom-bg-image" alt="" aria-hidden="true"/><video id="custom-bg-video" loop="" muted="" playsinline="" preload="metadata"></video></div>
+<div id="custom-bg"><video id="custom-bg-video" loop="" muted="" playsinline="" preload="metadata"></video></div>
 <div aria-hidden="true" id="wallpaper-engine-layer">
 <img alt="" id="wallpaper-engine-image"/>
 <canvas aria-hidden="true" id="wallpaper-engine-freeze"></canvas>
@@ -126,7 +168,6 @@
 <div aria-label="Search mode" class="search-mode-tabs" id="search-mode-tabs" role="tablist">
 <button aria-selected="true" class="active" id="search-mode-song" onclick="setSearchMode('song')" type="button">Tất cả</button>
 <button aria-selected="false" id="search-mode-netease" onclick="setSearchMode('netease')" type="button">Spotify</button>
-<button aria-selected="false" id="search-mode-soundcloud" onclick="setSearchMode('soundcloud')" type="button">SoundCloud</button>
 <button aria-selected="false" id="search-mode-ytmusic" onclick="setSearchMode('ytmusic')" type="button">YouTube Music</button>
 <button aria-selected="false" id="search-mode-ytvideo" onclick="setSearchMode('ytvideo')" type="button">YouTube Video</button>
 <button aria-selected="false" id="search-mode-podcast" onclick="setSearchMode('podcast')" type="button">Podcast</button>
@@ -460,9 +501,9 @@
 </div>
 </div>
 <div class="fx-section-label sy-interface-section-label" id="sy-liquid-glass-section-label">Liquid Glass</div>
-<div class="fx-slider sy-panel-opacity-control" id="sy-panel-opacity-control"><label id="sy-panel-opacity-label">Bảng điều khiển hình ảnh</label><input id="fx-ui-panel-opacity" max="0.96" min="0.05" step="0.01" type="range" value="0.90"/><output id="fx-ui-panel-opacity-output">90%</output></div>
-<div class="fx-slider sy-panel-opacity-control" id="sy-left-shelf-opacity-control"><label id="sy-left-shelf-opacity-label">Kệ playlist bên trái</label><input id="fx-ui-left-shelf-opacity" max="0.96" min="0.05" step="0.01" type="range" value="0.90"/><output id="fx-ui-left-shelf-opacity-output">90%</output></div>
-<div class="fx-slider sy-panel-opacity-control" id="sy-right-shelf-opacity-control"><label id="sy-right-shelf-opacity-label">Kệ playlist bên phải</label><input id="fx-ui-right-shelf-opacity" max="1" min="0.05" step="0.01" type="range" value="1.00"/><output id="fx-ui-right-shelf-opacity-output">100%</output></div>
+<div class="fx-slider sy-panel-opacity-control" id="sy-panel-opacity-control"><label id="sy-panel-opacity-label">Bảng điều khiển hình ảnh</label><input id="fx-ui-panel-opacity" max="0.96" min="0.25" step="0.01" type="range" value="0.90"/><output id="fx-ui-panel-opacity-output">90%</output></div>
+<div class="fx-slider sy-panel-opacity-control" id="sy-left-shelf-opacity-control"><label id="sy-left-shelf-opacity-label">Kệ playlist bên trái</label><input id="fx-ui-left-shelf-opacity" max="0.96" min="0.25" step="0.01" type="range" value="0.90"/><output id="fx-ui-left-shelf-opacity-output">90%</output></div>
+<div class="fx-slider sy-panel-opacity-control" id="sy-right-shelf-opacity-control"><label id="sy-right-shelf-opacity-label">Kệ playlist bên phải</label><input id="fx-ui-right-shelf-opacity" max="1" min="0.25" step="0.01" type="range" value="1.00"/><output id="fx-ui-right-shelf-opacity-output">100%</output></div>
 <div class="fx-slider sy-panel-opacity-control" id="sy-right-shelf-bg-opacity-control"><label id="sy-right-shelf-bg-opacity-label">Nền thẻ kệ playlist bên phải</label><input id="fx-ui-right-shelf-bg-opacity" max="0.98" min="0.25" step="0.01" type="range" value="0.79"/><output id="fx-ui-right-shelf-bg-opacity-output">79%</output></div>
 <div class="fx-section-label">Giao diện</div>
 <div class="fx-slider"><label>Độ trong suốt nền</label><input id="fx-bgopacity" max="1" min="0" step="0.01" type="range"/><output></output></div>
@@ -782,17 +823,6 @@
 <button class="active" data-cam="off">Tắt</button>
 <button data-cam="gesture">Chạm bằng cử chỉ</button>
 </div>
-<div class="fx-section-label">Cử chỉ người chơi</div>
-<div class="fx-toggle-grid">
-<div class="fx-toggle on" id="t-gesturePlayerActions" onclick="toggleGesturePlayerActions()"><span>Điều khiển trình phát</span><span class="dot"></span></div>
-<div class="fx-toggle on" id="t-gestureHandOverlay" onclick="toggleGestureHandOverlay()"><span>Hiệu ứng bàn tay</span><span class="dot"></span></div>
-</div>
-<div class="fx-section-label">Độ nhạy nhận diện</div>
-<div class="fx-seg gesture-sensitivity-seg" id="gesture-sensitivity-seg">
-<button data-gesture-sensitivity="steady" onclick="setGestureSensitivity('steady')">Ổn định</button>
-<button data-gesture-sensitivity="balanced" class="active" onclick="setGestureSensitivity('balanced')">Cân bằng</button>
-<button data-gesture-sensitivity="quick" onclick="setGestureSensitivity('quick')">Nhanh</button>
-</div>
 </div>
 </div>
 <div class="fx-advanced" id="fx-advanced">
@@ -800,6 +830,23 @@
 <span>Thông số nâng cao</span><span class="arrow">▶</span>
 </div>
 <div class="fx-advanced-body">
+<div class="fx-section-label">Discord Rich Presence</div>
+<div class="sy-discord-settings-card" id="discord-advanced-card" data-discord-settings-trigger="1" tabindex="0" role="button" aria-label="Discord settings">
+  <div class="sy-discord-settings-glow" aria-hidden="true"></div>
+  <div class="sy-discord-settings-main">
+    <div class="sy-discord-settings-icon" aria-hidden="true">⌁</div>
+    <div class="sy-discord-settings-copy">
+      <span>DISCORD RICH PRESENCE</span>
+      <strong id="discord-profile-name">Discord chưa kết nối</strong>
+      <small id="discord-profile-note">Thiết lập Rich Presence, ảnh bìa và trạng thái bài hát.</small>
+      <em id="discord-card-state">Chưa cấu hình</em>
+    </div>
+    <span class="sy-discord-settings-status" id="discord-status-pill"><i></i><b id="discord-status-text">Ngoại tuyến</b></span>
+  </div>
+  <div class="sy-discord-settings-preview"><span>●</span><div><strong id="discord-now-title">ShinaYuu Music</strong><small id="discord-now-meta">Visual Music Experience</small></div><em id="discord-now-progress">Live</em></div>
+  <button class="sy-discord-settings-open" id="discord-open-settings" type="button" aria-label="Mở thiết lập Discord">⚙ Thiết lập Discord</button>
+</div>
+
 <div class="fx-section-label">Phát trực tiếp / Nền</div>
 <div class="fx-seg" id="performance-background-seg" title="Điều khiển cách kết xuất khi cửa sổ bị ẩn, thu nhỏ hoặc chạy nền.">
 <button data-performance-background="auto">Tự tối ưu</button>
@@ -907,20 +954,6 @@
 <div class="fx-slider"><label>Độ phân tán</label><input id="fx-scatter" max="0.5" min="0" step="0.01" type="range"/><output></output></div>
 <div class="fx-slider"><label>Nén nền</label><input id="fx-bgfade" max="1.2" min="0" step="0.01" type="range"/><output></output></div>
 </div>
-</div>
-<div class="shinayuu-standalone-tools" id="shinayuu-standalone-tools">
-  <div class="fx-section-label">Kết nối Discord</div>
-  <div class="shinayuu-standalone-status-card" id="shinayuu-discord-standalone-card">
-    <div class="shinayuu-standalone-status-icon" aria-hidden="true">
-      <svg viewBox="0 0 24 24"><path d="M7.4 6.2c1.5-.7 3-.9 4.6-.9s3.1.2 4.6.9c1.1.5 2.1 1.2 2.8 2.1.5 2 .8 3.9.6 5.9-.9 1.2-2 2.2-3.4 2.9l-.9-1.2c.6-.2 1.2-.5 1.7-.9-3.3 1.5-7.5 1.5-10.8 0 .5.4 1.1.7 1.7.9l-.9 1.2c-1.4-.7-2.5-1.7-3.4-2.9-.2-2 .1-3.9.6-5.9.7-.9 1.7-1.6 2.8-2.1Zm2.1 4.4c-.8 0-1.4.7-1.4 1.5s.6 1.5 1.4 1.5 1.4-.7 1.4-1.5-.6-1.5-1.4-1.5Zm5 0c-.8 0-1.4.7-1.4 1.5s.6 1.5 1.4 1.5 1.4-.7 1.4-1.5-.6-1.5-1.4-1.5Z"/></svg>
-    </div>
-    <div class="shinayuu-standalone-status-copy">
-      <span class="shinayuu-standalone-kicker">DISCORD RICH PRESENCE</span>
-      <h4 id="shinayuu-standalone-discord-title">Discord Rich Presence</h4>
-      <p id="shinayuu-standalone-discord-status">Chưa cấu hình</p>
-    </div>
-    <button class="shinayuu-standalone-status-btn" id="shinayuu-standalone-discord-open" type="button">Kết nối Discord</button>
-  </div>
 </div>
 <div class="fx-actions">
 <button class="fx-mini-btn" onclick="resetFx()">Khôi phục mặc định</button>
@@ -1260,11 +1293,6 @@
 <span class="provider-login-copy"><b>Spotify</b><small>OAuth chính thức · Yêu cầu Premium để phát trực tiếp</small></span>
 <span class="provider-login-state" id="login-provider-spotify-state">Chưa kết nối</span>
 </button>
-<button class="provider-login-card soundcloud" data-login-provider="soundcloud" id="login-provider-soundcloud" onclick="selectLoginProviderNode('soundcloud')" type="button">
-<span class="provider-login-logo">SC</span>
-<span class="provider-login-copy"><b>SoundCloud</b><small>Tìm kiếm công khai · ShinaYuu tự xử lý phát từ URL SoundCloud</small></span>
-<span class="provider-login-state" id="login-provider-soundcloud-state">Sẵn sàng</span>
-</button>
 </div>
 
 <div class="provider-login-workspace" id="provider-login-workspace-panel">
@@ -1311,7 +1339,7 @@
 
 <div class="provider-login-footer">
 <div class="provider-login-footer-actions"><button class="modal-btn" onclick="skipLoginAndFocusSearch()" type="button">Tìm nhạc mà không đăng nhập</button><button class="modal-btn" id="use-both-sources-btn" onclick="enableBothMusicSources()" type="button">Dùng cả hai nguồn</button></div>
-<span>SoundCloud không yêu cầu Client ID / Client Secret; ShinaYuu chỉ lưu URL track để xử lý phát.</span>
+<span>Dữ liệu đăng nhập và Client ID chỉ được lưu cục bộ trên máy.</span>
 </div>
 
 </div>
@@ -1633,16 +1661,15 @@ Có thể không dùng mốc thời gian; mỗi dòng sẽ tự dàn theo thời
 </div>
 </div>
 <script src="js/shinayuu-i18n.js"></script>
-<script src="js/shinayuu-index-bundle.js?v=2.5.2-252"></script>
-<script src="js/shinayuu-home-smart-queue.js?v=2.1.10"></script>
-<script src="js/shinayuu-v2-native.js?v=2.1.10"></script>
+<script src="js/shinayuu-index-bundle.js?v=2.2.0"></script>
+<script src="js/shinayuu-home-smart-queue.js?v=2.2.0"></script>
+<script src="js/shinayuu-v2-native.js?v=2.2.0"></script>
 <script src="js/shinayuu-background-media-library.js?v=2.2.0"></script>
-<script src="js/shinayuu-alpha2-features.js?v=2.1.10"></script>
+<script src="js/shinayuu-alpha2-features.js?v=2.2.0"></script>
 <script src="js/shinayuu-ui-v6.js"></script>
-<script src="spotify-direct-player.js?v=2.5.2-252"></script>
-<script src="js/shinayuu-2.0.15-foreground-prewarm.js?v=2.1.10"></script>
-<script src="js/shinayuu-alpha3.0.4-ui.js?v=2.1.10"></script>
-<script src="js/shinayuu-alpha3.0.5-fixes.js?v=2.1.10"></script>
-<script src="js/shinayuu-ai-v01.js?v=2.5.0-ai40"></script>
+<script src="spotify-direct-player.js?v=2.2.0"></script>
+<script src="js/shinayuu-2.0.15-foreground-prewarm.js?v=2.2.0"></script>
+<script src="js/shinayuu-alpha3.0.4-ui.js?v=2.2.0"></script>
+<script src="js/shinayuu-alpha3.0.5-fixes.js?v=2.2.0"></script>
 </body>
 </html>

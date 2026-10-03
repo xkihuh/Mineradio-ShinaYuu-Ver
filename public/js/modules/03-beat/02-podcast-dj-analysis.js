@@ -429,7 +429,7 @@ async function analyzePodcastDjBeats(audioUrl, token, durationSec) {
       hideBeatChip();
       if (durationSec <= 0 || durationSec > 3300) return null;
     }
-    var fetchAudioUrl = audioUrl;
+    var fetchAudioUrl = /^https?:\/\//i.test(audioUrl || '') ? ('/api/audio?url=' + encodeURIComponent(audioUrl)) : audioUrl;
     var resp = await fetch(fetchAudioUrl);
     if (token !== djBeatMapToken || !djMode.active) { hideBeatChip(); return null; }
     var ab = await resp.arrayBuffer();

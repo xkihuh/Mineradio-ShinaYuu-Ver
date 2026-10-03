@@ -20,7 +20,6 @@ const SPOTIFY_LYRICS_BASE = 'https://spclient.wg.spotify.com/color-lyrics/v2/tra
 const lyricSync = require('./public/lyrics-sync');
 const youtubeCaptions = require('./youtube-caption-provider');
 const youtubeForcedAligner = require('./youtube-forced-aligner');
-const soundcloudApi = require('./soundcloud-api');
 const crossProviderLyrics = require('./desktop/cross-provider-lyrics');
 
 const spotifyTrackCache = new Map();
@@ -81,13 +80,9 @@ const SPOTIFY_AUTH_TTL = 15 * 60 * 1000;
 const SPOTIFY_PROFILE_RETRY_FALLBACK = 15 * 1000;
 const SPOTIFY_REQUEST_TIMEOUT = 15 * 1000;
 
-const YTDLP_VERSION = '2026.08.18+';
-// YouTube changed its player/Innertube behavior repeatedly during Aug 2026.
-// The stable 2026.07.04 binary is known to hit `The page needs to be reloaded`
-// on current YouTube. Use the official yt-dlp master-builds latest asset so
-// ShinaYuu can pick up extractor fixes without waiting for a stable release.
-const YTDLP_WINDOWS_URL = 'https://github.com/yt-dlp/yt-dlp-master-builds/releases/latest/download/yt-dlp.exe';
-const YTDLP_MIN_DATE = 20260818;
+const YTDLP_VERSION = '2026.07.04';
+const YTDLP_WINDOWS_URL = `https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VERSION}/yt-dlp.exe`;
+const YTDLP_WINDOWS_SHA256 = '52fe3c26dcf71fbdc85b528589020bb0b8e383155cfa81b64dd447bbe35e24b8';
 const STREAM_TOKEN_TTL = 12 * 60 * 1000;
 const YOUTUBE_AUDIO_DESCRIPTOR_TTL = 8 * 60 * 1000;
 const YOUTUBE_VIDEO_DESCRIPTOR_TTL = 8 * 60 * 1000;
@@ -135,7 +130,6 @@ function providerConfig() {
     spotifyMarket: String(process.env.SPOTIFY_MARKET || stored.spotifyMarket || 'VN').trim().toUpperCase(),
     youtubeClientId: String(process.env.YOUTUBE_CLIENT_ID || stored.youtubeClientId || bundledYoutube.oauthClientId || '').trim(),
     youtubeClientSecret: String(process.env.YOUTUBE_CLIENT_SECRET || stored.youtubeClientSecret || bundledYoutube.oauthClientSecret || '').trim(),
-    // SoundCloud 2.2.x is public-web/yt-dlp based; no user credentials are read.
     language: String(stored.language || 'vi').trim().toLowerCase() === 'en' ? 'en' : 'vi',
   };
 }
@@ -147,8 +141,6 @@ function updateProviderConfig(input) {
     spotifyMarket: String(input && input.spotifyMarket != null ? input.spotifyMarket : previous.spotifyMarket).trim().toUpperCase() || 'VN',
     youtubeClientId: String(input && input.youtubeClientId != null ? input.youtubeClientId : previous.youtubeClientId).trim(),
     youtubeClientSecret: String(input && input.youtubeClientSecret != null ? input.youtubeClientSecret : previous.youtubeClientSecret).trim(),
-    soundcloudClientId: String(input && input.soundcloudClientId != null ? input.soundcloudClientId : previous.soundcloudClientId).trim(),
-    soundcloudClientSecret: String(input && input.soundcloudClientSecret != null ? input.soundcloudClientSecret : previous.soundcloudClientSecret).trim(),
     language: String(input && input.language != null ? input.language : previous.language).trim().toLowerCase() === 'en' ? 'en' : 'vi',
   };
   writeJson(CONFIG_FILE, next);
@@ -1343,21 +1335,6 @@ async function youtubeLoginStatus(baseUrl = '') {
     }
   }
 
-  const deviceStatus = await youtubeDeviceLoginStatus().catch((error) => {
-    console.warn('[YouTubeDeviceAuth] status probe failed:', error.message || error);
-    return null;
-  });
-  if (deviceStatus && deviceStatus.loggedIn) {
-    return {
-      ...deviceStatus,
-      configured: true,
-      quickLoginAvailable: true,
-      advancedConfigured: !!config.youtubeClientId || deviceStatus.authMode === 'cookie',
-      redirectUri: youtubeRedirectUri(baseUrl),
-      message: deviceStatus.authMode === 'cookie' ? 'YOUTUBE_COOKIE_SESSION_READY' : 'YOUTUBE_DEVICE_SESSION_READY',
-    };
-  }
-
   return {
     provider: 'youtube', loggedIn: false, configured: !!config.youtubeClientId,
     quickLoginAvailable: !!config.youtubeClientId, advancedConfigured: !!config.youtubeClientId,
@@ -1375,25 +1352,7 @@ function parseIsoDurationMs(value) {
 
 async function youtubeAccountPlaylists(limit = 50) {
   const status = await youtubeLoginStatus();
-  if (!status.loggedIn) {
-    const error = new Error('YOUTUBE_PLAYLIST_AUTH_REQUIRED');
-    error.code = 'YOUTUBE_PLAYLIST_AUTH_REQUIRED';
-    error.status = 401;
-    error.provider = 'youtube';
-    error.reauthRequired = true;
-    error.requiredScope = 'https://www.googleapis.com/auth/youtube.readonly';
-    throw error;
-  }
-  if (status.authMode === 'cookie' || status.authMode === 'device') {
-    return youtubeDevicePlaylists(limit);
-  }
-  if (status.authMode !== 'official') {
-    const error = new Error('YOUTUBE_PLAYLIST_AUTH_MODE_UNSUPPORTED');
-    error.status = 401;
-    error.provider = 'youtube';
-    error.reauthRequired = true;
-    throw error;
-  }
+  if (!status.loggedIn || status.authMode !== 'official') return [];
   const maxItems = Math.max(1, Math.min(500, Number(limit) || 50));
   const results = [];
   let pageToken = '';
@@ -1454,9 +1413,7 @@ async function youtubeAccountPlaylistTracks(playlistId, limit = 200) {
   const id = String(playlistId || '').trim();
   if (!id) throw Object.assign(new Error('YOUTUBE_PLAYLIST_ID_REQUIRED'), { status: 400 });
   const status = await youtubeLoginStatus();
-  if (!status.loggedIn) throw Object.assign(new Error('YOUTUBE_LOGIN_REQUIRED'), { status: 401 });
-  if (status.authMode === 'cookie' || status.authMode === 'device') return youtubeDevicePlaylistTracks(id, limit);
-  if (status.authMode !== 'official') throw Object.assign(new Error('YOUTUBE_LOGIN_REQUIRED'), { status: 401 });
+  if (!status.loggedIn || status.authMode !== 'official') throw Object.assign(new Error('YOUTUBE_LOGIN_REQUIRED'), { status: 401 });
   const rawItems = [];
   let pageToken = '';
   while (rawItems.length < limit) {
@@ -1623,12 +1580,15 @@ function commandExists(command) {
 
 function findNodeRuntime() {
   const electronRuntime = process.versions && process.versions.electron ? process.execPath : '';
+  // yt-dlp's EJS challenge solver is a normal external Node runtime. Prefer
+  // the system/runtime Node binary when available; use Electron's embedded
+  // Node only as a packaged-app fallback (with ELECTRON_RUN_AS_NODE=1).
   const candidates = [
     process.env.SHINAYUU_NODE_PATH,
-    electronRuntime,
     process.env.npm_node_execpath,
     process.env.NODE,
     commandExists(process.platform === 'win32' ? 'node.exe' : 'node'),
+    electronRuntime,
   ].map((value) => String(value || '').trim()).filter(Boolean);
   return candidates.find((value) => fs.existsSync(value)) || '';
 }
@@ -1705,7 +1665,7 @@ function ytDlpAuthRecoveryError(error) {
 function ytDlpClientFallbackError(error) {
   const message = String(error && (error.stderr || error.message) || '').toLowerCase();
   return ytDlpAuthRecoveryError(error)
-    || /no video formats found|requested format is not available|only images are available|player response playability status|this video is not available|streaming data not available|no audio formats|format is not available|unplayable|page needs to be reloaded|reload the page|po token|http error 403|forbidden|nsig|signature extraction|challenge solving|javascript runtime/.test(message);
+    || /no video formats found|requested format is not available|only images are available|player response playability status|this video is not available|streaming data not available|no audio formats|format is not available|unplayable|po token|http error 403|forbidden|nsig|signature extraction|challenge solving|javascript runtime/.test(message);
 }
 
 function ytDlpBrowserBaseName(source) {
@@ -1777,20 +1737,20 @@ function ytDlpAuthStrategies(cookieBundle) {
   // so try explicit no-cookie clients before falling back to account cookies.
   // This also avoids a stale/rotated cookie turning every public track into a
   // false YOUTUBE_AUTH_REQUIRED failure.
-  // YouTube changed the android_vr client on 2026-08-17: all formats began
-  // returning HTTP 403 from that client. Do not probe android_vr at all, and
-  // do not use the old `default` selector unmodified because YouTube's current
-  // client set is changing and the logged-in default can select tv_downgraded. Keep public playback independent
-  // of browser cookies and fall through across clients that can still expose
-  // directly playable audio.
   strategies.push(
-    { key: 'public:tv', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=tv'] },
+    // `android_vr` has regressed on some YouTube sessions and may return only
+    // format 18 or URLs that later 403. Prefer plain Android first; yt-dlp
+    // documents it as a practical workaround for current SABR/GVS issues.
+    { key: 'public:android', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=android'] },
+    { key: 'public:web_embedded_default', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=web_embedded,default'] },
     { key: 'public:web_embedded', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=web_embedded'] },
-    { key: 'public:web_safari', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=web_safari'] },
+    { key: 'public:tv', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=tv'] },
+    { key: 'public:android_vr', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=android_vr'] },
     { key: 'public:ios', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=ios'] },
-    { key: 'public:default-no-android-vr', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=default,-android_vr'] },
+    { key: 'public:web_safari', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=web_safari'] },
+    { key: 'public:default', args: ['--no-cookies'] },
   );
-  if (cookieFile) strategies.push({ key: 'app-cookie:web-embedded', args: ['--cookies', cookieFile, '--extractor-args', 'youtube:player_client=default,web_embedded'] });
+  if (cookieFile) strategies.push({ key: 'app-cookie', args: ['--cookies', cookieFile] });
   for (const browser of ytDlpBrowserCookieSources()) {
     strategies.push({ key: `browser:${browser}`, args: ['--cookies-from-browser', browser] });
   }
@@ -1806,7 +1766,7 @@ function ytDlpAuthStrategies(cookieBundle) {
     return a.key === preferred ? -1 : b.key === preferred ? 1 : 0;
   })) {
     const blockedUntil = Number(youtubeYtDlpAuthFailures.get(item.key) || 0);
-    if (blockedUntil > now && item.key !== 'public:default-no-android-vr' && !item.key.startsWith('app-cookie')) continue;
+    if (blockedUntil > now && item.key !== 'public:default' && item.key !== 'app-cookie') continue;
     if (!used.has(item.key)) { used.add(item.key); unique.push(item); }
   }
   return unique;
@@ -1875,10 +1835,14 @@ function uniqueExistingStrings(values) {
 
 function ytDlpCandidatePaths() {
   const name = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
+  // In packaged builds the bundled/pinned engine must win over a stale or
+  // newer user-cache copy. Otherwise a previously installed nightly can be
+  // selected even though the application was packaged with a known-good pin.
+  // An explicit YTDLP_PATH still remains the highest-priority override.
   return uniqueExistingStrings([
     String(process.env.YTDLP_PATH || '').trim(),
-    userYtDlpPath(),
     bundledYtDlpPath(),
+    userYtDlpPath(),
     commandExists(name),
     commandExists('yt-dlp'),
   ]);
@@ -1893,6 +1857,15 @@ function copyFileAtomic(source, target) {
   const partial = `${target}.restore`;
   safeUnlink(partial);
   fs.copyFileSync(source, partial);
+  if (process.platform === 'win32' && path.basename(source).toLowerCase() === 'yt-dlp.exe') {
+    const digest = sha256File(partial);
+    if (digest.toLowerCase() !== YTDLP_WINDOWS_SHA256.toLowerCase()) {
+      safeUnlink(partial);
+      const error = new Error('Bundled yt-dlp checksum verification failed');
+      error.code = 'YTDLP_BUNDLE_CHECKSUM_FAILED';
+      throw error;
+    }
+  }
   safeUnlink(target);
   fs.renameSync(partial, target);
   return target;
@@ -1934,9 +1907,12 @@ async function downloadYtDlpWindows(target) {
       };
       const bytes = await fetchBinary(YTDLP_WINDOWS_URL, 45000);
       fs.writeFileSync(partial, bytes);
-      // The official master-builds endpoint is versioned dynamically; its
-      // release asset cannot be pinned to a stable SHA-256 here. The URL is
-      // restricted to the official yt-dlp GitHub repository.
+      const digest = sha256File(partial);
+      if (digest.toLowerCase() !== YTDLP_WINDOWS_SHA256.toLowerCase()) {
+        const error = new Error('yt-dlp checksum verification failed');
+        error.code = 'YTDLP_CHECKSUM_FAILED';
+        throw error;
+      }
       safeUnlink(target);
       fs.renameSync(partial, target);
       return target;
@@ -2030,20 +2006,6 @@ function ytDlpSourceForPath(executable) {
   return 'system';
 }
 
-function ytDlpVersionDate(version) {
-  const match = String(version || '').match(/(?:master|nightly|stable)?@?(\d{4})\.(\d{2})\.(\d{2})/);
-  if (!match) {
-    const stable = String(version || '').match(/^(\d{4})\.(\d{2})\.(\d{2})/);
-    if (!stable) return 0;
-    return Number(`${stable[1]}${stable[2]}${stable[3]}`);
-  }
-  return Number(`${match[1]}${match[2]}${match[3]}`);
-}
-
-function ytDlpVersionIsCurrent(version) {
-  return ytDlpVersionDate(version) >= YTDLP_MIN_DATE;
-}
-
 async function prepareYouTubeEngine(options = {}) {
   const force = !!options.force;
   if (youtubeEnginePreparePromise && youtubeEngineLastStatus.ready) {
@@ -2071,10 +2033,6 @@ async function prepareYouTubeEngine(options = {}) {
       try {
         if (!fs.existsSync(candidate) || !fs.statSync(candidate).isFile()) continue;
         version = await inspectYtDlpExecutable(candidate);
-        if (!ytDlpVersionIsCurrent(version)) {
-          failures.push({ path: candidate, code: 'YTDLP_OUTDATED', message: `yt-dlp ${version} is older than the current YouTube compatibility baseline ${YTDLP_VERSION}` });
-          continue;
-        }
         executable = candidate;
         source = ytDlpSourceForPath(candidate);
         if (source === 'bundled' && process.platform === 'win32') {
@@ -2506,9 +2464,6 @@ function publicProviderConfig(config = providerConfig(), baseUrl = '') {
     youtubeRedirectUri: youtubeRedirectUri(baseUrl),
     language: config.language,
     spotifyRedirectUri: spotifyRedirectUri(baseUrl),
-    soundcloudClientId: String(config.soundcloudClientId || '').trim(),
-    soundcloudConfigured: !!(config.soundcloudClientId && config.soundcloudClientSecret),
-    soundcloudClientSecretConfigured: !!config.soundcloudClientSecret,
   };
 }
 
@@ -3532,10 +3487,10 @@ function spotifyPlaylistContextUri(value) {
 
 function spotifyPlaylistReadScopesReady(token) {
   const granted = new Set(String(token && token.scope || '').split(/\s+/).filter(Boolean));
-  // /me/playlists requires playlist-read-private. The collaborative scope is
-  // additive: without it Spotify may omit collaborative playlists, but normal
-  // owned/followed playlists should still synchronize.
-  return granted.has('playlist-read-private');
+  // playlist-read-private is sufficient for playlist item reads; the collaborative
+  // scope is additionally required when listing collaborative playlists. Do not
+  // incorrectly report a normal private/owned playlist as requiring both scopes.
+  return granted.has('playlist-read-private') || granted.has('playlist-read-collaborative');
 }
 
 function spotifyTrackHasPlaylistMetadata(track) {
@@ -3599,7 +3554,8 @@ async function normalizeSpotifyPlaylistTrack(entry, market) {
   });
   if (!spotifyTrackHasPlaylistMetadata(track)) {
     try {
-      const full = await spotifyApi(`/tracks/${encodeURIComponent(id)}?market=${encodeURIComponent(market)}`, { required: true, ignoreRateLimit: true });
+      const marketQuery = /^[A-Z]{2}$/.test(String(market || '').toUpperCase()) ? `?market=${encodeURIComponent(String(market).toUpperCase())}` : '';
+      const full = await spotifyApi(`/tracks/${encodeURIComponent(id)}${marketQuery}`, { required: true });
       track = mergeSpotifyTrackPayload(track, full);
     } catch (error) {
       console.warn('[SpotifyPlaylist] track hydration failed:', id, error && (error.message || error));
@@ -3651,19 +3607,6 @@ function mapSpotifyTrack(track) {
   return song;
 }
 
-
-async function soundcloudSearch(query, limit = 30, offset = 0) {
-  return soundcloudApi.search(query, limit, offset);
-}
-
-async function resolveSoundCloudPlayback(trackId, quality = 'standard') {
-  return soundcloudApi.resolveStream(trackId, quality);
-}
-
-function soundcloudStatus() {
-  return { provider: 'soundcloud', configured: true, available: true, publicCatalog: true, searchReady: true, loggedIn: false, nickname: 'SoundCloud', message: 'SoundCloud web search + URL resolver sẵn sàng.' };
-}
-
 async function spotifySearch(query, limit = 18) {
   const config = providerConfig();
   const token = await validSpotifyToken(false);
@@ -3710,30 +3653,56 @@ async function spotifySearch(query, limit = 18) {
   return songs.slice(0, target);
 }
 
+function spotifyPlaylistReadError(error, token, meta = {}) {
+  const status = Number(error && error.status || 0) || 500;
+  const scopeString = String(token && token.scope || '').trim();
+  const grantedScopes = scopeString ? scopeString.split(/\s+/).filter(Boolean) : [];
+  const readScopeReady = grantedScopes.includes('playlist-read-private') || grantedScopes.includes('playlist-read-collaborative');
+  const cause = error instanceof Error ? error : new Error(String(error && error.message || error || 'Spotify playlist read failed'));
+  const wrapped = new Error(cause.message || 'Spotify playlist read failed');
+  wrapped.status = status;
+  wrapped.provider = 'spotify';
+  wrapped.code = status === 401 || status === 403 ? 'SPOTIFY_PLAYLIST_READ_SCOPE_REQUIRED' : 'SPOTIFY_PLAYLIST_READ_FAILED';
+  wrapped.reauthRequired = status === 401 || (status === 403 && !readScopeReady);
+  wrapped.requiredScopes = ['playlist-read-private'];
+  wrapped.optionalScopes = ['playlist-read-collaborative'];
+  wrapped.grantedScopes = grantedScopes;
+  wrapped.payload = cause.payload || null;
+  wrapped.diagnostics = {
+    ...(cause.diagnostics && typeof cause.diagnostics === 'object' ? cause.diagnostics : {}),
+    ...(meta && typeof meta === 'object' ? meta : {}),
+    status,
+    readScopeReady,
+    reauthRequired: wrapped.reauthRequired,
+    requiredScopes: wrapped.requiredScopes,
+    optionalScopes: wrapped.optionalScopes,
+    grantedScopes,
+    reason: String(cause && cause.diagnostics && cause.diagnostics.reason || cause && cause.payload && cause.payload.error && cause.payload.error.reason || ''),
+  };
+  return wrapped;
+}
+
 async function spotifyUserPlaylistsPage(limit = 50, offset = 0) {
-  const token = await validSpotifyToken(false);
-  if (!token || !token.access_token) {
-    const error = new Error('SPOTIFY_PLAYLIST_AUTH_REQUIRED');
-    error.code = 'SPOTIFY_PLAYLIST_AUTH_REQUIRED';
-    error.status = 401;
-    error.provider = 'spotify';
-    error.reauthRequired = true;
-    throw error;
-  }
-  if (!spotifyPlaylistReadScopesReady(token)) {
-    const error = new Error('SPOTIFY_PLAYLIST_READ_SCOPE_REQUIRED');
-    error.code = 'SPOTIFY_PLAYLIST_READ_SCOPE_REQUIRED';
-    error.status = 403;
-    error.provider = 'spotify';
-    error.reauthRequired = true;
-    error.requiredScopes = ['playlist-read-private'];
-    error.optionalScopes = ['playlist-read-collaborative'];
-    error.grantedScopes = String(token.scope || '').split(/\s+/).filter(Boolean);
-    throw error;
-  }
   const safeLimit = Math.max(1, Math.min(50, Number(limit) || 50));
   const safeOffset = Math.max(0, Number(offset) || 0);
-  const data = await spotifyApi(`/me/playlists?limit=${safeLimit}&offset=${safeOffset}`, { ignoreRateLimit: true });
+  const token = await validSpotifyToken(true);
+  if (!token || !token.access_token) {
+    const error = new Error('SPOTIFY_PLAYLIST_AUTH_REQUIRED');
+    error.status = 401;
+    error.provider = 'spotify';
+    error.code = 'SPOTIFY_PLAYLIST_AUTH_REQUIRED';
+    error.reauthRequired = true;
+    throw error;
+  }
+  let data;
+  try {
+    data = await spotifyApi(`/me/playlists?limit=${safeLimit}&offset=${safeOffset}`);
+  } catch (cause) {
+    if (Number(cause && cause.status) === 401 || Number(cause && cause.status) === 403) {
+      throw spotifyPlaylistReadError(cause, token, { stage: 'playlist-catalog' });
+    }
+    throw cause;
+  }
   const profile = cachedSpotifyProfile(token);
   const playlists = ((data && data.items) || []).map((playlist) => {
     const id = String(playlist.id || '');
@@ -3750,7 +3719,7 @@ async function spotifyUserPlaylistsPage(limit = 50, offset = 0) {
       creator: playlist.owner && (playlist.owner.display_name || playlist.owner.id) || '',
       ownerId,
       ownedByCurrentUser: !!(profile && profile.id && ownerId && profile.id === ownerId),
-      subscribed: true,
+      subscribed: !((profile && profile.id && ownerId && profile.id === ownerId) || false),
       specialType: 0,
       collaborative: !!playlist.collaborative,
       public: playlist.public,
@@ -3760,92 +3729,117 @@ async function spotifyUserPlaylistsPage(limit = 50, offset = 0) {
       externalUrl: String(playlist.external_urls && playlist.external_urls.spotify || ''),
     };
   }).filter((playlist) => playlist.id);
-  const total = Math.max(playlists.length, Number(data && data.total) || 0);
+  const total = Number(data && data.total) || playlists.length;
   const nextOffset = safeOffset + playlists.length;
-  return {
-    playlists,
-    total,
-    offset: safeOffset,
-    limit: safeLimit,
-    nextOffset,
-    hasMore: !!(data && data.next) || nextOffset < total,
-  };
+  return { playlists, total, offset: safeOffset, limit: safeLimit, nextOffset, hasMore: !!(data && data.next) || nextOffset < total };
 }
 
-async function spotifyUserPlaylists(limit = 50) {
-  const page = await spotifyUserPlaylistsPage(limit, 0);
+async function spotifyUserPlaylists(limit = 50, offset = 0) {
+  const page = await spotifyUserPlaylistsPage(limit, offset);
   return page.playlists;
 }
 
-async function spotifyPlaylistTracks(id, limit = 100) {
-  const encodedId = encodeURIComponent(id);
-  const market = providerConfig().spotifyMarket;
-  const encodedMarket = encodeURIComponent(market);
+async function spotifyPlaylistTracks(id, limit = 100, offset = 0) {
+  const encodedId = encodeURIComponent(String(id || '').trim());
+  if (!encodedId) throw Object.assign(new Error('SPOTIFY_PLAYLIST_ID_REQUIRED'), { status: 400, provider: 'spotify' });
+  const market = String(providerConfig().spotifyMarket || '').trim().toUpperCase();
   const token = await validSpotifyToken(true);
+  if (!token || !token.access_token) {
+    const error = new Error('SPOTIFY_PLAYLIST_AUTH_REQUIRED');
+    error.status = 401;
+    error.provider = 'spotify';
+    error.code = 'SPOTIFY_PLAYLIST_AUTH_REQUIRED';
+    error.reauthRequired = true;
+    throw error;
+  }
   const profile = cachedSpotifyProfile(token);
-  const playlist = await spotifyApi(`/playlists/${encodedId}?market=${encodedMarket}`, { ignoreRateLimit: true });
+  const safeLimit = Math.max(1, Math.min(100, Number(limit) || 100));
+  const safeOffset = Math.max(0, Number(offset) || 0);
+  const encodedMarket = /^[A-Z]{2}$/.test(market) ? encodeURIComponent(market) : '';
+  const marketQuery = encodedMarket ? `market=${encodedMarket}` : '';
+  const pageLimit = Math.min(50, safeLimit);
+
+  let playlist;
+  try {
+    const metadataQuery = [marketQuery, 'additional_types=track'].filter(Boolean).join('&');
+    playlist = await spotifyApi(`/playlists/${encodedId}${metadataQuery ? `?${metadataQuery}` : ''}`);
+  } catch (error) {
+    throw spotifyPlaylistReadError(error, token, { playlistId: id, stage: 'playlist-metadata' });
+  }
+
   const embeddedPage = spotifyPlaylistEmbeddedPage(playlist);
+  const embeddedItems = spotifyPlaylistPageItems(embeddedPage);
   const declaredTotal = spotifyPlaylistPageTotal(embeddedPage)
     || Number(playlist && playlist.items && playlist.items.total || playlist && playlist.tracks && playlist.tracks.total || 0);
+  const ownerId = String(playlist && playlist.owner && playlist.owner.id || '');
+  const ownedByCurrentUser = !!(profile && profile.id && ownerId && profile.id === ownerId);
+  const collaborative = !!(playlist && playlist.collaborative);
 
   let firstPage = null;
   let itemEndpointError = null;
   let itemSource = 'none';
-  const itemHref = String(embeddedPage && embeddedPage.href || '').trim();
-  const itemEndpoint = itemHref
-    ? itemHref.replace(/^https:\/\/api\.spotify\.com\/v1/i, '')
-    : `/playlists/${encodedId}/items?market=${encodedMarket}&additional_types=track&limit=50`;
 
-  try {
-    firstPage = await spotifyApi(itemEndpoint, { ignoreRateLimit: true });
-    itemSource = spotifyPlaylistPageItems(firstPage).length ? 'items-endpoint' : 'items-endpoint-empty';
-  } catch (error) {
-    itemEndpointError = error;
-    console.warn('[SpotifyPlaylist] item endpoint failed:', id, error && (error.message || error));
-  }
-
-  // GET /playlists/{id} now embeds an items page for playlists owned by the
-  // current user or collaborative playlists. Prefer it whenever the dedicated
-  // /items endpoint returns an unexpectedly empty page or is temporarily
-  // unavailable. This prevents a playlist showing a correct count but 0 rows.
-  if (spotifyPlaylistPageItems(embeddedPage).length
-      && (!firstPage || !spotifyPlaylistPageItems(firstPage).length)) {
-    firstPage = embeddedPage;
-    itemSource = 'playlist-embedded-items';
-  }
-
-  // One lightweight retry without market/additional_types covers older tokens
-  // and Spotify edge responses where metadata reports items but the first
-  // request returns an empty page.
-  if ((!firstPage || !spotifyPlaylistPageItems(firstPage).length) && declaredTotal > 0 && !itemEndpointError) {
+  async function fetchPlaylistItems(endpoint, source) {
     try {
-      const retryPage = await spotifyApi(`/playlists/${encodedId}/items?limit=50`, { ignoreRateLimit: true });
-      if (spotifyPlaylistPageItems(retryPage).length) {
-        firstPage = retryPage;
-        itemSource = 'items-endpoint-retry';
-      }
+      const result = await spotifyApi(endpoint);
+      firstPage = result;
+      itemSource = spotifyPlaylistPageItems(result).length ? source : `${source}-empty`;
+      return result;
     } catch (error) {
       itemEndpointError = error;
-      console.warn('[SpotifyPlaylist] item endpoint retry failed:', id, error && (error.message || error));
+      console.warn('[SpotifyPlaylist] item endpoint failed:', id, error && (error.message || error));
+      return null;
     }
+  }
+
+  if (safeOffset === 0) {
+    // Preserve the 2.1.7 path: Spotify's playlist metadata can already contain
+    // an `items.href`; use it when it is the current /items endpoint.
+    const itemHref = String(embeddedPage && embeddedPage.href || '').trim();
+    const normalizedHref = itemHref.replace(/^https:\/\/api\.spotify\.com\/v1/i, '');
+    const itemEndpoint = normalizedHref && /\/items(?:\?|$)/i.test(normalizedHref)
+      ? normalizedHref
+      : `/playlists/${encodedId}/items?${[marketQuery, 'additional_types=track', `limit=${pageLimit}`, 'offset=0'].filter(Boolean).join('&')}`;
+    await fetchPlaylistItems(itemEndpoint, 'items-endpoint');
+
+    // 2.1.7 compatibility: for a user's own/collaborative playlist, GET /playlists/{id}
+    // may embed the first items page. Prefer that data only if the dedicated endpoint
+    // returned no rows; this prevents a correct track count from becoming an empty UI.
+    if (!spotifyPlaylistPageItems(firstPage).length && embeddedItems.length) {
+      firstPage = embeddedPage;
+      itemSource = 'playlist-embedded-items';
+      itemEndpointError = null;
+    }
+  } else {
+    await fetchPlaylistItems(`/playlists/${encodedId}/items?${[marketQuery, 'additional_types=track', `limit=${pageLimit}`, `offset=${safeOffset}`].filter(Boolean).join('&')}`, 'items-endpoint-paged');
+  }
+
+  // A second request without market/additional_types covers token/account market
+  // edge cases where the API advertises the items count but returns an empty page.
+  if ((!firstPage || !spotifyPlaylistPageItems(firstPage).length) && declaredTotal > safeOffset) {
+    const retryEndpoint = `/playlists/${encodedId}/items?limit=${pageLimit}&offset=${safeOffset}`;
+    const retryPage = await fetchPlaylistItems(retryEndpoint, 'items-endpoint-retry');
+    if (retryPage && spotifyPlaylistPageItems(retryPage).length) itemEndpointError = null;
   }
 
   const entries = [];
   const seenPages = new Set();
   let page = firstPage;
-  while (page && entries.length < limit) {
+  let responseOffset = safeOffset;
+  while (page && entries.length < safeLimit) {
+    responseOffset = Number(page && page.offset != null ? page.offset : responseOffset) || responseOffset;
     for (const entry of spotifyPlaylistPageItems(page)) {
-      if (entries.length >= limit) break;
+      if (entries.length >= safeLimit) break;
       const item = unwrapSpotifyPlaylistItem(entry);
       if (String(item && item.type || '').toLowerCase() === 'episode') continue;
       entries.push(entry);
     }
     const nextUrl = spotifyPlaylistPageNext(page);
-    if (!nextUrl || entries.length >= limit || seenPages.has(nextUrl)) break;
+    if (!nextUrl || entries.length >= safeLimit || seenPages.has(nextUrl)) break;
     seenPages.add(nextUrl);
     try {
       const next = new URL(nextUrl);
-      page = await spotifyApi(next.pathname.replace(/^\/v1/, '') + next.search, { ignoreRateLimit: true });
+      page = await spotifyApi(next.pathname.replace(/^\/v1/, '') + next.search);
     } catch (error) {
       itemEndpointError = itemEndpointError || error;
       console.warn('[SpotifyPlaylist] pagination failed:', id, error && (error.message || error));
@@ -3853,18 +3847,27 @@ async function spotifyPlaylistTracks(id, limit = 100) {
     }
   }
 
-  // Spotify Development Mode can return sparse playlist item objects after
-  // the playlist-field migration. Hydrate only incomplete entries through the
-  // official single-track endpoint, with low concurrency to avoid 429s.
   const normalized = await mapWithConcurrency(entries, 4, (entry) => normalizeSpotifyPlaylistTrack(entry, market));
   const tracks = normalized.filter(Boolean);
-  const ownerId = String(playlist && playlist.owner && playlist.owner.id || '');
-  const ownedByCurrentUser = !!(profile && profile.id && ownerId && profile.id === ownerId);
-  const contextUri = spotifyPlaylistContextUri(playlist) || spotifyPlaylistContextUri(id);
+  const pageTotal = spotifyPlaylistPageTotal(page) || declaredTotal;
+  const nextUrl = spotifyPlaylistPageNext(page);
+  const nextOffset = responseOffset + entries.length;
+  const hasMore = !!nextUrl || nextOffset < pageTotal;
   const missingReadScopes = !spotifyPlaylistReadScopesReady(token);
+
   let itemAccess = 'available';
-  if (!tracks.length && declaredTotal > 0) {
+  if (!tracks.length && pageTotal > safeOffset) {
     itemAccess = itemEndpointError && Number(itemEndpointError.status) === 403 ? 'restricted' : 'unavailable';
+  }
+  let warning = '';
+  if (itemAccess === 'restricted') {
+    warning = missingReadScopes
+      ? 'Spotify cần cấp lại quyền playlist-read-private để đọc bài hát trong playlist này.'
+      : 'Spotify không cho phép ứng dụng đọc các bài của playlist này; playlist chỉ theo dõi có thể chỉ trả về metadata.';
+  } else if (itemAccess === 'unavailable' && pageTotal > safeOffset) {
+    warning = missingReadScopes
+      ? 'Quyền đọc playlist trong phiên Spotify hiện tại chưa đầy đủ. Hãy kết nối lại Spotify rồi mở lại playlist.'
+      : 'Spotify trả về số lượng bài nhưng không trả về nội dung các bài. Hãy thử làm mới playlist.';
   }
 
   return {
@@ -3872,20 +3875,26 @@ async function spotifyPlaylistTracks(id, limit = 100) {
       id: playlist && playlist.id || id,
       name: playlist && playlist.name || '',
       cover: playlist && playlist.images && playlist.images[0] && playlist.images[0].url || '',
-      trackCount: declaredTotal || tracks.length,
+      trackCount: pageTotal || tracks.length,
       creator: playlist && playlist.owner && (playlist.owner.display_name || playlist.owner.id) || '',
       ownerId,
       ownedByCurrentUser,
-      collaborative: !!(playlist && playlist.collaborative),
+      collaborative,
       public: playlist && playlist.public,
-      spotifyUri: contextUri,
-      contextUri,
-      canContextPlay: !!contextUri,
+      spotifyUri: spotifyPlaylistContextUri(playlist) || spotifyPlaylistContextUri(id),
+      contextUri: spotifyPlaylistContextUri(playlist) || spotifyPlaylistContextUri(id),
+      canContextPlay: !!(spotifyPlaylistContextUri(playlist) || spotifyPlaylistContextUri(id)),
       itemAccess,
-      requiresReauthorization: missingReadScopes,
+      requiresReauthorization: missingReadScopes && pageTotal > safeOffset && !tracks.length,
       externalUrl: String(playlist && playlist.external_urls && playlist.external_urls.spotify || ''),
     },
     tracks,
+    total: pageTotal || tracks.length,
+    offset: responseOffset,
+    nextOffset,
+    hasMore,
+    warning,
+    reauthRequired: missingReadScopes && pageTotal > safeOffset && !tracks.length,
     diagnostics: {
       declaredTotal,
       receivedItems: entries.length,
@@ -3896,8 +3905,11 @@ async function spotifyPlaylistTracks(id, limit = 100) {
       itemEndpointStatus: itemEndpointError ? Number(itemEndpointError.status || 0) : 200,
       itemEndpointError: itemEndpointError ? String(itemEndpointError.message || itemEndpointError) : '',
       ownedByCurrentUser,
-      collaborative: !!(playlist && playlist.collaborative),
+      collaborative,
       missingReadScopes,
+      pageOffset: responseOffset,
+      nextOffset,
+      hasMore,
     },
   };
 }
@@ -4701,32 +4713,33 @@ async function youtubeAudioUrl(videoId, quality = '', options = {}) {
   const cachedDescriptor = refresh ? null : cachedYouTubeAudioDescriptor(videoId, quality);
   if (cachedDescriptor) return playbackResultFromYouTubeDescriptor(cachedDescriptor, 'youtube-cache');
 
-  // Start the lightweight Innertube route immediately. Give it a very small
-  // head start, then run yt-dlp in parallel. Whichever returns a valid stream
-  // first starts playback; the slower result still warms the descriptor cache.
-  const fastPromise = youtubeAudioViaInnertube(videoId, quality, { refresh });
-  const ytDlpPromise = new Promise((resolve) => setTimeout(resolve, 180))
-    .then(() => youtubeAudioViaYtDlp(videoId, quality, { refresh }));
+  // Use yt-dlp as the authoritative resolver. Its extractor/EJS flow follows
+  // current YouTube playback behavior and its response includes request headers
+  // that can be reused by the local media proxy. Innertube remains an isolated
+  // compatibility fallback instead of racing a potentially undecodable URL.
+  let ytDlpError = null;
   try {
-    return await Promise.any([fastPromise, ytDlpPromise]);
-  } catch (aggregate) {
-    const errors = aggregate && Array.isArray(aggregate.errors) ? aggregate.errors : [];
-    const fastError = errors[0] || null;
-    const ytDlpError = errors[1] || errors[0] || aggregate;
+    return await youtubeAudioViaYtDlp(videoId, quality, { refresh });
+  } catch (error) {
+    ytDlpError = error;
+  }
+
+  try {
+    return await youtubeAudioViaInnertube(videoId, quality, { refresh });
+  } catch (innertubeError) {
     const engineCode = ytDlpFailureCode(ytDlpError);
     const actualEngineFailure = /^(YTDLP_NOT_FOUND|YTDLP_BLOCKED_OR_PERMISSION|YTDLP_INVALID_EXECUTABLE|ENOENT|EACCES|EPERM)$/i.test(engineCode);
-    const authFailure = String(ytDlpError && ytDlpError.code || '').toUpperCase() === 'YOUTUBE_AUTH_REQUIRED';
-    const error = new Error(authFailure
-      ? 'YOUTUBE_AUTH_REQUIRED'
-      : `YouTube stream unavailable: ${ytDlpError && ytDlpError.message || 'yt-dlp failed'}; ${fastError && fastError.message || 'youtubei.js failed'}`);
-    error.code = authFailure ? 'YOUTUBE_AUTH_REQUIRED' : (actualEngineFailure ? 'YOUTUBE_ENGINE_UNAVAILABLE' : 'YOUTUBE_STREAM_UNAVAILABLE');
+    const ytAuthFailure = String(ytDlpError && ytDlpError.code || '').toUpperCase() === 'YOUTUBE_AUTH_REQUIRED';
+    const message = ytDlpError && ytDlpError.message || innertubeError && innertubeError.message || 'YouTube stream unavailable';
+    const error = new Error(ytAuthFailure ? 'YOUTUBE_AUTH_REQUIRED' : message);
+    error.code = ytAuthFailure ? 'YOUTUBE_AUTH_REQUIRED' : (actualEngineFailure ? 'YOUTUBE_ENGINE_UNAVAILABLE' : 'YOUTUBE_STREAM_UNAVAILABLE');
     error.engineCode = engineCode;
-    error.status = authFailure ? 401 : 503;
-    error.userMessageVi = authFailure ? String(ytDlpError && ytDlpError.userMessageVi || '') : '';
-    error.userMessageEn = authFailure ? String(ytDlpError && ytDlpError.userMessageEn || '') : '';
+    error.status = ytAuthFailure ? 401 : 503;
+    error.userMessageVi = ytAuthFailure ? String(ytDlpError && ytDlpError.userMessageVi || '') : '';
+    error.userMessageEn = ytAuthFailure ? String(ytDlpError && ytDlpError.userMessageEn || '') : '';
     error.diagnostics = {
       ytDlp: ytDlpError && (ytDlpError.diagnostics || ytDlpError.message) || '',
-      innertube: fastError && (fastError.code || fastError.message) || '',
+      innertube: innertubeError && (innertubeError.code || innertubeError.message) || '',
     };
     throw error;
   }
@@ -4798,7 +4811,7 @@ async function spotifyPlayerToken() {
 }
 
 async function spotifyDevices() {
-  const data = await spotifyApi('/me/player/devices', { ignoreRateLimit: true });
+  const data = await spotifyApi('/me/player/devices');
   return (data && data.devices || []).map((device) => ({
     id: device.id || '',
     name: device.name || 'Spotify',
@@ -4812,7 +4825,7 @@ async function spotifyDevices() {
 }
 
 async function spotifyPlaybackState() {
-  const data = await spotifyApi('/me/player', { required: true, ignoreRateLimit: true });
+  const data = await spotifyApi('/me/player', { required: true });
   if (!data || !data.item) return { active: false, isPlaying: false, progressMs: 0, durationMs: 0, device: data && data.device || null };
   return {
     active: true,
@@ -4829,7 +4842,6 @@ async function spotifyPlaybackState() {
 async function spotifyTransferPlayback(deviceId, play = false) {
   if (!deviceId) throw Object.assign(new Error('SPOTIFY_DEVICE_REQUIRED'), { status: 400 });
   await spotifyApi('/me/player', {
-    ignoreRateLimit: true,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ device_ids: [String(deviceId)], play: !!play }),
@@ -4853,7 +4865,6 @@ async function spotifyStartPlayback({ deviceId, uri, contextUri, offsetUri, posi
       }
     : { uris: [normalizedUri], position_ms: normalizedPositionMs };
   await spotifyApi(`/me/player/play${query}`, {
-    ignoreRateLimit: true,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -4868,7 +4879,7 @@ async function spotifyStartPlayback({ deviceId, uri, contextUri, offsetUri, posi
 
 async function spotifyPausePlayback(deviceId = '') {
   const query = deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : '';
-  await spotifyApi(`/me/player/pause${query}`, { ignoreRateLimit: true, method: 'PUT' });
+  await spotifyApi(`/me/player/pause${query}`, { method: 'PUT' });
   return true;
 }
 
@@ -4883,14 +4894,14 @@ async function spotifySeekPlayback(positionMs, deviceId = '') {
   const normalizedDeviceId = String(deviceId || '');
   const params = new URLSearchParams({ position_ms: String(normalizedPositionMs) });
   if (normalizedDeviceId) params.set('device_id', normalizedDeviceId);
-  await spotifyApi(`/me/player/seek?${params.toString()}`, { ignoreRateLimit: true, method: 'PUT' });
+  await spotifyApi(`/me/player/seek?${params.toString()}`, { method: 'PUT' });
   return { positionMs: normalizedPositionMs, deviceId: normalizedDeviceId };
 }
 
 async function spotifySetPlaybackVolume(volumePercent, deviceId = '') {
   const params = new URLSearchParams({ volume_percent: String(Math.max(0, Math.min(100, Math.round(Number(volumePercent) || 0)))) });
   if (deviceId) params.set('device_id', deviceId);
-  await spotifyApi(`/me/player/volume?${params.toString()}`, { ignoreRateLimit: true, method: 'PUT' });
+  await spotifyApi(`/me/player/volume?${params.toString()}`, { method: 'PUT' });
   return true;
 }
 
@@ -4938,7 +4949,7 @@ async function resolveSpotifyPlayback(trackId, quality) {
   }
   let track = spotifyTrackCache.get(String(trackId));
   if (!track) {
-    track = mapSpotifyTrack(await spotifyApi(`/tracks/${encodeURIComponent(trackId)}?market=${encodeURIComponent(providerConfig().spotifyMarket)}`, { ignoreRateLimit: true }));
+    track = mapSpotifyTrack(await spotifyApi(`/tracks/${encodeURIComponent(trackId)}?market=${encodeURIComponent(providerConfig().spotifyMarket)}`));
   }
   if (!track || !track.spotifyUri) {
     return {
@@ -5019,32 +5030,13 @@ async function resolveYouTubeVideoBackground(videoId, quality = 'auto', options 
     throw error;
   }
   const mode = normalizeBackgroundVideoQuality(quality);
-  // Compatibility recovery must let yt-dlp enforce its H.264/MP4 format
-  // selection. Racing an arbitrary Innertube codec here could repeatedly pick
-  // the same undecodable stream on older or policy-managed Windows 10 PCs.
-  // Compatibility mode intentionally uses yt-dlp only. In normal mode we
-  // race the fast Innertube path against yt-dlp, but never insert a synthetic
-  // rejected Promise: that rejection used to surface as an UnhandledRejection
-  // when both real providers failed and obscured the actual failure reason.
-  if (options && options.compatibility) {
-    const stream = await youtubeVideoViaYtDlp(id, quality, options);
-    return {
-      ...stream,
-      proxyUrl: stream.streamToken ? `/api/media?stream=${encodeURIComponent(stream.streamToken)}` : stream.proxyUrl,
-      provider: 'youtube',
-      playbackProvider: 'youtube',
-      mediaKind: 'video',
-      muted: true,
-      playable: !!(stream.url || stream.proxyUrl),
-      requestedQuality: mode,
-      compatibility: true,
-    };
-  }
 
-  const fastPromise = youtubeVideoViaInnertube(id, quality, options);
-  const ytDlpPromise = new Promise((resolve) => setTimeout(resolve, 220)).then(() => youtubeVideoViaYtDlp(id, quality, options));
+  // Keep MV resolution on the same authoritative yt-dlp path as audio. This
+  // avoids returning a video URL from a different Innertube client that the
+  // target Chromium media stack may not be able to decode.
+  let ytDlpError = null;
   try {
-    const stream = await Promise.any([fastPromise, ytDlpPromise]);
+    const stream = await youtubeVideoViaYtDlp(id, quality, options);
     return {
       ...stream,
       proxyUrl: stream.streamToken ? `/api/media?stream=${encodeURIComponent(stream.streamToken)}` : stream.proxyUrl,
@@ -5056,16 +5048,42 @@ async function resolveYouTubeVideoBackground(videoId, quality = 'auto', options 
       requestedQuality: mode,
       compatibility: !!(options && options.compatibility),
     };
-  } catch (aggregate) {
-    const errors = aggregate && Array.isArray(aggregate.errors) ? aggregate.errors : [];
-    const fastError = errors[0] || null;
-    const ytDlpError = errors[1] || errors[0] || aggregate;
+  } catch (error) {
+    ytDlpError = error;
+  }
+
+  if (options && options.compatibility) {
+    const authFailure = String(ytDlpError && ytDlpError.code || '').toUpperCase() === 'YOUTUBE_AUTH_REQUIRED';
+    const error = new Error(authFailure ? ytDlpError.message : `YouTube background video unavailable: ${ytDlpError && ytDlpError.message || 'yt-dlp failed'}`);
+    error.code = authFailure ? 'YOUTUBE_AUTH_REQUIRED' : 'YOUTUBE_BACKGROUND_VIDEO_UNAVAILABLE';
+    error.status = authFailure ? 401 : 503;
+    throw error;
+  }
+
+  try {
+    const stream = await youtubeVideoViaInnertube(id, quality, options);
+    return {
+      ...stream,
+      proxyUrl: stream.streamToken ? `/api/media?stream=${encodeURIComponent(stream.streamToken)}` : stream.proxyUrl,
+      provider: 'youtube',
+      playbackProvider: 'youtube',
+      mediaKind: 'video',
+      muted: true,
+      playable: !!(stream.url || stream.proxyUrl),
+      requestedQuality: mode,
+      compatibility: !!(options && options.compatibility),
+    };
+  } catch (innertubeError) {
     const authFailure = String(ytDlpError && ytDlpError.code || '').toUpperCase() === 'YOUTUBE_AUTH_REQUIRED';
     const error = new Error(authFailure
       ? ytDlpError.message
-      : `YouTube background video unavailable: ${ytDlpError && ytDlpError.message || 'yt-dlp failed'}; ${fastError && fastError.message || 'youtubei.js failed'}`);
+      : `YouTube background video unavailable: ${ytDlpError && ytDlpError.message || 'yt-dlp failed'}; ${innertubeError && innertubeError.message || 'youtubei.js failed'}`);
     error.code = authFailure ? 'YOUTUBE_AUTH_REQUIRED' : 'YOUTUBE_BACKGROUND_VIDEO_UNAVAILABLE';
     error.status = authFailure ? 401 : 503;
+    error.diagnostics = {
+      ytDlp: ytDlpError && (ytDlpError.code || ytDlpError.message) || '',
+      innertube: innertubeError && (innertubeError.code || innertubeError.message) || '',
+    };
     throw error;
   }
 }
@@ -5082,11 +5100,11 @@ async function spotifyTrackVisualBackground(trackId) {
   const market = providerConfig().spotifyMarket;
   let track = spotifyTrackCache.get(id);
   if (!track || !track.cover || !track.artistId) {
-    track = mapSpotifyTrack(await spotifyApi(`/tracks/${encodeURIComponent(id)}?market=${encodeURIComponent(market)}`, { required: true, ignoreRateLimit: true }));
+    track = mapSpotifyTrack(await spotifyApi(`/tracks/${encodeURIComponent(id)}?market=${encodeURIComponent(market)}`, { required: true }));
   }
   let artist = null;
   if (track && track.artistId) {
-    artist = await spotifyApi(`/artists/${encodeURIComponent(track.artistId)}`, { required: true, ignoreRateLimit: true }).catch(() => null);
+    artist = await spotifyApi(`/artists/${encodeURIComponent(track.artistId)}`, { required: true }).catch(() => null);
   }
   const artistImages = Array.isArray(artist && artist.images) ? artist.images.map((item) => item && item.url).filter(Boolean) : [];
   const albumImage = String(track && track.cover || '');
@@ -6403,7 +6421,6 @@ module.exports = {
   setYouTubeCookieHeader,
   clearYouTubeCookieHeader,
   invalidateYouTubeAccountSession,
-  youtubeDevicePlaylists,
   youtubeAccountPlaylists,
   youtubeAccountPlaylistTracks,
   youtubePlaylistSyncDiagnostics,
@@ -6414,12 +6431,8 @@ module.exports = {
   spotifyLoginResult,
   clearSpotifyToken,
   spotifySearch,
-  soundcloudSearch,
-  soundcloudStatus,
-  resolveSoundCloudPlayback,
-  updateSoundCloudConfig: soundcloudApi.updateConfig,
-  soundcloudPublicConfig: soundcloudApi.publicConfig,
   spotifyUserPlaylists,
+  spotifyUserPlaylistsPage,
   spotifyPlaylistTracks,
   spotifyLikedCheck,
   spotifySetLiked,

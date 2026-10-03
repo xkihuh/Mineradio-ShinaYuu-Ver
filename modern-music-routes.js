@@ -3,6 +3,7 @@
 // ShinaYuu music-source, authentication, and playback routes.
 // The visual UI and lyrics engine are intentionally isolated from provider code.
 const musicProviders = require('./music-providers');
+const appPlaylists = require('./app-playlists');
 
 function sendJson(res, value, status = 200) {
   const body = JSON.stringify(value == null ? {} : value);
@@ -237,8 +238,8 @@ async function handle(req, res, url, pathname) {
   if (pathname === '/api/youtube-music/user/playlists' || pathname === '/api/qq/user/playlists') {
     try {
       const playlists = await musicProviders.youtubeAccountPlaylists(normalizeLimit(url, 50, 200));
-      sendJson(res, { ok: true, provider: 'youtube', realProvider: 'youtube', loggedIn: true, playlists, total: playlists.length, nextOffset: playlists.length, hasMore: false });
-    } catch (error) { providerError(res, error, 401); }
+      sendJson(res, { ok: true, provider: 'qq', realProvider: 'youtube', loggedIn: true, playlists });
+    } catch (error) { providerError(res, error); }
     return true;
   }
 
@@ -325,32 +326,58 @@ async function handle(req, res, url, pathname) {
     return true;
   }
 
+  if (pathname === '/api/app/playlists' && req.method === 'GET') {
+    try {
+      sendJson(res, { ok: true, provider: 'app', loggedIn: true, playlists: await appPlaylists.list() });
+    } catch (error) { providerError(res, error); }
+    return true;
+  }
+
+  if (pathname === '/api/app/playlist/tracks' && req.method === 'GET') {
+    try {
+      const id = url.searchParams.get('id') || url.searchParams.get('pid') || '';
+      const limit = Math.max(1, Math.min(500, Number(url.searchParams.get('limit') || 100) || 100));
+      const offset = Math.max(0, Number(url.searchParams.get('offset') || 0) || 0);
+      sendJson(res, { ok: true, provider: 'app', ...(await appPlaylists.get(id, limit, offset)) });
+    } catch (error) { providerError(res, error); }
+    return true;
+  }
+
+  if (pathname === '/api/app/playlist/create' && req.method === 'POST') {
+    try {
+      const body = await readBody(req);
+      sendJson(res, { ok: true, success: true, provider: 'app', playlist: await appPlaylists.create(body.name || body.title || '') });
+    } catch (error) { providerError(res, error); }
+    return true;
+  }
+
+  if (pathname === '/api/app/playlist/add-song' && req.method === 'POST') {
+    try {
+      const body = await readBody(req);
+      const pid = body.pid || body.playlistId || '';
+      const song = body.song || body;
+      const result = await appPlaylists.addSong(pid, song);
+      sendJson(res, { ok: true, success: true, provider: 'app', playlistId: pid, ...result });
+    } catch (error) { providerError(res, error); }
+    return true;
+  }
+
   if (pathname === '/api/spotify/user/playlists') {
     try {
-      const page = await musicProviders.spotifyUserPlaylistsPage(
-        normalizeLimit(url, 50, 50),
-        Math.max(0, Number(url.searchParams.get('offset') || 0) || 0),
-      );
-      sendJson(res, { ok: true, provider: 'spotify', loggedIn: true, reauthRequired: false, ...page });
-    } catch (error) {
-      sendJson(res, {
-        ok: false,
-        provider: 'spotify',
-        loggedIn: false,
-        reauthRequired: !!(error && error.reauthRequired),
-        error: error && (error.code || error.message) || 'SPOTIFY_PLAYLIST_SYNC_FAILED',
-        message: error && error.message || 'Spotify playlist sync failed',
-        requiredScopes: error && error.requiredScopes || ['playlist-read-private'],
-        optionalScopes: error && error.optionalScopes || ['playlist-read-collaborative'],
-        grantedScopes: error && error.grantedScopes || [],
-      }, Number(error && error.status) || 502);
-    }
+      const limit = normalizeLimit(url, 50, 50);
+      const offset = Math.max(0, Number(url.searchParams.get('offset') || 0) || 0);
+      const playlists = await musicProviders.spotifyUserPlaylists(limit, offset);
+      sendJson(res, { ok: true, provider: 'spotify', loggedIn: true, playlists });
+    } catch (error) { providerError(res, error, 401); }
     return true;
   }
 
   if (pathname === '/api/spotify/playlist/tracks') {
     try {
-      const result = await musicProviders.spotifyPlaylistTracks(url.searchParams.get('id') || url.searchParams.get('pid') || '', normalizeLimit(url, 100, 500));
+      const id = url.searchParams.get('id') || url.searchParams.get('pid') || '';
+      const limit = Math.max(1, Math.min(50, Number(url.searchParams.get('limit') || 50) || 50));
+      const offset = Math.max(0, Number(url.searchParams.get('offset') || 0) || 0);
+      const result = await musicProviders.spotifyPlaylistTracks(id, limit, offset);
       sendJson(res, result && result.tracks ? { ok: true, provider: 'spotify', ...result } : { ok: true, provider: 'spotify', tracks: result || [] });
     } catch (error) { providerError(res, error, 401); }
     return true;

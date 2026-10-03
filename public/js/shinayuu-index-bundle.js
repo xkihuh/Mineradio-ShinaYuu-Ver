@@ -31,7 +31,6 @@ var youtubeLoginStatus = { provider: 'youtube', loggedIn: false, preview: false,
 var youtubeLoginAutoRefreshTimer = null;
 var youtubeLoginStatusLastForcedAt = 0;
 var spotifyLoginStatus = { provider: 'spotify', loggedIn: false, configured: false, oauthConfigured: false, oauthMissing: [], preview: false, nickname: 'Spotify', userId: '', avatar: '', product: '', vipType: 0, vipLevel: 'none', isVip: false, isSvip: false, playbackKeyReady: false, playbackMode: 'recommend-match' };
-var soundcloudLoginStatus = { provider: 'soundcloud', loggedIn: false, configured: false, searchReady: false, publicCatalog: false, nickname: 'SoundCloud', userId: '', avatar: '', vipType: 0, vipLevel: 'none', isVip: false, isSvip: false, playbackKeyReady: false, playbackMode: 'direct' };
 var spotifyLoginAutoRefreshTimer = null;
 var youtubeLoginWasLoggedIn = false;
 var spotifyLoginWasLoggedIn = false;
@@ -60,7 +59,7 @@ var AUDIO_FADE_IN_MS = audioFadePreference.fadeInMs;
 var AUDIO_FADE_OUT_MS = audioFadePreference.fadeOutMs;
 var AUDIO_SILENCE_GAIN = 0.0001;
 var audioFadeEnvelope = 1;
-var userPlaylists = [], builtInPlaylists = [], youtubePlaylists = [], spotifyPlaylists = [], playlistCoverCache = {};
+var userPlaylists = [], youtubePlaylists = [], spotifyPlaylists = [], playlistCoverCache = {};
 // Compatibility state retained by the original ShinaYuu 1.1.7.4 3D shelf.
 // The 2.0 provider layer does not currently expose podcast collections, but the
 // restored shelf and playlist catalog still reference this array. Keeping it as
@@ -127,7 +126,7 @@ var AUDIO_INPUT_BRIDGE_STORE_KEY = 'mineradio-audio-input-bridge-v1';
 var PROVIDER_VIP_AUDIT_STORE_KEY = 'mineradio-provider-vip-audit-v1';
 var YouTube_PLAYBACK_VIP_EVIDENCE_STORE_KEY = 'mineradio-youtube-playback-vip-evidence-v1';
 var LOGIN_COOKIE_EXPORT_STORE_KEY = 'mineradio-login-cookie-export-v1';
-var PLAYBACK_QUALITY_DEFAULTS = { youtube: 'hires', spotify: 'standard', soundcloud: 'standard' };
+var PLAYBACK_QUALITY_DEFAULTS = { youtube: 'hires', spotify: 'standard' };
 var PLAYBACK_QUALITY_OPTIONS = {
   youtube: [
     { key: 'hires', title: 'Chất lượng cao', sub: 'YouTube Music · ưu tiên chất lượng' },
@@ -137,10 +136,6 @@ var PLAYBACK_QUALITY_OPTIONS = {
   ],
   spotify: [
     { key: 'standard', title: 'Spotify Premium', sub: 'Phát trực tiếp qua Spotify' }
-  ],
-  soundcloud: [
-    { key: 'standard', title: 'SoundCloud 160 kbps', sub: 'AAC HLS · ưu tiên chất lượng' },
-    { key: 'low', title: 'SoundCloud 96 kbps', sub: 'AAC HLS · tiết kiệm băng thông' }
   ]
 };
 var UPLOAD_TIP_STORE_KEY = 'mineradio-upload-tip-seen';
@@ -286,7 +281,7 @@ var updatePreviewState = {
   installerPath: '',
   installerOpened: false,
   cached: false,
-  currentVersion: '2.1.10',
+  currentVersion: '2.1.7',
   version: '2.0.0',
   configured: false,
   preview: true,
@@ -1006,9 +1001,6 @@ var fxDefaults = {
   memorySafetyRevision: 3,
   liveBackgroundKeep: true,
   cam: 'off',
-  gesturePlayerActions: true,
-  gestureHandOverlay: true,
-  gestureSensitivity: 'balanced',
 };
 function normalizeForegroundFpsMode(value) {
   var mode = String(value || '').trim().toLowerCase();
@@ -2254,6 +2246,168 @@ if (document.readyState === 'loading') {
 } else {
   setTimeout(bindSystemMemoryControls, 0);
 }
+
+;
+
+/* ===== js/modules/00-state/12-display-scale-runtime.js ===== */
+(function () {
+  'use strict';
+
+  var DISPLAY_EVENT = 'shinayuu-display-metrics-change';
+  var lastSignature = '';
+  var refreshTimer = 0;
+
+  function num(value, fallback) {
+    var n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+  }
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function signature(metrics) {
+    return [
+      metrics.displayId,
+      metrics.scaleFactor,
+      metrics.cssWidth,
+      metrics.cssHeight,
+      metrics.pixelWidth,
+      metrics.pixelHeight,
+      metrics.windowCssWidth,
+      metrics.windowCssHeight,
+    ].join('|');
+  }
+
+  function applyMetrics(raw) {
+    raw = raw && typeof raw === 'object' ? raw : {};
+    var cssWidth = Math.max(1, Math.round(num(raw.cssWidth, window.innerWidth || 1280)));
+    var cssHeight = Math.max(1, Math.round(num(raw.cssHeight, window.innerHeight || 720)));
+    var scaleFactor = clamp(num(raw.scaleFactor, window.devicePixelRatio || 1), 0.75, 4);
+    var pixelWidth = Math.max(1, Math.round(num(raw.pixelWidth, cssWidth * scaleFactor)));
+    var pixelHeight = Math.max(1, Math.round(num(raw.pixelHeight, cssHeight * scaleFactor)));
+    var referenceWindowCssWidth = Math.max(960, Math.min(1920, Math.round(num(raw.referenceWindowCssWidth, pixelWidth * 0.75))));
+    var referenceWindowCssHeight = Math.max(540, Math.min(1080, Math.round(num(raw.referenceWindowCssHeight, pixelHeight * 0.75))));
+    var windowWidth = Math.max(1, window.innerWidth || cssWidth);
+    var windowHeight = Math.max(1, window.innerHeight || cssHeight);
+    // Only borrow the reference tier when the current CSS viewport is large
+    // enough to host it. On extremely high-DPI/small-DIP displays, falling
+    // back to the real viewport keeps the compact/narrow rules protective.
+    var balanced = referenceWindowCssWidth >= 1360 && windowWidth >= 1180;
+    var layoutWidth = balanced ? Math.max(windowWidth, referenceWindowCssWidth) : windowWidth;
+    var layoutHeight = balanced ? Math.max(windowHeight, referenceWindowCssHeight) : windowHeight;
+    var physicalDpi = Math.round(scaleFactor * 96);
+    var osScalePercent = Math.round(scaleFactor * 100);
+    var signatureValue = signature({
+      displayId: raw.displayId || '', scaleFactor: scaleFactor, cssWidth: cssWidth, cssHeight: cssHeight,
+      pixelWidth: pixelWidth, pixelHeight: pixelHeight,
+      windowCssWidth: Math.max(1, Math.round(num(raw.windowCssWidth, window.innerWidth || cssWidth))),
+      windowCssHeight: Math.max(1, Math.round(num(raw.windowCssHeight, window.innerHeight || cssHeight)))
+    });
+    if (signatureValue === lastSignature) return;
+    lastSignature = signatureValue;
+
+    var root = document.documentElement;
+    root.style.setProperty('--sy-display-scale', scaleFactor.toFixed(4));
+    root.style.setProperty('--sy-display-scale-percent', osScalePercent + '%');
+    root.style.setProperty('--sy-display-css-width', cssWidth + 'px');
+    root.style.setProperty('--sy-display-css-height', cssHeight + 'px');
+    root.style.setProperty('--sy-display-pixel-width', pixelWidth + 'px');
+    root.style.setProperty('--sy-display-pixel-height', pixelHeight + 'px');
+    root.style.setProperty('--sy-display-physical-dpi', physicalDpi + 'px');
+    root.style.setProperty('--sy-ui-reference-width', referenceWindowCssWidth + 'px');
+    root.style.setProperty('--sy-ui-reference-height', referenceWindowCssHeight + 'px');
+    root.style.setProperty('--sy-layout-width', layoutWidth + 'px');
+    root.style.setProperty('--sy-layout-height', layoutHeight + 'px');
+
+    root.dataset.shinayuuDisplayScale = String(osScalePercent);
+    root.dataset.shinayuuDisplayResolution = pixelWidth + 'x' + pixelHeight;
+    root.dataset.shinayuuDisplayCss = cssWidth + 'x' + cssHeight;
+    root.dataset.shinayuuLayoutProfile = balanced ? 'balanced' : (layoutWidth >= 1440 ? 'wide' : (layoutWidth >= 900 ? 'compact' : 'narrow'));
+
+    window.shinayuuDisplayMetrics = {
+      displayId: raw.displayId || null,
+      isPrimary: raw.isPrimary === true,
+      scaleFactor: scaleFactor,
+      osScalePercent: osScalePercent,
+      physicalDpi: physicalDpi,
+      pixelWidth: pixelWidth,
+      pixelHeight: pixelHeight,
+      referenceWindowCssWidth: referenceWindowCssWidth,
+      referenceWindowCssHeight: referenceWindowCssHeight,
+      layoutWidth: layoutWidth,
+      layoutHeight: layoutHeight,
+      balanced: balanced,
+      cssWidth: cssWidth,
+      cssHeight: cssHeight,
+      workArea: raw.workArea || null,
+      bounds: raw.bounds || null,
+      windowCssWidth: Math.max(1, Math.round(num(raw.windowCssWidth, window.innerWidth || cssWidth))),
+      windowCssHeight: Math.max(1, Math.round(num(raw.windowCssHeight, window.innerHeight || cssHeight)))
+    };
+
+    try {
+      window.dispatchEvent(new CustomEvent(DISPLAY_EVENT, { detail: window.shinayuuDisplayMetrics }));
+    } catch (_) {}
+  }
+
+  function fallbackMetrics() {
+    var dpr = num(window.devicePixelRatio, 1);
+    applyMetrics({
+      displayId: 'renderer-fallback',
+      isPrimary: true,
+      scaleFactor: dpr,
+      cssWidth: window.screen && window.screen.availWidth || window.innerWidth || 1280,
+      cssHeight: window.screen && window.screen.availHeight || window.innerHeight || 720,
+      pixelWidth: Math.round((window.screen && window.screen.availWidth || window.innerWidth || 1280) * dpr),
+      pixelHeight: Math.round((window.screen && window.screen.availHeight || window.innerHeight || 720) * dpr),
+      windowCssWidth: window.innerWidth || 1280,
+      windowCssHeight: window.innerHeight || 720
+    });
+  }
+
+  async function refreshDisplayMetrics() {
+    try {
+      if (window.desktopWindow && typeof window.desktopWindow.getDisplayMetrics === 'function') {
+        var metrics = await window.desktopWindow.getDisplayMetrics();
+        if (metrics && metrics.ok !== false) {
+          applyMetrics(metrics);
+          return metrics;
+        }
+      }
+    } catch (error) {
+      try { console.warn('[DisplayMetrics] refresh failed:', error && error.message || error); } catch (_) {}
+    }
+    fallbackMetrics();
+    return window.shinayuuDisplayMetrics;
+  }
+
+  function scheduleRefresh() {
+    if (refreshTimer) return;
+    refreshTimer = window.setTimeout(function () {
+      refreshTimer = 0;
+      refreshDisplayMetrics();
+    }, 80);
+  }
+
+  function start() {
+    refreshDisplayMetrics();
+    window.addEventListener('resize', scheduleRefresh, { passive: true });
+    window.addEventListener('orientationchange', scheduleRefresh, { passive: true });
+    if (window.desktopWindow && typeof window.desktopWindow.onDisplayMetricsChanged === 'function') {
+      window.desktopWindow.onDisplayMetricsChanged(function (metrics) { applyMetrics(metrics); });
+    }
+  }
+
+  window.ShinayuuDisplayRuntime = {
+    refresh: refreshDisplayMetrics,
+    getMetrics: function () { return window.shinayuuDisplayMetrics || null; },
+    eventName: DISPLAY_EVENT
+  };
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
+  else start();
+}());
 
 ;
 
@@ -16307,14 +16461,6 @@ function tickLyricsParticles() {
     }
     stageLyrics.currentIdx = newIdx;
     displayedNewLine = true;
-    // Discord must follow the actual Stage transition, not a coarse polling snapshot.
-    // This preserves short lyric lines that can exist for only a few hundred ms.
-    try {
-      var stageLineText = displayPayload && (displayPayload.text || displayPayload.line || displayPayload.lyric) || '';
-      document.dispatchEvent(new CustomEvent('shinayuu-stage-lyric-changed', {
-        detail: { index: newIdx, text: String(stageLineText).replace(/\s+/g, ' ').trim(), key: displayPayload && displayPayload.key || '', time: lyricT }
-      }));
-    } catch (_) {}
   }
   if (stageLyrics.current) {
     var curLine = lyricsLines[newIdx] || { t: lyricT };
@@ -18478,7 +18624,7 @@ async function fetchBeatPrefetchAudioUrl(song) {
     '&mediaMid=' + encodeURIComponent(song.mediaMid || song.media_mid || '') +
     '&quality=' + encodeURIComponent(requestedQuality), { timeoutMs: 15000 });
   if (!data || !data.url || data.trial) return null;
-  return data.proxyUrl || data.url || '';
+  return '/api/audio?url=' + encodeURIComponent(data.url);
 }
 
 function scheduleQueueBeatPrefetch(fromIdx, delayMs, state) {
@@ -19747,7 +19893,7 @@ async function analyzePodcastDjBeats(audioUrl, token, durationSec) {
       hideBeatChip();
       if (durationSec <= 0 || durationSec > 3300) return null;
     }
-    var fetchAudioUrl = audioUrl;
+    var fetchAudioUrl = /^https?:\/\//i.test(audioUrl || '') ? ('/api/audio?url=' + encodeURIComponent(audioUrl)) : audioUrl;
     var resp = await fetch(fetchAudioUrl);
     if (token !== djBeatMapToken || !djMode.active) { hideBeatChip(); return null; }
     var ab = await resp.arrayBuffer();
@@ -22341,15 +22487,6 @@ function makeShelfManager() {
       console.warn('[ShelfCatalogAdapter]', error);
       nextItems = allItems && allItems.length ? allItems.slice() : [];
     }
-    var nextSig = sig(nextItems);
-    // Provider/search/bootstrap callbacks can arrive several times while the
-    // shelf is still empty. Rebuilding the single "empty shelf" card on every
-    // callback tears down its GPU objects and recreates the same card, which
-    // looks like the playlist shelf is flashing/reloading. Keep the existing
-    // render tree when the logical shelf content has not changed.
-    if (nextSig === lastSig && Array.isArray(allItems) && allItems.length === nextItems.length) {
-      return;
-    }
     disposeRenderedCards();
     if (connectorParticles) {
       if (connectorParticles.parent) connectorParticles.parent.remove(connectorParticles);
@@ -22364,7 +22501,7 @@ function makeShelfManager() {
       floorMirror = null;
     }
     allItems = Array.isArray(nextItems) ? nextItems : [];
-    lastSig = nextSig;
+    lastSig = sig(allItems);
     if (allItems.length && mode !== 'off') shelfVisibility = Math.max(Number(shelfVisibility) || 0, 0.36);
     lastCardRedrawAt = -10;
     lastCardPulseBucket = -1;
@@ -24251,7 +24388,6 @@ function normalizePlaybackQuality(value) {
 }
 function normalizePlaybackProvider(provider) {
   if (provider === 'spotify') return 'spotify';
-  if (provider === 'soundcloud') return 'soundcloud';
   if (provider === 'local') return 'local';
   return 'youtube';
 }
@@ -24259,7 +24395,6 @@ function normalizePlaybackQualityForProvider(value, provider) {
   provider = normalizePlaybackProvider(provider);
   var q = normalizePlaybackQuality(value);
   if (provider === 'youtube' && q === 'jymaster') return 'hires';
-  if (provider === 'soundcloud' && q !== 'low') return 'standard';
   return q;
 }
 function playbackQualityOptions(provider) {
@@ -24379,7 +24514,7 @@ function playbackResolvedQualityText(data, provider) {
   return br ? (label + ' · ' + br) : label;
 }
 function readPlaybackQualityPreference() {
-  var fallback = { youtube: PLAYBACK_QUALITY_DEFAULTS.youtube, spotify: PLAYBACK_QUALITY_DEFAULTS.spotify, soundcloud: PLAYBACK_QUALITY_DEFAULTS.soundcloud };
+  var fallback = { youtube: PLAYBACK_QUALITY_DEFAULTS.youtube, spotify: PLAYBACK_QUALITY_DEFAULTS.spotify };
   try {
     var raw = localStorage.getItem(PLAYBACK_QUALITY_STORE_KEY) || '';
     if (!raw) return fallback;
@@ -24881,18 +25016,6 @@ function openAudioOutputWorkflowPanel() {
 function closeAudioOutputWorkflowPanel() {
   closeGsapModal(document.getElementById('audio-output-workflow-modal'));
 }
-function reapplyNativeAudioOutputRoute(reason) {
-  if (!window.desktopWindow || typeof window.desktopWindow.routeAudioOutput !== 'function') return Promise.resolve(null);
-  var selected = audioOutputDeviceId ? audioOutputDeviceById(audioOutputDeviceId) : null;
-  return window.desktopWindow.routeAudioOutput({
-    deviceLabel: selected && selected.label || '',
-    clear: !audioOutputDeviceId,
-    reason: reason || 'refresh'
-  }).catch(function (error) {
-    console.warn('[AudioOutputNative]', error);
-    return null;
-  });
-}
 async function refreshAudioOutputDevices(showNotice) {
   if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
     audioOutputDevices = [];
@@ -24904,7 +25027,6 @@ async function refreshAudioOutputDevices(showNotice) {
   try {
     var devices = await navigator.mediaDevices.enumerateDevices();
     audioOutputDevices = devices.filter(function (device) { return device && device.kind === 'audiooutput' && device.deviceId !== 'default'; });
-    reapplyNativeAudioOutputRoute('device-refresh');
     audioInputDevices = devices.filter(function (device) { return device && device.kind === 'audioinput' && device.deviceId !== 'default'; });
     if (audioInputBridgeState && audioInputBridgeState.enabled && audioInputBridgeState.deviceId && !audioOutputDeviceById(audioInputBridgeState.deviceId)) {
       audioInputBridgeState.enabled = false;
@@ -25093,13 +25215,7 @@ function setAudioOutputDevice(deviceId, showNotice) {
   saveAudioOutputMirrorPreference();
   saveAudioOutputDevicePreference();
   renderAudioOutputDeviceUi();
-  var nativeRoutePromise = reapplyNativeAudioOutputRoute('user-select');
-  Promise.all([Promise.resolve(applyAudioOutputDevice(audio)), nativeRoutePromise]).then(function (results) {
-    var ok = results[0];
-    var nativeRoute = results[1];
-    if (nativeRoute && nativeRoute.ok !== true && requestedDeviceId) {
-      console.warn('[AudioOutputNative] Spotify/system route unavailable');
-    }
+  Promise.resolve(applyAudioOutputDevice(audio)).then(function (ok) {
     if (!showNotice) return;
     if (!requestedDeviceId) showToast('Đã chuyển về đầu ra mặc định hệ thống');
     else if (ok === true) showToast('Đã chuyển thiết bị đầu ra');
@@ -25207,12 +25323,6 @@ function coverProxySrc(url, cacheBust) {
 function coverUrlWithSize(url, size) {
   if (!url || isInlineCoverSrc(url) || !/^https?:\/\//i.test(url)) return url || '';
   if (!size) return url;
-  // SoundCloud CDN artwork uses filename size variants (t300x300, t500x500,
-  // etc.), not the QQ-style ?param=WxH query used by other providers.
-  if (/sndcdn\.com\//i.test(url)) {
-    var scToken = size >= 500 ? 't500x500' : size >= 400 ? 'crop' : size >= 300 ? 't300x300' : size >= 100 ? 'large' : 'small';
-    return url.replace(/-(?:mini|tiny|small|badge|t67x67|large|t300x300|crop|t500x500|original)\.(jpg|png)(?:\?.*)?$/i, '-' + scToken + '.$1');
-  }
   var param = 'param=' + size + 'y' + size;
   if (/[?&]param=\d+y\d+/i.test(url)) return url.replace(/([?&])param=\d+y\d+/i, '$1' + param);
   return url + (url.indexOf('?') >= 0 ? '&' : '?') + param;
@@ -25341,7 +25451,7 @@ function listenReportProvider(snapshot) {
     (snapshot && (snapshot.provider || snapshot.sourceKey || snapshot.resolvedPlaybackProvider)) || ''
   ).trim().toLowerCase();
   if (provider === 'song' || provider === 'music' || !provider) provider = 'youtube';
-  if (/^(youtube|spotify|soundcloud)$/.test(provider) && typeof normalizePlaybackProvider === 'function') {
+  if (/^(youtube|spotify)$/.test(provider) && typeof normalizePlaybackProvider === 'function') {
     provider = normalizePlaybackProvider(provider);
   }
   return provider;
@@ -28586,15 +28696,13 @@ function currentCoverSong() {
 }
 function songDurationLabel(song) {
   var sec = playbackDurationFromSong(song);
-  var provider = song && String(song.provider || song.source || song.type || '').toLowerCase();
-  if (!sec && provider !== 'soundcloud' && audio && isFinite(audio.duration) && audio.duration > 0) sec = audio.duration;
+  if (!sec && audio && isFinite(audio.duration) && audio.duration > 0) sec = audio.duration;
   if (!sec) return 'Không rõ';
   return formatProgramTime(sec);
 }
 function songSourceLabel(song) {
   if (!song) return 'Không rõ';
   if (song.provider === 'spotify' || song.source === 'spotify' || song.type === 'spotify' || song.spotifyId || song.spotifyUri) return 'Spotify';
-  if (song.provider === 'soundcloud' || song.source === 'soundcloud' || song.type === 'soundcloud' || song.soundcloudId || song.soundcloudPermalink) return 'SoundCloud';
   if (song.sourceType === 'video' || song.youtubeSourceType === 'video' || song.provider === 'youtube-video' || song.source === 'youtube-video') return 'YouTube Video';
   if (song.provider === 'youtube' || song.source === 'youtube' || song.type === 'youtube' || song.provider === 'qq' || song.source === 'qq' || song.youtubeId || song.videoId) return 'YouTube Music';
   if (song.type === 'local' || song.source === 'local' || song.localKey) return localizeUiMessage('Nhạc cục bộ');
@@ -29631,27 +29739,20 @@ function deleteCustomLyricForCurrent() {
 var SONG_ACCOUNT_ACTION_ADAPTERS = {
   spotify: {
     provider: 'spotify', label: 'Spotify', like: true, collect: true, createPlaylist: true,
-    likeCheckUrl: '/api/spotify/song/like/check', likeUrl: '/api/spotify/song/like',
-    playlistAddUrl: '/api/spotify/playlist/add-song', playlistCreateUrl: '/api/spotify/playlist/create',
+    likeCheckUrl: '/api/app/liked/check', likeUrl: '/api/app/liked/toggle',
+    playlistAddUrl: '/api/app/playlist/add-song', playlistCreateUrl: '/api/app/playlist/create',
     playlistTracksUrl: '/api/spotify/playlist/tracks'
   },
   youtube: {
-    provider: 'youtube', label: 'YouTube Music', like: false, collect: false, createPlaylist: false,
-    likeCheckUrl: '', likeUrl: '', playlistAddUrl: '', playlistCreateUrl: '',
+    provider: 'youtube', label: 'YouTube Music', like: true, collect: true, createPlaylist: true,
+    likeCheckUrl: '/api/app/liked/check', likeUrl: '/api/app/liked/toggle',
+    playlistAddUrl: '/api/app/playlist/add-song', playlistCreateUrl: '/api/app/playlist/create',
     playlistTracksUrl: '/api/youtube-music/playlist/tracks'
-  },
-  soundcloud: {
-    provider: 'soundcloud', label: 'SoundCloud', like: false, collect: false, createPlaylist: false,
-    likeCheckUrl: '', likeUrl: '', playlistAddUrl: '', playlistCreateUrl: '',
-    playlistTracksUrl: ''
   }
 };
 function songAccountProvider(song) {
   if (!song) return 'youtube';
-  var provider = songProviderKey(song);
-  if (provider === 'spotify') return 'spotify';
-  if (provider === 'soundcloud') return 'soundcloud';
-  return 'youtube';
+  return songProviderKey(song) === 'spotify' ? 'spotify' : 'youtube';
 }
 function songAccountAdapter(songOrProvider) {
   var provider = typeof songOrProvider === 'string' ? normalizePlaybackProvider(songOrProvider) : songAccountProvider(songOrProvider);
@@ -29682,8 +29783,7 @@ function playlistAccountProvider(playlist) { return String(playlist && (playlist
 function songAccountLoginStatus(provider) { return provider === 'spotify' ? (spotifyLoginStatus || {}) : (youtubeLoginStatus || {}); }
 function isSongAccountLoggedIn(provider) { var status = songAccountLoginStatus(provider); return provider === 'youtube' ? true : !!status.loggedIn; }
 function songAccountUnsupportedMessage(provider, action) {
-  if (provider === 'youtube') return action === 'collect' ? 'YouTube Music chưa hỗ trợ thêm trực tiếp vào playlist trong ứng dụng' : 'YouTube Music chưa hỗ trợ đồng bộ yêu thích trong ứng dụng';
-  return 'Nguồn này chưa hỗ trợ thao tác tài khoản';
+  return action === 'collect' ? 'Không thể thêm bài vào playlist ShinaYuu' : 'Không thể cập nhật Nhạc Yêu Thích';
 }
 function isCloudSong(song) {
   return false;
@@ -29735,50 +29835,31 @@ function songActionHtml(kind, source, index, song) {
 }
 function syncLikeStatusForSongs(songs) {
   if (!songs || !songs.length) return;
-  var groups = Object.create(null);
-  songs.forEach(function (song) {
-    var provider = songAccountProvider(song);
-    var adapter = songAccountAdapter(provider);
-    var id = songAccountId(song, provider);
-    if (!adapter || !adapter.like || !adapter.likeCheckUrl || !id || !isSongAccountLoggedIn(provider)) return;
-    if (!groups[provider]) groups[provider] = { adapter: adapter, ids: [], seen: Object.create(null) };
-    if (groups[provider].seen[id]) return;
-    groups[provider].seen[id] = true;
-    groups[provider].ids.push(id);
+  var keys = [];
+  var seen = Object.create(null);
+  (songs || []).forEach(function (song) {
+    var key = songAccountStateKey(song);
+    if (!key || seen[key]) return;
+    seen[key] = true;
+    keys.push(key);
   });
-  var providers = Object.keys(groups);
-  if (!providers.length) return;
+  if (!keys.length) return;
   var token = ++likeStatusToken;
-  var requests = [];
-  providers.forEach(function (provider) {
-    var group = groups[provider];
-    var batchSize = provider === 'spotify' ? 40 : 200;
-    for (var offset = 0; offset < group.ids.length; offset += batchSize) {
-      (function (batchIds) {
-        var url = group.adapter.likeCheckUrl + '?' + group.adapter.likeCheckParam + '=' + encodeURIComponent(batchIds.join(','));
-        requests.push(apiJson(url).then(function (r) {
-          if (token < likeStatusToken - 3 || !r || !r.liked) return;
-          var responseLiked = r.liked || {};
-          batchIds.forEach(function (id) {
-            var responseId = String(id);
-            var liked = responseLiked[responseId];
-            if (liked == null) liked = responseLiked[id];
-            if (liked == null) return;
-            likedSongMap[provider + ':' + responseId] = !!liked;
-          });
-        }).catch(function (err) {
-          console.warn(provider + ' like check failed:', err);
-        }));
-      })(group.ids.slice(offset, offset + batchSize));
-    }
-  });
-  Promise.all(requests).then(function () {
+  apiJson('/api/app/liked/check?keys=' + encodeURIComponent(keys.join(','))).then(function (r) {
+    if (token < likeStatusToken - 3 || !r || !r.liked) return;
+    keys.forEach(function (key) {
+      if (Object.prototype.hasOwnProperty.call(r.liked, key)) likedSongMap[key] = !!r.liked[key];
+    });
+  }).catch(function (err) {
+    console.warn('app liked check failed:', err);
+  }).finally(function () {
     if (token < likeStatusToken - 3) return;
     safeRenderQueuePanel('like-status-sync', { scrollCurrent: miniQueueOpen });
     if ($results && $results.classList.contains('show')) refreshSearchResultActionStates();
     updateLikeButtons();
   });
 }
+
 function syncLikeStatusForSong(song) {
   var adapter = songAccountAdapter(song);
   if (!adapter || !adapter.like) { updateLikeButtons(song); return; }
@@ -29816,17 +29897,11 @@ function refreshSearchResultActionStates() {
   });
 }
 async function toggleLikeSong(song) {
-  var provider = songAccountProvider(song);
-  var adapter = songAccountAdapter(provider);
-  if (!adapter || !adapter.like || !adapter.likeUrl) {
-    showToast(songAccountUnsupportedMessage(provider, 'like'));
-    return;
-  }
-  if (!ensureLoggedInForAction(provider)) return;
-  var id = songAccountId(song, provider);
+  if (!song) { showToast('Hãy phát hoặc chọn một bài hát trước'); return; }
+  var id = songAccountId(song, songAccountProvider(song));
   var stateKey = songAccountStateKey(song);
   if (!id || !stateKey) {
-    showToast('Bài hiện tại thiếu ' + adapter.label + 'mã bài hát');
+    showToast('Bài hiện tại thiếu mã bài hát');
     return;
   }
   if (likeBusyMap[stateKey]) return;
@@ -29837,24 +29912,30 @@ async function toggleLikeSong(song) {
   safeRenderQueuePanel('like-toggle-optimistic', { scrollCurrent: miniQueueOpen });
   refreshSearchResultActionStates();
   try {
-    var r = await apiJson(adapter.likeUrl, {
+    var r = await apiJson('/api/app/liked/toggle', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: id, like: next, song: song })
+      body: JSON.stringify({ like: next, song: song })
     });
     if (r && (r.error || r.success === false)) throw new Error(r.error || r.message || 'LIKE_FAILED');
     likedSongMap[stateKey] = r && r.liked != null ? !!r.liked : next;
-    showToast(next ? 'Đã thêm vào yêu thích' : 'Đã bỏ yêu thích');
+    showToast(next ? 'Đã thêm vào Nhạc Yêu Thích' : 'Đã bỏ khỏi Nhạc Yêu Thích');
+    await refreshUserPlaylists(true).catch(function () {});
+    if (typeof playlistPanelDetailState !== 'undefined' && playlistPanelDetailState.key === 'app:app-liked') {
+      var updatedTracks = Array.isArray(playlistPanelDetailState.tracks) ? playlistPanelDetailState.tracks.slice() : [];
+      if (next && !updatedTracks.some(function (item) { return songAccountStateKey(item) === stateKey; })) updatedTracks.unshift(cloneSong(song));
+      if (!next) updatedTracks = updatedTracks.filter(function (item) { return songAccountStateKey(item) !== stateKey; });
+      playlistPanelDetailState.tracks = updatedTracks;
+      playlistPanelDetailState.total = updatedTracks.length;
+      playlistPanelDetailState.nextOffset = updatedTracks.length;
+      playlistPanelDetailState.hasMore = false;
+      if (typeof renderPlaylistPanelDetailState === 'function') renderPlaylistPanelDetailState();
+    }
   } catch (err) {
     likedSongMap[stateKey] = !next;
     var errorText = String(err && err.message || '');
-    if (/SCOPE|PERMISSION/i.test(errorText)) {
-      showToast('Quyền hiện tại chưa cho phép ghi playlist; hãy cấp quyền lại');
-    } else if (/LOGIN_REQUIRED|AUTH_REQUIRED/i.test(errorText)) {
-      showToast(adapter.label + ' phiên đăng nhập đã hết hạn; hãy đăng nhập lại');
-    } else {
-      showToast(errorText ? ('Thao tác yêu thích thất bại: ' + errorText) : 'Thao tác yêu thích thất bại');
-    }
+    if (/LOGIN_REQUIRED|AUTH_REQUIRED/i.test(errorText)) showToast('Không thể cập nhật Nhạc Yêu Thích');
+    else showToast(errorText ? ('Thao tác yêu thích thất bại: ' + errorText) : 'Thao tác yêu thích thất bại');
   } finally {
     delete likeBusyMap[stateKey];
     updateLikeButtons(song);
@@ -29862,18 +29943,14 @@ async function toggleLikeSong(song) {
     refreshSearchResultActionStates();
   }
 }
+
 function toggleLikeCurrent() { toggleLikeSong(currentCoverSong()); }
 function toggleLikeSearchResult(i) { if (playlist[i]) toggleLikeSong(playlist[i]); }
 function toggleLikeQueueIndex(i) { if (playQueue[i]) toggleLikeSong(playQueue[i]); }
 function toggleLikeDetailSong(song) { toggleLikeSong(song); }
 function openCollectModal(song) {
-  var provider = songAccountProvider(song);
-  var adapter = songAccountAdapter(provider);
-  if (!adapter || !adapter.collect || !adapter.playlistAddUrl) {
-    showToast(songAccountUnsupportedMessage(provider, 'collect'));
-    return;
-  }
-  if (!ensureLoggedInForAction(provider)) return;
+  song = song || currentCoverSong();
+  if (!song) { showToast('Hãy phát hoặc chọn một bài hát trước'); return; }
   collectTargetSong = song;
   renderCollectModal();
   openGsapModal(document.getElementById('collect-modal'));
@@ -29898,82 +29975,47 @@ function renderCollectModal() {
   var cover = songCoverSrc(song, 80);
   current.innerHTML = (cover ? '<img src="' + cover + '" alt="">' : '<div class="cover-placeholder"></div>') +
     '<div style="min-width:0"><div class="collect-title">' + escHtml(song.name || 'Bài hiện tại') + '</div><div class="collect-sub">' + escHtml(song.artist || '') + '</div></div>';
-  var builtIn = Array.isArray(builtInPlaylists) ? builtInPlaylists.filter(function (pl) { return pl && !pl.subscribed && !pl.virtual; }) : [];
-  var builtInHtml = builtIn.length ? '<div class="collect-section-label">Playlist ShinaYuu</div>' + builtIn.map(function (pl) {
-    var thumb = pl.cover ? coverUrlWithSize(pl.cover, 80) : '';
-    return '<div class="collect-item" data-collect-provider="shinayuu" data-collect-pid="' + escHtml(String(pl.id || '')) + '" onclick="addCollectTargetToPlaylist(this.getAttribute(\'data-collect-pid\'), \'shinayuu\')">' +
-      (thumb ? '<img src="' + thumb + '" alt="">' : '<div class="cover-placeholder"></div>') +
-      '<div style="min-width:0"><div class="collect-title">' + escHtml(pl.name || '') + '</div><div class="collect-sub">' + (pl.trackCount || 0) + ' bài</div></div>' +
-      '</div>';
-  }).join('') : '';
-
-  var provider = songAccountProvider(song);
-  var adapter = songAccountAdapter(provider);
-  var providerHtml = '';
-  var providerMessage = '';
-  if (!adapter || !adapter.collect) {
-    providerMessage = songAccountUnsupportedMessage(provider, 'collect');
-  } else if (!isSongAccountLoggedIn(provider)) {
-    providerMessage = 'Đăng nhập ' + adapter.label + ' để hiển thị playlist của bạn';
-  } else {
-    var mine = userPlaylists.filter(function (pl) {
-      return playlistAccountProvider(pl) === provider && !pl.subscribed && !pl.virtual;
-    });
-    providerHtml = mine.map(function (pl) {
-      var thumb = pl.cover ? coverUrlWithSize(pl.cover, 80) : '';
-      return '<div class="collect-item" data-collect-provider="' + escHtml(provider) + '" data-collect-pid="' + escHtml(String(pl.id || '')) + '" onclick="addCollectTargetToPlaylist(this.getAttribute(\'data-collect-pid\'), this.getAttribute(\'data-collect-provider\'))">' +
-        (thumb ? '<img src="' + thumb + '" alt="">' : '<div class="cover-placeholder"></div>') +
-        '<div style="min-width:0"><div class="collect-title">' + escHtml(pl.name || '') + '</div><div class="collect-sub">' + (pl.trackCount || 0) + ' bài</div></div>' +
-        '</div>';
-    }).join('');
-    if (!mine.length) providerMessage = 'Chưa có playlist ' + adapter.label + ' có thể ghi; hãy tạo một playlist trước';
-  }
-
-  if (!builtIn.length && !providerHtml) {
-    list.innerHTML = '<div class="collect-empty">' + escHtml(providerMessage || 'Chưa có playlist có thể ghi; hãy tạo một playlist trước') + '</div>';
+  var rows = [];
+  (Array.isArray(appPlaylists) ? appPlaylists : []).forEach(function (pl) {
+    rows.push('<div class="collect-item" data-collect-pid="' + escHtml(String(pl.id || '')) + '" data-collect-provider="app" onclick="addCollectTargetToPlaylist(this.getAttribute(\'data-collect-pid\'), \'app\')">' +
+      (pl.cover ? '<img src="' + escHtml(coverUrlWithSize(pl.cover, 80)) + '" alt="">' : '<div class="cover-placeholder"></div>') +
+      '<div style="min-width:0"><div class="collect-title">' + escHtml(pl.name || 'Playlist ShinaYuu') + '</div><div class="collect-sub">' + (pl.trackCount || 0) + ' bài · ShinaYuu Music</div></div></div>');
+  });
+  if (!rows.length) {
+    list.innerHTML = '<div class="collect-empty">Chưa có playlist ShinaYuu. Hãy tạo một playlist mới ở phía trên.</div>';
     return;
   }
-  list.innerHTML = builtInHtml + (providerHtml ? '<div class="collect-section-label">' + escHtml(adapter.label) + '</div>' + providerHtml : (providerMessage ? '<div class="collect-provider-note">' + escHtml(providerMessage) + '</div>' : ''));
+  list.innerHTML = rows.join('');
   if (window.gsap) animateListItems(list, '.collect-item', { x: 0, y: 6, stagger: 0.012, duration: 0.18, limit: 18 });
 }
-function setCollectBusyPid(pid, busy, provider) {
+
+function setCollectBusyPid(pid, busy) {
   var list = document.getElementById('collect-list');
   if (!list) return;
   list.querySelectorAll('.collect-item').forEach(function (item) {
-    var sameId = item.getAttribute('data-collect-pid') === String(pid);
-    var sameProvider = !provider || item.getAttribute('data-collect-provider') === String(provider);
-    item.classList.toggle('busy', !!busy && sameId && sameProvider);
+    item.classList.toggle('busy', !!busy && item.getAttribute('data-collect-pid') === String(pid));
   });
 }
 async function createPlaylistFromCollect() {
-  var provider = songAccountProvider(collectTargetSong);
-  var adapter = songAccountAdapter(provider);
-  if (!adapter || !adapter.createPlaylist || !adapter.playlistCreateUrl) {
-    showToast((adapter && adapter.label || 'Nguồn hiện tại') + ' chưa hỗ trợ tạo playlist trực tiếp trong ShinaYuu Music');
-    return;
-  }
-  if (!ensureLoggedInForAction(provider)) return;
+  if (!collectTargetSong) { showToast('Hãy chọn một bài hát trước'); return; }
   var input = document.getElementById('collect-new-name');
   var name = input ? input.value.trim() : '';
   if (!name) { showToast('Hãy nhập tên playlist'); return; }
   try {
-    var r = await apiJson(adapter.playlistCreateUrl, {
+    var r = await apiJson('/api/app/playlist/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: name })
     });
-    if (r && (r.error || r.success === false)) throw new Error(r.error || r.message || 'PLAYLIST_CREATE_FAILED');
+    if (!r || r.error || r.success === false || !r.playlist || !r.playlist.id) throw new Error(r && (r.error || r.message) || 'APP_PLAYLIST_CREATE_FAILED');
     if (input) input.value = '';
-    showToast('Đã tạo playlist');
     await refreshUserPlaylists(true);
-    renderCollectModal();
-    var created = r && r.playlist;
-    var pid = created && created.id;
-    if (pid && collectTargetSong) addCollectTargetToPlaylist(pid);
+    await addCollectTargetToPlaylist(r.playlist.id, 'app');
   } catch (err) {
-    showToast('Tạo playlist thất bại');
+    showToast(err && err.message ? ('Tạo playlist thất bại: ' + err.message) : 'Tạo playlist thất bại');
   }
 }
+
 function collectResultMessage(r) {
   if (!r) return 'Thêm vào playlist thất bại';
   var msg = r.error || r.message || r.msg || '';
@@ -29982,12 +30024,15 @@ function collectResultMessage(r) {
   if (/exist|trùng lặp|đã tồn tại|already/i.test(String(msg))) return 'Bài hát đã có trong playlist';
   return msg ? ('Thêm vào playlist thất bại: ' + msg) : 'Thêm vào playlist thất bại';
 }
-function playlistTracksPageUrl(adapter, pid, offset, limit) {
-  var url = adapter.playlistTracksUrl + '?id=' + encodeURIComponent(pid);
+function playlistTracksPageUrl(adapter, pid, offset, limit, providerOverride) {
+  var provider = providerOverride || songAccountProvider(collectTargetSong || {});
+  var endpoint = provider === 'app' ? '/api/app/playlist/tracks' : adapter.playlistTracksUrl;
+  var url = endpoint + '?id=' + encodeURIComponent(pid);
   if (limit) url += '&limit=' + encodeURIComponent(String(limit));
   if (offset) url += '&offset=' + encodeURIComponent(String(offset));
   return url;
 }
+
 function playlistContainsAccountSong(tracks, song, provider) {
   var expected = songAccountIdentityValues(song, provider);
   if (!expected.length) return false;
@@ -29997,88 +30042,70 @@ function playlistContainsAccountSong(tracks, song, provider) {
     return songAccountIdentityValues(track, provider).some(function (id) { return !!expectedSet[id]; });
   });
 }
-async function verifySongInPlaylist(pid, song) {
-  var provider = songAccountProvider(song);
-  var adapter = songAccountAdapter(provider);
-  if (!pid || !adapter || !adapter.playlistTracksUrl || !songAccountId(song, provider)) return false;
-  var pageLimit = provider === 'spotify' ? 50 : 200;
+async function verifySongInPlaylist(pid, song, playlistProvider) {
+  var provider = playlistProvider || songAccountProvider(song);
+  var adapter = songAccountAdapter(song);
+  if (!pid || !song || !songAccountId(song, songAccountProvider(song))) return false;
+  if (provider !== 'app' && (!adapter || !adapter.playlistTracksUrl)) return false;
+  var pageLimit = provider === 'spotify' ? 50 : (provider === 'app' ? 200 : 200);
   for (var attempt = 0; attempt < 3; attempt++) {
-    if (attempt) {
-      await new Promise(function (resolve) { setTimeout(resolve, attempt === 1 ? 360 : 820); });
-    }
+    if (attempt) await new Promise(function (resolve) { setTimeout(resolve, attempt === 1 ? 360 : 820); });
     try {
-      var detail = await apiJson(playlistTracksPageUrl(adapter, pid, 0, pageLimit));
+      var detail = await apiJson(playlistTracksPageUrl(adapter, pid, 0, pageLimit, provider));
       var tracks = (detail && detail.tracks) || [];
-      if (playlistContainsAccountSong(tracks, song, provider)) return true;
+      if (playlistContainsAccountSong(tracks, song, songAccountProvider(song))) return true;
       var total = Math.max(0, Number(detail && (detail.total || (detail.playlist && detail.playlist.trackCount))) || 0);
       var lastOffset = total > pageLimit ? Math.max(0, total - pageLimit) : 0;
       if (lastOffset) {
-        var lastPage = await apiJson(playlistTracksPageUrl(adapter, pid, lastOffset, pageLimit));
-        if (playlistContainsAccountSong((lastPage && lastPage.tracks) || [], song, provider)) return true;
+        var lastPage = await apiJson(playlistTracksPageUrl(adapter, pid, lastOffset, pageLimit, provider));
+        if (playlistContainsAccountSong((lastPage && lastPage.tracks) || [], song, songAccountProvider(song))) return true;
       }
-    } catch (e) {
-      console.warn(provider + ' collect verify failed:', e);
-    }
+    } catch (e) { console.warn(provider + ' collect verify failed:', e); }
   }
   return false;
 }
-async function addCollectTargetToPlaylist(pid, targetProvider) {
+async function addCollectTargetToPlaylist(pid, playlistProvider) {
   if (collectBusy || !collectTargetSong || !pid) return;
   var targetSong = collectTargetSong;
-  var provider = targetProvider || songAccountProvider(targetSong);
-  if (provider === 'shinayuu') {
-    collectBusy = true;
-    setCollectBusyPid(pid, true, 'shinayuu');
-    try {
-      var added = await addTrackToBuiltInPlaylist(pid, targetSong, { silentSuccess: true });
-      if (!added) throw new Error('BUILT_IN_PLAYLIST_ADD_FAILED');
-      showToast(added === 'duplicate' ? 'Bài hát đã có trong playlist ShinaYuu' : 'Đã thêm vào playlist ShinaYuu');
-      closeCollectModal();
-      await refreshUserPlaylists(true);
-    } catch (err) {
-      showToast('Thêm vào playlist ShinaYuu thất bại');
-    } finally {
-      collectBusy = false;
-      setCollectBusyPid(pid, false, 'shinayuu');
-      updateLikeButtons();
-    }
+  var sourceProvider = songAccountProvider(targetSong);
+  var provider = playlistProvider || sourceProvider;
+  var adapter = songAccountAdapter(sourceProvider);
+  if (provider !== 'app' && (!adapter || !adapter.collect || !adapter.playlistAddUrl)) {
+    showToast(songAccountUnsupportedMessage(sourceProvider, 'collect'));
     return;
   }
-  var adapter = songAccountAdapter(provider);
-  if (!adapter || !adapter.collect || !adapter.playlistAddUrl) {
-    showToast(songAccountUnsupportedMessage(provider, 'collect'));
-    return;
-  }
-  if (!ensureLoggedInForAction(provider)) return;
+  if (provider !== 'app' && !ensureLoggedInForAction(sourceProvider)) return;
   collectBusy = true;
-  setCollectBusyPid(pid, true, provider);
+  setCollectBusyPid(pid, true);
   updateLikeButtons();
   showToast('Đang thêm vào playlist...');
   try {
-    var songId = songAccountId(targetSong, provider);
-    if (!songId) throw new Error('Bài hiện tại thiếu ' + adapter.label + 'mã bài hát');
-    var r = await apiJson(adapter.playlistAddUrl, {
+    var songId = songAccountId(targetSong, sourceProvider);
+    if (!songId) throw new Error('Bài hiện tại thiếu mã bài hát');
+    var endpoint = provider === 'app' ? '/api/app/playlist/add-song' : adapter.playlistAddUrl;
+    var r = await apiJson(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pid: pid, id: songId, song: targetSong })
     });
-    if (!r || r.error || r.success === false) throw new Error(collectResultMessage(r));
-    showToast('Đã thêm vào playlist');
+    if (!r || r.error || r.success === false) throw new Error(provider === 'app' && r && r.alreadyExists ? 'Bài hát đã có trong playlist' : collectResultMessage(r));
+    showToast(r.alreadyExists ? 'Bài hát đã có trong playlist' : 'Đã thêm vào playlist');
     closeCollectModal();
-    refreshUserPlaylists(true);
+    await refreshUserPlaylists(true);
     setTimeout(function () {
-      verifySongInPlaylist(pid, targetSong).then(function (ok) {
+      verifySongInPlaylist(pid, targetSong, provider).then(function (ok) {
         if (!ok) console.warn(provider + ' collect submitted but verify did not find song yet:', pid, songId);
       });
-    }, 900);
+    }, 350);
   } catch (err) {
     showToast(err && err.message ? err.message : 'Thêm vào playlist thất bại');
   } finally {
     collectBusy = false;
-    setCollectBusyPid(pid, false, provider);
+    setCollectBusyPid(pid, false);
     updateLikeButtons();
   }
 }
+
 function cloneSong(song) { return hydrateCustomCover(Object.assign({}, song)); }
 function avatarSrc(url) {
   if (!url) return '';
@@ -30098,7 +30125,7 @@ var searchLastResultQuery = '';
 var searchProviderNotice = '';
 var SEARCH_HISTORY_STORE_KEY = 'shinayuu-v2-search-history';
 var SEARCH_HISTORY_STORE_VERSION = 3;
-var SEARCH_HISTORY_MODES = ['song', 'netease', 'soundcloud', 'ytmusic', 'ytvideo', 'podcast'];
+var SEARCH_HISTORY_MODES = ['song', 'netease', 'ytmusic', 'ytvideo', 'podcast'];
 var MUSIC_SEARCH_INITIAL_VISIBLE = 18;
 var MUSIC_SEARCH_APPEND_BATCH = 14;
 var MUSIC_SEARCH_MAX_RESULTS = 180;
@@ -30254,13 +30281,11 @@ function runSearchHistory(q) {
 function updateSearchModeTabs() {
   var songBtn = document.getElementById('search-mode-song');
   var neteaseBtn = document.getElementById('search-mode-netease');
-  var soundcloudBtn = document.getElementById('search-mode-soundcloud');
   var ytMusicBtn = document.getElementById('search-mode-ytmusic');
   var ytVideoBtn = document.getElementById('search-mode-ytvideo');
   var podcastBtn = document.getElementById('search-mode-podcast');
   if (songBtn) { songBtn.classList.toggle('active', searchMode === 'song'); songBtn.setAttribute('aria-selected', searchMode === 'song' ? 'true' : 'false'); songBtn.textContent = window.appLanguage === 'en' ? 'All' : 'Tất cả'; }
   if (neteaseBtn) { neteaseBtn.classList.toggle('active', searchMode === 'netease'); neteaseBtn.setAttribute('aria-selected', searchMode === 'netease' ? 'true' : 'false'); neteaseBtn.textContent = 'Spotify'; }
-  if (soundcloudBtn) { soundcloudBtn.classList.toggle('active', searchMode === 'soundcloud'); soundcloudBtn.setAttribute('aria-selected', searchMode === 'soundcloud' ? 'true' : 'false'); soundcloudBtn.textContent = 'SoundCloud'; }
   if (ytMusicBtn) { ytMusicBtn.classList.toggle('active', searchMode === 'ytmusic'); ytMusicBtn.setAttribute('aria-selected', searchMode === 'ytmusic' ? 'true' : 'false'); ytMusicBtn.textContent = 'YouTube Music'; }
   if (ytVideoBtn) { ytVideoBtn.classList.toggle('active', searchMode === 'ytvideo'); ytVideoBtn.setAttribute('aria-selected', searchMode === 'ytvideo' ? 'true' : 'false'); ytVideoBtn.textContent = 'YouTube Video'; }
   if (podcastBtn) { podcastBtn.classList.toggle('active', searchMode === 'podcast'); podcastBtn.setAttribute('aria-selected', searchMode === 'podcast' ? 'true' : 'false'); podcastBtn.textContent = 'Podcast'; }
@@ -30269,7 +30294,6 @@ function updateSearchModeTabs() {
     else if (searchMode === 'ytmusic') $input.placeholder = window.appLanguage === 'en' ? 'Search YouTube Music songs...' : 'Tìm bài hát trên YouTube Music...';
     else if (searchMode === 'ytvideo') $input.placeholder = window.appLanguage === 'en' ? 'Search normal YouTube videos...' : 'Tìm video YouTube thông thường...';
     else if (searchMode === 'netease') $input.placeholder = window.appLanguage === 'en' ? 'Search Spotify...' : 'Tìm trên Spotify...';
-    else if (searchMode === 'soundcloud') $input.placeholder = window.appLanguage === 'en' ? 'Search SoundCloud...' : 'Tìm trên SoundCloud...';
     else $input.placeholder = window.appLanguage === 'en' ? 'Search songs and artists...' : 'Tìm bài hát, nghệ sĩ...';
   }
   requestAnimationFrame(updateSearchPillGlassDisplacementMap);
@@ -30278,7 +30302,7 @@ function setSearchMode(mode) {
   if (mode === 'qq' || mode === 'youtube') mode = 'ytmusic';
   if (mode === 'youtube-video') mode = 'ytvideo';
   if (mode === 'spotify') mode = 'netease';
-  mode = (mode === 'podcast' || mode === 'netease' || mode === 'soundcloud' || mode === 'ytmusic' || mode === 'ytvideo') ? mode : 'song';
+  mode = (mode === 'podcast' || mode === 'netease' || mode === 'ytmusic' || mode === 'ytvideo') ? mode : 'song';
   if (searchMode === mode) { updateSearchModeTabs(); return; }
   searchMode = mode;
   updateSearchModeTabs();
@@ -30515,7 +30539,6 @@ updateSearchModeTabs();
 function songProviderKey(song) {
   if (song && (song.type === 'local' || song.source === 'local' || song.provider === 'local' || song.localUrl)) return 'local';
   if (song && (song.provider === 'spotify' || song.source === 'spotify' || song.type === 'spotify' || song.spotifyId || song.spotifyUri)) return 'spotify';
-  if (song && (song.provider === 'soundcloud' || song.source === 'soundcloud' || song.type === 'soundcloud' || song.soundcloudId || song.soundcloudPermalink)) return 'soundcloud';
   if (song && (song.sourceType === 'video' || song.youtubeSourceType === 'video' || song.provider === 'youtube-video' || song.source === 'youtube-video')) return 'youtube-video';
   return 'youtube';
 }
@@ -30523,7 +30546,7 @@ function songSourceTagHtml(song, opts) {
   opts = opts || {};
   var rawKey = song && (song.resolvedPlaybackProvider || song.playbackProvider || song.audioProvider || song.providerResolved || '');
   var key = String(rawKey || '') === 'spotify' ? 'spotify' : songProviderKey(song);
-  var label = key === 'youtube' ? 'YM' : (key === 'youtube-video' ? 'MV' : (key === 'spotify' ? 'SP' : (key === 'soundcloud' ? 'SC' : 'LC')));
+  var label = key === 'youtube' ? 'YM' : (key === 'youtube-video' ? 'MV' : (key === 'spotify' ? 'SP' : 'LC'));
   if (opts.switcher) {
     return '<button type="button" class="tag-source ' + key + ' control-source-chip" title="Chuyển nguồn phát" aria-haspopup="true" onclick="toggleControlSourceSwitcher(event)">' + label + '</button>';
   }
@@ -30533,7 +30556,6 @@ var controlSourceSwitcherState = { open: false, loading: false, requestId: 0, an
 function controlSourceProviders() {
   return [
     { key: 'spotify', label: 'SP', title: 'Spotify' },
-    { key: 'soundcloud', label: 'SC', title: 'SoundCloud' },
     { key: 'youtube', label: 'YM', title: 'YouTube Music' },
     { key: 'youtube-video', label: 'MV', title: 'YouTube Video' },
     { key: 'local', label: 'LC', title: 'Local Music' }
@@ -30545,7 +30567,6 @@ function controlSourceProviderTitle(provider) {
 }
 function controlSourceSearchUrl(provider, query) {
   if (provider === 'spotify') return '/api/spotify/search?keywords=' + encodeURIComponent(query) + '&limit=8';
-  if (provider === 'soundcloud') return '/api/soundcloud/search?keywords=' + encodeURIComponent(query) + '&limit=8';
   if (provider === 'youtube-video') return '/api/youtube-video/search?keywords=' + encodeURIComponent(query) + '&limit=8';
   if (provider === 'local') return '/api/local/search?keywords=' + encodeURIComponent(query) + '&limit=8';
   return '/api/youtube-music/search?keywords=' + encodeURIComponent(query) + '&limit=8';
@@ -30794,7 +30815,6 @@ function searchResultMetaText(song) {
   if (song.album) bits.push(song.album);
   if (songProviderKey(song) === 'youtube' && !song.playable) bits.push('YouTube Music cần phiên đăng nhập hoặc quyền phát');
   if (songProviderKey(song) === 'spotify' && !song.playable) bits.push('Spotify cần đăng nhập Premium để phát trong ứng dụng');
-  if (songProviderKey(song) === 'soundcloud' && song.externalUrl) bits.push('SoundCloud · ' + song.artist);
   return bits.join('  ·  ') || songSourceLabel(song);
 }
 function searchResultMetaHtml(song, index) {
@@ -30804,7 +30824,6 @@ function searchResultMetaHtml(song, index) {
   if (song.album) bits.push(song.album);
   if (songProviderKey(song) === 'youtube' && !song.playable) bits.push('YouTube Music cần phiên đăng nhập hoặc quyền phát');
   if (songProviderKey(song) === 'spotify' && !song.playable) bits.push('Spotify cần đăng nhập Premium để phát trong ứng dụng');
-  if (songProviderKey(song) === 'soundcloud' && song.externalUrl) bits.push('SoundCloud · ' + song.artist);
   var tail = bits.length ? (' · ' + escHtml(bits.join('  ·  '))) : '';
   if (!artist) return escHtml(searchResultMetaText(song));
   return '<button class="search-artist-link" type="button" onclick="event.stopPropagation();openSearchResultArtist(' + index + ')">' + escHtml(artist) + '</button>' + tail;
@@ -30818,11 +30837,10 @@ function searchIntentPrefersYouTube(q) {
   q = String(q || '').toLowerCase();
   return /(^|\s)youtube($|\s)|youtube音乐|youtube音樂/.test(q);
 }
-var MUSIC_SEARCH_PROVIDER_ORDER = ['spotify', 'soundcloud', 'youtube', 'youtube-video'];
+var MUSIC_SEARCH_PROVIDER_ORDER = ['spotify', 'youtube', 'youtube-video'];
 function searchProviderStatus(provider) {
   if (provider === 'spotify') return spotifyLoginStatus || {};
   if (provider === 'local') return { loggedIn: true, searchReady: true, publicCatalog: true };
-  if (provider === 'soundcloud') return { loggedIn: false, searchReady: true, publicCatalog: true, message: 'SoundCloud web search sẵn sàng · không cần Client ID / Client Secret' };
   return youtubeLoginStatus || {};
 }
 function searchProviderIsLoggedIn(provider) {
@@ -30844,7 +30862,6 @@ function searchProviderCanSearch(provider) {
 }
 function searchModeProvider(mode) {
   if (mode === 'netease' || mode === 'spotify') return 'spotify';
-  if (mode === 'soundcloud') return 'soundcloud';
   if (mode === 'ytmusic' || mode === 'qq' || mode === 'youtube') return 'youtube';
   if (mode === 'ytvideo' || mode === 'youtube-video') return 'youtube-video';
   return '';
@@ -30866,7 +30883,6 @@ function searchProviderUrl(provider, q, limit, offset) {
   var suffix = '&limit=' + limit + '&offset=' + Math.max(0, Number(offset) || 0);
   if (provider === 'spotify') return '/api/spotify/search?keywords=' + encodeURIComponent(q) + suffix;
   if (provider === 'youtube-video') return '/api/youtube-video/search?keywords=' + encodeURIComponent(q) + suffix;
-  if (provider === 'soundcloud') return '/api/soundcloud/search?keywords=' + encodeURIComponent(q) + suffix;
   if (provider === 'local') return '/api/local/search?keywords=' + encodeURIComponent(q) + suffix;
   return '/api/youtube-music/search?keywords=' + encodeURIComponent(q) + suffix;
 }
@@ -31091,7 +31107,6 @@ function scoreSongSearchResult(song, q, sourceIndex) {
 }
 function searchSourceGroupForProvider(provider) {
   if (provider === 'spotify') return 'netease';
-  if (provider === 'soundcloud') return 'soundcloud';
   if (provider === 'youtube-video') return 'ytvideo';
   return 'ytmusic';
 }
@@ -31110,7 +31125,7 @@ function prepareSourceSearchResults(items, q, provider) {
       song.youtubeSurface = 'video';
       song.isYouTubeMusicResult = false;
     }
-    var id = song.mid || song.songmid || song.videoId || song.youtubeId || song.spotifyId || song.soundcloudId || song.id || (song.name + '|' + song.artist);
+    var id = song.mid || song.songmid || song.videoId || song.youtubeId || song.spotifyId || song.id || (song.name + '|' + song.artist);
     var key = provider + ':' + id;
     if (seen[key]) return;
     seen[key] = true;
@@ -31125,7 +31140,7 @@ function appendUniqueSearchGroup(target, source, count, seenIds) {
   var added = 0;
   for (var i = 0; i < source.length && added < count; i++) {
     var song = source[i];
-    var id = song.mid || song.songmid || song.videoId || song.youtubeId || song.spotifyId || song.soundcloudId || song.id || (song.name + '|' + song.artist);
+    var id = song.mid || song.songmid || song.videoId || song.youtubeId || song.spotifyId || song.id || (song.name + '|' + song.artist);
     var provider = songProviderKey(song);
     var crossSourceKey = (provider === 'youtube' || provider === 'youtube-video') ? ('youtube:' + id) : (provider + ':' + id);
     if (seenIds[crossSourceKey]) continue;
@@ -31149,7 +31164,6 @@ function mergeSongSearchResults(pools, limit, q, mode) {
   limit = Math.max(1, Number(limit) || 20);
   mode = mode || searchMode || 'song';
   var spotify = prepareSourceSearchResults(pools && pools.spotify, q, 'spotify');
-  var soundcloud = prepareSourceSearchResults(pools && pools.soundcloud, q, 'soundcloud');
   var music = prepareSourceSearchResults(pools && pools.youtube, q, 'youtube');
   var videos = prepareSourceSearchResults(pools && pools['youtube-video'], q, 'youtube-video');
   var seen = {};
@@ -31160,12 +31174,9 @@ function mergeSongSearchResults(pools, limit, q, mode) {
   }
   var out = [];
   if (mode === 'netease' || mode === 'spotify') out = select(spotify, limit, []);
-  else if (mode === 'soundcloud') out = select(soundcloud, limit, []);
   else if (mode === 'ytvideo' || mode === 'youtube-video') out = select(videos, limit, []);
   else if (mode === 'ytmusic' || mode === 'qq' || mode === 'youtube') out = select(music, limit, []);
   else {
-    var soundcloudQuota = Math.min(soundcloud.length, Math.max(4, Math.floor(limit * 0.25)));
-    select(soundcloud, soundcloudQuota, out);
     var spotifyQuota = Math.min(spotify.length, Math.max(5, Math.floor(limit * 0.35)));
     var musicQuota = Math.min(music.length, Math.max(7, Math.floor(limit * 0.45)));
     var videoQuota = Math.min(videos.length, Math.max(3, limit - spotifyQuota - musicQuota));
@@ -31194,7 +31205,7 @@ function searchProviderPagesHaveMore(providerPages) {
   });
 }
 function mergeUniqueSearchSongPools(existing, incoming) {
-  var pools = { spotify: [], soundcloud: [], youtube: [], 'youtube-video': [] };
+  var pools = { spotify: [], youtube: [], 'youtube-video': [] };
   (existing || []).concat(incoming || []).forEach(function (song) {
     var provider = songProviderKey(song);
     if (!pools[provider]) return;
@@ -31214,7 +31225,7 @@ async function fetchMusicSearchResults(q, mode, previousPages) {
   Object.keys(previousPages || {}).forEach(function (provider) {
     providerPages[provider] = Object.assign({}, previousPages[provider]);
   });
-  var pageLimitByProvider = { youtube: 18, 'youtube-video': 18, spotify: 14, soundcloud: 50, local: 24 };
+  var pageLimitByProvider = { youtube: 18, 'youtube-video': 18, spotify: 14, local: 24 };
   var fetchProviders = providers.filter(function (provider) {
     return !previousPages || !previousPages[provider] || previousPages[provider].hasMore;
   });
@@ -31226,7 +31237,7 @@ async function fetchMusicSearchResults(q, mode, previousPages) {
       return { provider: provider, offset: offset, requestedLimit: limit, value: value || {} };
     });
   }));
-  var songsByProvider = { youtube: [], 'youtube-video': [], spotify: [], soundcloud: [], local: [] };
+  var songsByProvider = { youtube: [], 'youtube-video': [], spotify: [], local: [] };
   fetchProviders.forEach(function (provider, index) {
     var entry = result[index];
     if (!entry || entry.status !== 'fulfilled') {
@@ -32267,7 +32278,6 @@ function playbackRestoreSongSnapshot(song) {
   [
     'provider', 'source', 'type', 'id', 'mid', 'songmid', 'mediaMid', 'media_mid', 'youtubeId',
     'spotifyId', 'spotifyUri', 'spotifyUrl', 'uri', 'albumUri',
-    'soundcloudId', 'soundcloudPermalink', 'soundcloudUrl', 'externalUrl',
     'hash', 'fileHash', 'audioHash', 'albumId', 'album_id', 'albumMid', 'albummid', 'albumAudioId', 'album_audio_id', 'mixSongId', 'hqHash', 'sqHash', 'resHash',
     'name', 'title', 'artist', 'album', 'cover', 'duration', 'durationMs', 'dt', 'fee',
     'playable', 'playbackMode', 'recommendationSource', 'programId', 'radioId', 'radioName', 'localKey'
@@ -32289,31 +32299,14 @@ function readLastPlaybackSnapshot() {
     return null;
   }
 }
-function currentSpotifySnapshotState() {
-  var state = window.spotifyDirectState || null;
-  var transport = String(window.activePlaybackTransport || '');
-  var active = !!(
-    state
-    && (state.active || transport === 'spotify' || transport === 'spotify-pending')
-    && (transport === 'spotify' || transport === 'spotify-pending')
-  );
-  return {
-    active: active,
-    playing: !!(active && state && state.isPlaying),
-    positionSec: active && state && typeof window.getPlaybackCurrentSeconds === 'function'
-      ? Math.max(0, Number(window.getPlaybackCurrentSeconds()) || 0)
-      : 0
-  };
-}
 function saveLastPlaybackSnapshot(force, reason) {
   var now = Date.now();
   if (!force && now - lastPlaybackSnapshotSavedAt < 2500) return;
   var song = currentCoverSong();
   if (!song) return;
-  var spotifySnapshot = currentSpotifySnapshotState();
-  if (!audio && !spotifySnapshot.active && restoredLastPlaybackSnapshot && restoredLastPlaybackSnapshot.current && queueItemKey(song) === queueItemKey(restoredLastPlaybackSnapshot.current)) return;
+  if (!audio && restoredLastPlaybackSnapshot && restoredLastPlaybackSnapshot.current && queueItemKey(song) === queueItemKey(restoredLastPlaybackSnapshot.current)) return;
   var durationSec = getPlaybackDurationSeconds();
-  var currentSec = spotifySnapshot.active ? spotifySnapshot.positionSec : getPlaybackCurrentSeconds();
+  var currentSec = getPlaybackCurrentSeconds();
   if (durationSec > 0 && currentSec > durationSec) currentSec = durationSec;
   var queue = Array.isArray(playQueue) ? playQueue.slice(0, 120).map(playbackRestoreSongSnapshot).filter(function (item) { return item && (item.id || item.mid || item.localKey || item.name); }) : [];
   var payload = {
@@ -32323,7 +32316,7 @@ function saveLastPlaybackSnapshot(force, reason) {
     currentIdx: currentIdx,
     currentTime: Math.max(0, Number(currentSec) || 0),
     duration: Math.max(0, Number(durationSec) || playbackDurationFromSong(song) || 0),
-    playing: spotifySnapshot.active ? spotifySnapshot.playing : !!(audio && !audio.paused && !audio.ended),
+    playing: !!(audio && !audio.paused && !audio.ended),
     current: playbackRestoreSongSnapshot(song),
     queue: queue
   };
@@ -32712,7 +32705,6 @@ function playbackPlatformKey(song) {
 function playbackProviderLabel(song) {
   var platform = playbackPlatformKey(song);
   if (platform === 'spotify') return 'Spotify';
-  if (platform === 'soundcloud') return 'SoundCloud';
   if (platform === 'youtube-video') return 'YouTube Video';
   return 'YouTube Music';
 }
@@ -33008,7 +33000,7 @@ function isSameTitleArtist(source, candidate) {
   return a.some(function (name) { return b.indexOf(name) >= 0; });
 }
 var SOURCE_FALLBACK_SEARCH_TIMEOUT_MS = 6500;
-var SOURCE_FALLBACK_DIRECT_PROVIDERS = ['youtube-music', 'youtube-video', 'spotify', 'soundcloud'];
+var SOURCE_FALLBACK_DIRECT_PROVIDERS = ['youtube-music', 'youtube-video', 'spotify'];
 var SOURCE_FALLBACK_RECOVERY_TIMEOUT_MS = 20000;
 var SOURCE_FALLBACK_MAX_QUEUE_ADVANCES = 2;
 var SOURCE_FALLBACK_MAX_PROVIDER_ATTEMPTS = 4;
@@ -33299,7 +33291,6 @@ function awaitSourceFallbackBudget(promise, recovery) {
 function sourceFallbackProviderTitle(provider) {
   provider = sourceFallbackLogicalProviderKey(provider);
   if (provider === 'spotify') return 'Spotify';
-  if (provider === 'soundcloud') return 'SoundCloud';
   if (provider === 'youtube-video') return 'YouTube Video';
   return 'YouTube Music';
 }
@@ -33307,22 +33298,16 @@ function sourceFallbackProviderReady(provider) {
   provider = sourceFallbackLogicalProviderKey(provider);
   if (SOURCE_FALLBACK_DIRECT_PROVIDERS.indexOf(provider) < 0) return false;
   if (provider === 'youtube-music' || provider === 'youtube-video') return true;
-  if (provider === 'soundcloud') {
-    var sc = typeof platformStatus === 'function' ? platformStatus('soundcloud') : null;
-    return !!(sc && sc.configured && sc.searchReady);
-  }
   var status = typeof platformStatus === 'function' ? platformStatus('spotify') : null;
   return !!(status && status.loggedIn);
 }
 function alternatePlaybackProviders(song) {
   var currentProvider = playbackPlatformKey(song);
   var preferred = currentProvider === 'spotify'
-    ? ['youtube-music', 'youtube-video', 'soundcloud']
+    ? ['youtube-music', 'youtube-video']
     : (currentProvider === 'youtube-video'
-      ? ['youtube-music', 'spotify', 'soundcloud']
-      : (currentProvider === 'soundcloud'
-        ? ['youtube-music', 'youtube-video', 'spotify']
-        : ['youtube-video', 'spotify', 'soundcloud']));
+      ? ['youtube-music', 'spotify']
+      : ['youtube-video', 'spotify']);
   var accountOrder = typeof accountProviderOrder === 'function' ? accountProviderOrder() : [];
   accountOrder.forEach(function (provider) {
     provider = sourceFallbackLogicalProviderKey(provider);
@@ -33548,10 +33533,6 @@ async function skipFailedQueueItem(idx, token, message, opts) {
 }
 async function tryAutoPlaybackFallback(song, data, idx, token, opts) {
   opts = opts || {};
-  // A SoundCloud search result is an exact user-selected track. Never silently
-  // replace it with a YouTube/Spotify match: that can change the remix/version.
-  // Let the SoundCloud resolver report the real playback failure instead.
-  if (song && typeof songProviderKey === 'function' && songProviderKey(song) === 'soundcloud') return null;
   if (opts.fallbackDepth > 0) {
     if (opts.fallbackOriginalSong && opts.fallbackCandidateSong) {
       restoreSourceFallbackQueueItem(idx, opts.fallbackOriginalSong, opts.fallbackCandidateSong, token);
@@ -33839,43 +33820,10 @@ var albumGaplessTailFreqData = null;
 var shinayuuPlaybackDescriptorCache = new Map();
 var shinayuuPlaybackDescriptorInflight = new Map();
 var SHINAYUU_YOUTUBE_DESCRIPTOR_TTL_MS = 8 * 60 * 1000;
-
-function restartSingleRepeatMedia(media, token, index, reason) {
-  if (playMode !== 'single' || !media || token !== trackSwitchToken || index !== currentIdx || audio !== media) return false;
-  try { media.loop = true; } catch (_) {}
-  setTimeout(function () {
-    if (token !== trackSwitchToken || index !== currentIdx || audio !== media || playMode !== 'single') return;
-    try { media.currentTime = 0; } catch (_) {}
-    try {
-      var playPromise = media.play && media.play();
-      playing = true;
-      if (typeof setPlayIcon === 'function') setPlayIcon(true);
-      if (typeof updatePlaybackProgressUi === 'function') updatePlaybackProgressUi();
-      if (playPromise && typeof playPromise.catch === 'function') {
-        playPromise.catch(function () {
-          if (token !== trackSwitchToken || index !== currentIdx || audio !== media || playMode !== 'single') return;
-          playQueueAt(index, { autoRepeat: true, preserveHomeState: true, suppressPlayFailureNotice: true });
-        });
-      }
-    } catch (_) {
-      if (token === trackSwitchToken && index === currentIdx && audio === media && playMode === 'single') playQueueAt(index, { autoRepeat: true, preserveHomeState: true, suppressPlayFailureNotice: true });
-    }
-  }, 0);
-  return true;
-}
-
 var SHINAYUU_SPOTIFY_DESCRIPTOR_TTL_MS = 2 * 60 * 1000;
 
 function shinayuuDescriptorHasPlayback(data) {
-  return !!(data && (data.url || data.spotifyUri || data.uri || data.playbackUri));
-}
-
-// A provider descriptor may expose a short-lived proxy URL/token in addition to
-// the upstream media URL. The proxy carries the exact yt-dlp headers and refresh
-// path, so HTML playback must prefer it instead of rebuilding /api/audio?url=.
-function playbackMediaUrlFromDescriptor(data) {
-  data = data || {};
-  return String(data.proxyUrl || data.url || '').trim();
+  return !!(data && (data.url || data.proxyUrl || data.spotifyUri || data.uri || data.playbackUri));
 }
 
 function shinayuuPlaybackDescriptorKey(song, quality) {
@@ -33884,7 +33832,7 @@ function shinayuuPlaybackDescriptorKey(song, quality) {
   var provider = normalizePlaybackProvider(sourceProvider);
   var id = provider === 'spotify'
     ? (song.spotifyId || song.id || song.providerSongId || '')
-    : (provider === 'soundcloud' ? (song.externalUrl || song.soundcloudPermalink || song.soundcloudUrl || song.soundcloudId || song.id || song.providerSongId || '') : (song.youtubeId || song.id || song.mid || song.songmid || ''));
+    : (song.youtubeId || song.id || song.mid || song.songmid || '');
   var sourceType = sourceProvider === 'youtube-video' ? 'video' : 'music';
   return [provider, sourceType, String(id), String(quality || '')].join('|');
 }
@@ -33898,15 +33846,13 @@ async function resolvePlaybackDescriptor(song, quality, options) {
   var key = shinayuuPlaybackDescriptorKey(song, requestedQuality);
   var now = Date.now();
   var cached = shinayuuPlaybackDescriptorCache.get(key);
-  var ttl = provider === 'spotify' ? SHINAYUU_SPOTIFY_DESCRIPTOR_TTL_MS : (provider === 'soundcloud' ? 90 * 1000 : SHINAYUU_YOUTUBE_DESCRIPTOR_TTL_MS);
+  var ttl = provider === 'spotify' ? SHINAYUU_SPOTIFY_DESCRIPTOR_TTL_MS : SHINAYUU_YOUTUBE_DESCRIPTOR_TTL_MS;
   if (!options.refresh && cached && now - cached.at < ttl && cached.data && shinayuuDescriptorHasPlayback(cached.data)) return cached.data;
   if (!options.refresh && shinayuuPlaybackDescriptorInflight.has(key)) return shinayuuPlaybackDescriptorInflight.get(key);
   var qualityParam = '&quality=' + encodeURIComponent(requestedQuality);
   var promise;
   if (provider === 'spotify') {
     promise = apiJson('/api/spotify/song/url?id=' + encodeURIComponent(song.spotifyId || song.id || song.providerSongId || '') + qualityParam, { timeoutMs: options.prefetch ? 7000 : 9000 });
-  } else if (provider === 'soundcloud') {
-    promise = apiJson('/api/soundcloud/song/url?id=' + encodeURIComponent(song.externalUrl || song.soundcloudPermalink || song.soundcloudUrl || song.soundcloudId || song.id || song.providerSongId || '') + qualityParam, { timeoutMs: options.prefetch ? 9000 : 12000 });
   } else {
     promise = apiJson(youtubePlaybackUrlRoute(song) + '?id=' + encodeURIComponent(song.youtubeId || song.id || song.mid || song.songmid || '') + qualityParam + '&sourceType=' + encodeURIComponent(sourceProvider === 'youtube-video' ? 'video' : 'music'), { timeoutMs: options.prefetch ? 11000 : 15000 });
   }
@@ -33926,7 +33872,7 @@ function invalidatePlaybackDescriptorForSong(song) {
   var sourceProvider = songProviderKey(song);
   var id = provider === 'spotify'
     ? (song.spotifyId || song.id || song.providerSongId || '')
-    : (provider === 'soundcloud' ? (song.externalUrl || song.soundcloudPermalink || song.soundcloudUrl || song.soundcloudId || song.id || song.providerSongId || '') : (song.youtubeId || song.id || song.mid || song.songmid || ''));
+    : (song.youtubeId || song.id || song.mid || song.songmid || '');
   var sourceType = sourceProvider === 'youtube-video' ? 'video' : 'music';
   var prefix = [provider, sourceType, String(id), ''].join('|');
   Array.from(shinayuuPlaybackDescriptorCache.keys()).forEach(function (key) {
@@ -34361,9 +34307,6 @@ async function resolveAlbumGaplessPlaybackData(song) {
   if (playbackProvider === 'spotify') {
     return apiJson('/api/spotify/song/url?id=' + encodeURIComponent(song.spotifyId || song.id || song.providerSongId || '') + qualityParam, { timeoutMs: 9000 });
   }
-  if (playbackProvider === 'soundcloud') {
-    return apiJson('/api/soundcloud/song/url?id=' + encodeURIComponent(song.externalUrl || song.soundcloudPermalink || song.soundcloudUrl || song.soundcloudId || song.id || song.providerSongId || '') + qualityParam, { timeoutMs: 12000 });
-  }
   return apiJson(youtubePlaybackUrlRoute(song) + '?id=' + encodeURIComponent(song.youtubeId || song.id || song.mid || song.songmid || '') + qualityParam + '&sourceType=' + encodeURIComponent(sourceProvider === 'youtube-video' ? 'video' : 'music'), { timeoutMs: 15000 });
 }
 
@@ -34523,13 +34466,13 @@ async function scheduleAlbumGaplessPreloadForCurrent(token, reason) {
   try {
     var resolvedSong = nextSong;
     var data = await resolveAlbumGaplessPlaybackData(nextSong);
-    if ((!data || !data.url) && typeof searchAlternatePlatformSong === 'function') {
+    if ((!data || (!data.url && !data.proxyUrl)) && typeof searchAlternatePlatformSong === 'function') {
       var alternate = await searchAlternatePlatformSong(nextSong);
       if (alternate) {
         alternate.__albumGaplessKey = albumGaplessState.albumKey;
         alternate.__albumTrackIndex = nextSong && nextSong.__albumTrackIndex;
         var alternateData = await resolveAlbumGaplessPlaybackData(alternate);
-        if (alternateData && alternateData.url) {
+        if (alternateData && (alternateData.url || alternateData.proxyUrl)) {
           resolvedSong = alternate;
           data = alternateData;
         }
@@ -34542,8 +34485,8 @@ async function scheduleAlbumGaplessPreloadForCurrent(token, reason) {
       || queueItemKey(playQueue[nextIdx]) !== nextKey
       || !albumGaplessQueueCanAdvance(currentIdx)
     ) return false;
-    if (!data || !data.url) return false;
-    var proxyAudioUrl = playbackMediaUrlFromDescriptor(data);
+    if (!data || (!data.url && !data.proxyUrl)) return false;
+    var proxyAudioUrl = data.proxyUrl || '/api/audio?url=' + encodeURIComponent(data.url);
     var media = new Audio();
     media.crossOrigin = 'anonymous';
     media.preload = 'auto';
@@ -34629,7 +34572,7 @@ async function playLocalQueueSong(song, idx, token, firstVisualPlay, opts, resum
     }
     finalizeListenSession(true);
     if (playAlbumGaplessNextOnEnded(token)) return;
-    if (playMode === 'single' && restartSingleRepeatMedia(this, token, currentIdx, 'online-ended')) return;
+    if (playMode === 'single') setTimeout(function () { playQueueAt(currentIdx, { autoRepeat: true, suppressPlayFailureNotice: true }); }, 0);
     else setTimeout(nextTrack, 0);
   };
   audio.onloadedmetadata = function () {
@@ -34731,7 +34674,6 @@ async function playQueueAt(idx, opts) {
   var albumGaplessAdoptedGain = 0;
   var playbackMedia = null;
   var previousSongForTransition = currentIdx >= 0 && currentIdx < playQueue.length ? playQueue[currentIdx] : null;
-  var previousPlaybackTransport = String(window.activePlaybackTransport || 'none');
   if (
     playMode === 'shuffle'
     && !opts.skipShuffleOrder
@@ -34999,7 +34941,7 @@ async function playQueueAt(idx, opts) {
       var data;
       if (albumGaplessHandoff) {
         data = opts.preloadedData;
-      } else if (opts.preResolvedPlaybackData && opts.preResolvedPlaybackData.url) {
+      } else if (opts.preResolvedPlaybackData && (opts.preResolvedPlaybackData.url || opts.preResolvedPlaybackData.proxyUrl)) {
         data = opts.preResolvedPlaybackData;
       } else {
         data = await resolvePlaybackDescriptor(song, requestedQuality, { refresh: !!opts.forceDescriptorRefresh });
@@ -35013,14 +34955,6 @@ async function playQueueAt(idx, opts) {
         return settleExpiredSourceFallbackPlayback(idx, token, opts);
       }
       if (data) {
-        if (playbackProvider === 'soundcloud' && Number(data.duration) > 0) {
-          var soundcloudDurationMs = Number(data.duration);
-          // Backend duration is milliseconds; keep the queue item's duration in
-          // the same unit when it is declared that way, otherwise normalize from
-          // seconds. This value is authoritative for the progress clock.
-          song.duration = soundcloudDurationMs > 1000 ? Math.round(soundcloudDurationMs) : Math.round(soundcloudDurationMs * 1000);
-          song.durationMs = song.duration;
-        }
         song.resolvedPlaybackProvider = playbackProvider;
         song.playbackLevel = data.level || song.playbackLevel || '';
         if (!data.sourceMatch) song.playbackSource = data.source || data.provider || song.playbackSource || '';
@@ -35080,13 +35014,7 @@ async function playQueueAt(idx, opts) {
         document.getElementById('trial-banner').classList.add('show');
       }
       markPlayPhase('audio-element');
-      var proxyAudioUrl = opts.preloadedProxyAudioUrl || playbackMediaUrlFromDescriptor(data);
-      if (!proxyAudioUrl) {
-        var fallbackResult = await tryAutoPlaybackFallback(song, data, idx, token, retryPlaybackOpts);
-        if (fallbackResult !== null) return fallbackResult === true;
-        handlePlaybackUnavailable(song, data);
-        return false;
-      }
+      var proxyAudioUrl = opts.preloadedProxyAudioUrl || data.proxyUrl || '/api/audio?url=' + encodeURIComponent(data.url);
       if (albumGaplessHandoff) {
         audioFadeSerial++;
         clearAudioFadeTimers();
@@ -35163,7 +35091,7 @@ async function playQueueAt(idx, opts) {
         }
         finalizeListenSession(true);
         if (playAlbumGaplessNextOnEnded(token)) return;
-        if (playMode === 'single' && restartSingleRepeatMedia(this, token, currentIdx, 'online-ended')) return;
+        if (playMode === 'single') setTimeout(function () { playQueueAt(currentIdx, { autoRepeat: true, suppressPlayFailureNotice: true }); }, 0);
         else setTimeout(nextTrack, 0);
       };
       scheduleAudioResumePosition(audio, opts.resumeAt != null ? opts.resumeAt : restoreResumeAt, token);
@@ -35251,18 +35179,11 @@ async function playQueueAt(idx, opts) {
       // This prevents a late provider-stop completion from clearing the new
       // HTML transport or leaving both providers fighting over playback state.
       var providerStopPromise = window.pendingExternalProviderStopPromise;
-      var crossProviderStop = previousPlaybackTransport !== 'none'
-        && previousPlaybackTransport !== 'html-audio'
-        && playbackProvider !== 'spotify';
       if (!albumGaplessHandoff && providerStopPromise && typeof providerStopPromise.then === 'function') {
-        // Same-provider HTML starts should not wait at all. Cross-provider starts
-        // keep only a short bounded drain window; the previous 1800ms budget was
-        // directly audible on Spotify -> YouTube switches.
-        var providerStopBudget = crossProviderStop ? 650 : 260;
         try {
           await Promise.race([
             providerStopPromise,
-            new Promise(function (resolve) { setTimeout(function () { resolve(false); }, providerStopBudget); })
+            new Promise(function (resolve) { setTimeout(function () { resolve(false); }, 1800); })
           ]);
         } catch (_) { }
         // Do not clear a stop that merely exceeded the HTML start budget. A later
@@ -35545,7 +35466,7 @@ function currentResumeSeconds(fallback) {
 function canRefreshCurrentPlaybackUrlForResume(song) {
   if (!song || song.type === 'local' || song.source === 'local' || song.localUrl) return false;
   var provider = normalizePlaybackProvider(songProviderKey(song));
-  return provider === 'youtube' || provider === 'spotify' || provider === 'soundcloud';
+  return provider === 'youtube' || provider === 'spotify';
 }
 
 function playbackResumeProvider(song) {
@@ -37214,150 +37135,20 @@ function clearPlayerControlFocusState(reason) {
     return Math.round(toNumber(value, 0) * factor) / factor;
   }
 
-  function finiteOption(value) {
-    if (value == null) return null;
-    var n = Number(value);
-    return isFinite(n) ? n : null;
-  }
-
-  function buildEqualPowerCurve(direction, points) {
-    var count = Math.max(2, Math.round(toNumber(points, 33)));
-    var incoming = direction !== 'out';
-    var values = [];
-    for (var i = 0; i < count; i++) {
-      var progress = i / (count - 1);
-      var value = incoming
-        ? Math.sin(progress * Math.PI / 2)
-        : Math.cos(progress * Math.PI / 2);
-      values.push(round(value, 6));
-    }
-    values[0] = incoming ? 0 : 1;
-    values[count - 1] = incoming ? 1 : 0;
-    return values;
-  }
-
-  function buildVolumeOnlyCuefieldExecution(opts) {
-    opts = opts || {};
-    var leadSec = 2.2;
-    var threshold = 0.08;
-    var incomingAudibleAt = leadSec * (1 - Math.pow(1 - threshold, 1 / 3));
-    var outgoingSilentAt = opts.outgoingCurve === 'cubic-ease-out'
-      ? leadSec * (1 - Math.pow(threshold, 1 / 3))
-      : leadSec * (1 - threshold);
-    var anchorTime = Math.max(0, toNumber(opts.anchorTime, 0));
-    var targetVolume = clamp(opts.targetVolume == null ? 1 : opts.targetVolume, 0, 1);
-    var bStart = round(Math.max(0, anchorTime - leadSec));
-    return {
-      leadSec: leadSec,
-      bStart: bStart,
-      handoffDelayMs: 2200,
-      audibleStartDelayMs: Math.round(incomingAudibleAt * 1000),
-      audibleOverlap: round(Math.max(0, outgoingSilentAt - incomingAudibleAt)),
-      preRollDuration: round(incomingAudibleAt),
-      requiresBGraph: false,
-      actions: [
-        { delayMs: 0, durationMs: 0, deck: 'B', op: 'play', type: '', curve: '', value: 1, at: bStart },
-        { delayMs: 0, durationMs: 2200, deck: 'B', op: 'volume', type: '', curve: '', value: 1, target: targetVolume, at: 0 },
-        { delayMs: 0, durationMs: 2200, deck: 'A', op: 'volume', type: '', curve: '', value: 0, target: 0, at: 0 },
-      ],
-    };
-  }
-
-  function shouldReleaseCuefieldDeckGraph(opts) {
-    opts = opts || {};
-    return !!opts.hasGraph && !opts.isPrepared && !opts.isActiveGraph;
-  }
-
-  function transferCuefieldGainOwnership(opts) {
-    opts = opts || {};
-    var mediaVolume = clamp(opts.mediaVolume == null ? 1 : opts.mediaVolume, 0, 1);
-    var graphGain = clamp(opts.graphGain == null ? 1 : opts.graphGain, 0, 1);
-    return {
-      mediaVolume: 1,
-      graphGain: round(opts.gainOwned ? graphGain : mediaVolume * graphGain, 6),
-      gainOwned: true,
-    };
-  }
-
-  function normalizeAction(action, offsetSec, targetVolume, originT, playbackRate, sourceZeroPreRoll) {
+  function normalizeAction(action, leadSec, targetVolume) {
     action = action || {};
-    var actionTime = toNumber(action.t, 0);
     var value = clamp(action.value == null ? 1 : action.value, 0, 1);
     var normalized = {
-      t: round(actionTime),
-      delayMs: Math.max(0, Math.round((actionTime + offsetSec) * 1000)),
+      t: round(toNumber(action.t, 0)),
+      delayMs: Math.max(0, Math.round((toNumber(action.t, 0) + leadSec) * 1000)),
       durationMs: Math.max(0, Math.round(toNumber(action.duration, 0))),
-      deck: action.deck === 'A' ? 'A' : 'B',
+      deck: action.deck === 'A' ? 'A' : (action.deck === 'AB' ? 'AB' : 'B'),
       op: String(action.op || ''),
       type: String(action.type || ''),
-      curve: String(action.curve || ''),
       value: value,
       at: Math.max(0, toNumber(action.at, 0)),
-      optionalWhenLate: action.optionalWhenLate === true,
-      maxLateMs: Math.round(clamp(action.maxLateMs, 0, 200)),
-      sourceZeroPreRoll: sourceZeroPreRoll === true,
     };
-    if (normalized.deck === 'B' && normalized.op === 'play' && originT != null && actionTime < originT && !sourceZeroPreRoll) {
-      normalized.at = round(normalized.at + (originT - actionTime) * clamp(playbackRate, 0.94, 1.06));
-    }
     if (normalized.op === 'volume') normalized.target = round(targetVolume * value);
-    if (normalized.op === 'filter') {
-      normalized.value = normalized.type === 'none'
-        ? 20
-        : round(clamp(toNumber(action.value, 650), 20, 6000));
-    }
-    if (normalized.op === 'echo') {
-      normalized.enabled = action.enabled !== false;
-      normalized.bpm = round(clamp(toNumber(action.bpm, 120), 40, 240));
-      normalized.delayBeats = round(clamp(toNumber(action.delayBeats, 0.5), 0.125, 2));
-      normalized.feedback = round(clamp(toNumber(action.feedback, 0), 0, 0.72));
-      normalized.wet = round(clamp(toNumber(action.wet, 0), 0, 0.5));
-      normalized.tailMs = Math.round(clamp(toNumber(action.tailMs, 1200), 300, 4000));
-    }
-    if (normalized.op === 'duck') {
-      normalized.bpm = round(clamp(toNumber(action.bpm, 120), 40, 240));
-      normalized.depth = round(clamp(toNumber(action.depth, 0.35), 0.08, 0.75));
-      normalized.pulses = Math.round(clamp(toNumber(action.pulses, 4), 1, 16));
-      normalized.beats = round(clamp(toNumber(action.beats, 1), 0.25, 4));
-      normalized.attack = Math.round(clamp(toNumber(action.attack, 24), 5, 120));
-      normalized.hold = Math.round(clamp(toNumber(action.hold, 70), 10, 180));
-      normalized.release = Math.round(clamp(toNumber(action.release, 180), 40, 320));
-    }
-    if (normalized.op === 'spectrum') {
-      normalized.low = round(clamp(toNumber(action.low, 1), 0, 1));
-      normalized.mid = round(clamp(toNumber(action.mid, 1), 0, 1));
-      normalized.high = round(clamp(toNumber(action.high, 1), 0, 1));
-    }
-    if (normalized.op === 'rate') {
-      normalized.value = round(clamp(toNumber(action.value, 1), 0.94, 1.06));
-    }
-    if (normalized.op === 'loop') {
-      normalized.enabled = action.enabled !== false;
-      normalized.startAt = Math.max(0, round(toNumber(action.startAt, normalized.at)));
-      normalized.bpm = round(clamp(toNumber(action.bpm, 120), 40, 240));
-      normalized.loopBeats = round(clamp(toNumber(action.loopBeats, 1), 0.5, 8));
-      normalized.loopSeconds = round(60 / normalized.bpm * normalized.loopBeats);
-      normalized.slip = action.slip !== false;
-    }
-    if (normalized.op === 'bridge') {
-      var bridge = action.bridge || {};
-      var template = ['drum-build', 'echo-break', 'loop-rise', 'impact-drop'].indexOf(bridge.template) >= 0
-        ? bridge.template
-        : 'drum-build';
-      var requestedBars = toNumber(bridge.bars, 4);
-      var bars = requestedBars >= 12 ? 16 : (requestedBars >= 6 ? 8 : 4);
-      normalized.durationMs = Math.min(64000, normalized.durationMs);
-      normalized.bridge = {
-        template: template,
-        bars: bars,
-        bpmFrom: round(clamp(toNumber(bridge.bpmFrom, 120), 40, 240)),
-        bpmTo: round(clamp(toNumber(bridge.bpmTo, 120), 40, 240)),
-        stageDurations: Array.isArray(bridge.stageDurations)
-          ? bridge.stageDurations.slice(0, 3).map(function(value){ return round(Math.max(0, toNumber(value, 0))); })
-          : [],
-      };
-      normalized.fallbackTimeline = Array.isArray(action.fallbackTimeline) ? action.fallbackTimeline.slice() : [];
-    }
     return normalized;
   }
 
@@ -37414,70 +37205,19 @@ function clearPlayerControlFocusState(reason) {
     var fallback = rawTimeline.length ? null : fallbackTimeline(opts);
     var timeline = rawTimeline.length ? rawTimeline : fallback.actions;
     var leadSec = rawTimeline.length ? leadFromTimeline(timeline, 2.8) : fallback.leadSec;
-    var mixStart = finiteOption(opts.mixStart);
-    var handoffAt = finiteOption(opts.handoffAt);
-    var rawHandoff = timeline.filter(function(action) { return action && action.op === 'handoff'; }).slice(-1)[0];
-    var explicitWindow = mixStart != null && handoffAt != null && handoffAt > mixStart && !!rawHandoff;
-    var originT = explicitWindow
-      ? toNumber(rawHandoff.t, 0) - Math.max(0, handoffAt - mixStart)
-      : null;
-    var requestedPreRoll = Math.max(0, toNumber(opts.preRollDuration, 0));
-    var rawPlay = timeline.filter(function(action) {
-      return action && action.deck === 'B' && action.op === 'play';
-    })[0] || null;
-    var sourceZeroPreRoll = !!(explicitWindow
-      && rawPlay
-      && toNumber(rawPlay.t, 0) < originT
-      && Math.abs(toNumber(rawPlay.at, 0)) <= 0.001
-      && requestedPreRoll > 0
-      && Math.abs(Math.abs(toNumber(rawPlay.t, 0)) - requestedPreRoll) <= 0.01);
-    var executionStartT = sourceZeroPreRoll ? toNumber(rawPlay.t, originT) : originT;
-    var offsetSec = explicitWindow ? -executionStartT : leadSec;
     var entryTime = Math.max(0, toNumber(opts.entryTime, 0));
-    var rateActions = timeline.filter(function(action) {
-      return action && action.deck === 'B' && action.op === 'rate';
-    }).sort(function(a, b) { return toNumber(a.t, 0) - toNumber(b.t, 0); });
-    function rateAt(time) {
-      var value = 1;
-      for (var index = 0; index < rateActions.length; index++) {
-        if (toNumber(rateActions[index].t, 0) > time) break;
-        value = clamp(toNumber(rateActions[index].value, 1), 0.94, 1.06);
-      }
-      return value;
-    }
+    var bStart = rawTimeline.length ? bStartFromTimeline(timeline, entryTime) : fallback.bStart;
     var actions = timeline
-      .map(function(action) {
-        return normalizeAction(
-          action,
-          offsetSec,
-          targetVolume,
-          originT,
-          rateAt(toNumber(action && action.t, 0)),
-          sourceZeroPreRoll && action === rawPlay
-        );
-      })
+      .map(function(action) { return normalizeAction(action, leadSec, targetVolume); })
       .filter(function(action) { return !!action.op; })
       .sort(function(a, b) {
         return a.delayMs - b.delayMs || a.t - b.t;
       });
-    var play = actions.filter(function(action) { return action.deck === 'B' && action.op === 'play'; })[0];
-    var bStart = play ? play.at : (rawTimeline.length ? bStartFromTimeline(timeline, entryTime) : fallback.bStart);
     var requiresBGraph = actions.some(function(action) {
-      return action.deck === 'B' && (
-        action.op === 'filter'
-        || action.op === 'bass'
-        || action.op === 'spectrum'
-        || action.op === 'echo'
-        || action.op === 'duck'
-        || (action.op === 'volume' && action.curve.indexOf('equal-power-') === 0)
-      );
+      return action.deck === 'B' && (action.op === 'filter' || action.op === 'bass');
     });
-    var requiresAGraph = actions.some(function(action) {
-      return action.deck === 'A' && (action.op === 'echo' || action.op === 'duck');
-    });
-    var requiresBridge = actions.some(function(action) { return action.op === 'bridge'; });
-    var requiresSourceLoop = actions.some(function(action) { return action.op === 'loop'; });
     var handoff = actions.filter(function(action) { return action.op === 'handoff'; }).slice(-1)[0];
+    var crossfade = actions.filter(function(action) { return action.op === 'crossfade'; })[0] || null;
     var lastAction = actions[actions.length - 1] || null;
     var handoffDelayMs = handoff
       ? handoff.delayMs
@@ -37486,26 +37226,16 @@ function clearPlayerControlFocusState(reason) {
     return {
       leadSec: round(leadSec),
       bStart: round(bStart),
-      handoffDelayMs: Math.max(explicitWindow ? 0 : 520, handoffDelayMs),
-      audibleStartDelayMs: explicitWindow
-        ? Math.max(0, Math.round((originT - executionStartT) * 1000))
-        : null,
-      audibleOverlap: finiteOption(opts.audibleOverlap),
-      preRollDuration: finiteOption(opts.preRollDuration),
-      requiresAGraph: requiresAGraph,
+      handoffDelayMs: Math.max(520, handoffDelayMs),
+      fadeStartDelayMs: crossfade ? crossfade.delayMs : 0,
+      fadeDurationMs: crossfade ? Math.max(320, crossfade.durationMs) : 0,
       requiresBGraph: requiresBGraph,
-      requiresBridge: requiresBridge,
-      requiresSourceLoop: requiresSourceLoop,
       actions: actions,
     };
   }
 
   return {
     buildCuefieldTimelineExecution: buildCuefieldTimelineExecution,
-    buildEqualPowerCurve: buildEqualPowerCurve,
-    buildVolumeOnlyCuefieldExecution: buildVolumeOnlyCuefieldExecution,
-    shouldReleaseCuefieldDeckGraph: shouldReleaseCuefieldDeckGraph,
-    transferCuefieldGainOwnership: transferCuefieldGainOwnership,
   };
 });
 
@@ -37515,7 +37245,7 @@ function clearPlayerControlFocusState(reason) {
 (function () {
   'use strict';
 
-  var VERSION = '2.1.10';
+  var VERSION = '2.1.7';
   var STORE_KEY = 'shinayuu-cuefield-automix-v2';
   var GAPLESS_STORE_KEY = 'shinayuu-album-gapless-v1';
   var PREPARE_DELAY_MS = 950;
@@ -37719,17 +37449,13 @@ function clearPlayerControlFocusState(reason) {
     if (!Array.isArray(window.playQueue) || window.playQueue.length < 2 || window.playMode === 'single') return -1;
     index = isFinite(Number(index)) ? Math.round(Number(index)) : window.currentIdx;
     var total = window.playQueue.length;
-    // AutoMix may prepare far ahead, but it must never skip over the immediate
-    // queue successor merely because another candidate looks more suitable.
-    // Deterministic queue ownership belongs to the player; AI/Cuefield may
-    // shape the transition, not replace the queue order.
-    var immediate = (index + 1 + total) % total;
-    var immediateSong = window.playQueue[immediate];
-    // AutoMix owns transition styling/timing only. Queue order remains a hard
-    // player invariant: never jump from A to C because B failed to preload. If
-    // B is not mixable, return no AutoMix plan and let the normal onended/player
-    // path decide how to play B.
-    if (immediateSong && !isPodcast(immediateSong)) return immediate;
+    for (var step = 1; step < total; step++) {
+      var candidate = (index + step + total) % total;
+      var song = window.playQueue[candidate];
+      if (!song || isPodcast(song)) continue;
+      if (state.failureCooldown[trackFailureKey(song)] > Date.now()) continue;
+      return candidate;
+    }
     return -1;
   }
 
@@ -37955,53 +37681,6 @@ function clearPlayerControlFocusState(reason) {
 
   function executionActive(serial) {
     return !!(state.executing && Number(serial) === Number(state.executionSerial));
-  }
-
-  function safeMixTriggerAt(duration, proposedTrigger, fadeSec, warmupSec, gapless) {
-    var safeDuration = Math.max(0, Number(duration) || 0);
-    var proposed = Math.max(0, Number(proposedTrigger) || 0);
-    if (!safeDuration) return 0;
-    // AI/Cuefield may choose an attractive musical boundary, but it is NEVER
-    // allowed to decide that the current song can end early. Every transition
-    // is clamped into the terminal window of the actual track duration.
-    // Album-gapless gets a tiny terminal window; normal mixes get the larger
-    // fade window. The proposal can only move the transition later, never earlier.
-    var ratioFloor = gapless
-      ? safeDuration * 0.97
-      : (safeDuration >= 45 ? safeDuration * 0.88 : safeDuration * 0.82);
-    var defaultFade = gapless ? 0.9 : Math.max(Number(fadeSec) || 6, 4);
-    var fadeWindow = clamp(defaultFade, gapless ? 0.45 : 4, gapless ? 1.4 : 8);
-    var latestSafeStart = Math.max(0, safeDuration - fadeWindow);
-    var floor = Math.max(ratioFloor, latestSafeStart);
-    var trigger = Math.max(proposed, floor);
-    return Math.max(0, Math.min(Math.max(0, safeDuration - 0.05), trigger - Math.max(0, Number(warmupSec) || 0)));
-  }
-
-  function currentTrackPlaybackHealthy() {
-    try {
-      if (window.spotifyDirectState && window.spotifyDirectState.active) return !!window.spotifyDirectState.isPlaying;
-      return !!(window.audio && window.audio.src && !window.audio.paused && !window.audio.ended);
-    } catch (_) { return false; }
-  }
-
-  async function resumeCurrentTrackAfterAutoMixAbort(reason) {
-    if (currentTrackPlaybackHealthy()) return true;
-    try {
-      if (window.spotifyDirectState && window.spotifyDirectState.active) {
-        var direct = window.spotifyDirectState;
-        if (direct.sdkPlayer && typeof direct.sdkPlayer.resume === 'function') {
-          await direct.sdkPlayer.resume();
-          return !!direct.sdkPlayer;
-        }
-      }
-      if (window.audio && window.audio.src && !window.audio.ended && typeof window.audio.play === 'function') {
-        await window.audio.play();
-        return true;
-      }
-    } catch (error) {
-      console.warn('[CuefieldAutoMix] resume after abort:', reason || 'abort', error && (error.message || error));
-    }
-    return false;
   }
 
   function restoreAutoMixOutput(reason, options) {
@@ -38290,7 +37969,7 @@ function clearPlayerControlFocusState(reason) {
       }
       if (!data || data.trial || (!data.url && !data.proxyUrl)) return null;
       var local = providerKey(song) === 'local' || song.type === 'local' || song.localUrl;
-      var proxyUrl = local ? (data.proxyUrl || data.url) : (data.proxyUrl || data.url);
+      var proxyUrl = local ? (data.proxyUrl || data.url) : (data.proxyUrl || ('/api/audio?url=' + encodeURIComponent(data.url)));
       var descriptor = { proxyUrl: proxyUrl, playbackData: data, expiresAt: Date.now() + 3.5 * 60 * 1000 };
       state.descriptorCache[key] = descriptor;
       return descriptor;
@@ -38448,7 +38127,7 @@ function clearPlayerControlFocusState(reason) {
       timelineExecution: timelineExecution,
       fadeSec: fadeSec,
       warmupSec: warmupSec,
-      triggerAt: safeMixTriggerAt(duration || exitTime, fadeStartA, fadeSec, warmupSec, gapless),
+      triggerAt: Math.max(0, Math.min(fadeStartA - warmupSec, (duration || exitTime) - fadeSec - 0.45)),
       fadeStartA: fadeStartA,
       bStart: bStart,
       gapless: gapless,
@@ -39183,25 +38862,6 @@ function clearPlayerControlFocusState(reason) {
   async function execute(pending) {
     if (!pending || state.executing || !state.enabled) return;
     if (pending.token !== Number(window.trackSwitchToken) || pending.fromIndex !== Number(window.currentIdx)) return;
-    // Last-line safety: execute() is also called by manual/test controls, so
-    // the tick() gate alone is insufficient. Never cut a track before the
-    // measured terminal window, even if an AI/Cuefield plan asks for it.
-    var executeDuration = playbackDuration(currentSong());
-    if (!(executeDuration > 0)) {
-      state.pending = pending;
-      setStatus('waiting');
-      return;
-    }
-    var executeNow = playbackTime();
-    var executeFloor = safeMixTriggerAt(executeDuration, pending.triggerAt, pending.fadeSec, pending.warmupSec, !!pending.gapless);
-    if (executeNow + 0.05 < executeFloor) {
-      pending.triggerAt = executeFloor;
-      state.pending = pending;
-      state.lastCountdownSec = -1;
-      setStatus('ready');
-      updateUi();
-      return;
-    }
     var executionSerial = ++state.executionSerial;
     var settleExecution;
     var executionSettled = new Promise(function (resolve) { settleExecution = resolve; });
@@ -39267,20 +38927,11 @@ function clearPlayerControlFocusState(reason) {
         } else {
           markTrackFailure(pending && pending.toSong, 90000);
           state.bypassToken = Number(window.trackSwitchToken);
-          // A failed mix must never strand the current song. Restore the audible
-          // owner, try one bounded resume, then hand control back to normal
-          // onended/queue logic. AutoMix itself stays bypassed for this token.
           setTimeout(function () {
             if (state.executing || !state.enabled || state.bypassToken !== Number(window.trackSwitchToken)) return;
-            resumeCurrentTrackAfterAutoMixAbort('transition-failed').then(function (resumed) {
-              if (resumed || playbackRunning()) return;
-              var duration = playbackDuration(currentSong());
-              var remaining = Math.max(0, duration - playbackTime());
-              if (duration > 0 && remaining > 1.25 && window.audio && !window.audio.ended) {
-                state.bypassToken = Number(window.trackSwitchToken);
-                console.warn('[CuefieldAutoMix] transition failed without resume; preserving current track');
-                return;
-              }
+            var duration = playbackDuration(currentSong());
+            var remaining = Math.max(0, duration - playbackTime());
+            if (!playbackRunning() || (duration > 0 && remaining < 1.25)) {
               var fallbackIndex = nextIndex(Number(window.currentIdx));
               if (fallbackIndex >= 0 && fallbackIndex !== Number(window.currentIdx)) {
                 Promise.resolve(window.playQueueAt(fallbackIndex, {
@@ -39289,7 +38940,10 @@ function clearPlayerControlFocusState(reason) {
                   suppressPlayFailureNotice: true
                 })).catch(function () {});
               }
-            });
+            }
+            // When the current track is still healthy, do not immediately retry
+            // AutoMix on the same token. Normal onended/queue logic remains in
+            // control and the bypass clears on the next track.
           }, 0);
         }
       } finally {
@@ -39333,15 +38987,7 @@ function clearPlayerControlFocusState(reason) {
       state.lastCountdownSec = remainingSec;
       updateUi();
     }
-    var nowTime = playbackTime();
-    var knownDuration = playbackDuration(currentSong());
-    // Hard playback invariant: without a real end-of-track duration AutoMix is
-    // not allowed to execute. This prevents stale metadata/AI plans from
-    // turning an unknown clock into an early jump.
-    if (!(knownDuration > 0)) return;
-    var hardFloor = safeMixTriggerAt(knownDuration, pending.triggerAt, pending.fadeSec, pending.warmupSec, !!pending.gapless);
-    if (nowTime + 0.05 < hardFloor) return;
-    if (nowTime >= pending.triggerAt) execute(pending);
+    if (playbackTime() >= pending.triggerAt) execute(pending);
   }
 
   window.toggleCuefieldAutoMix = function () {
@@ -39493,13 +39139,6 @@ function lyricEndpointForSong(songOrId) {
   if (provider === 'local') {
     return '/api/local/lyrics?id=' + encodeURIComponent(song.localKey || song.id || song.providerSongId || '');
   }
-  if (provider === 'soundcloud') {
-    var soundcloudId = song.soundcloudId || song.id || song.providerSongId || '';
-    return '/api/soundcloud/lyric?id=' + encodeURIComponent(soundcloudId) +
-      '&track=' + encodeURIComponent(song.name || song.title || '') + '&artist=' + encodeURIComponent(song.artist || '') +
-      '&album=' + encodeURIComponent(song.album || '') + '&duration=' + encodeURIComponent(playbackDurationFromSong(song) || '') +
-      '&language=' + encodeURIComponent(window.appLanguage || 'vi');
-  }
   if (provider === 'spotify') {
     var exactSpotifyId = song.currentTrackId || song.actualSpotifyId || song.spotifyId || song.providerSongId || song.id || '';
     return '/api/spotify/lyric?id=' + encodeURIComponent(exactSpotifyId) +
@@ -39522,7 +39161,7 @@ function persistentLyricCacheKey(song) {
   var provider = typeof songProviderKey === 'function' ? songProviderKey(song) : (song.source || song.provider || 'youtube');
   var id = provider === 'spotify'
     ? (song.currentTrackId || song.actualSpotifyId || song.spotifyId || song.providerSongId || song.id || '')
-    : (provider === 'soundcloud' ? (song.soundcloudId || song.providerSongId || song.id || '') : (song.id || song.mid || song.songmid || song.hash || ''));
+    : (song.id || song.mid || song.songmid || song.hash || '');
   var artist = song.artist || song.singer || song.artists || '';
   return ['lyrics-v1', provider, id, song.name || song.title || '', artist].join('|');
 }
@@ -40344,175 +39983,6 @@ function updateLyricsHighlight() { /* v8: 由 tickLyricsParticles 接管 */ }
 
 ;
 
-/* ===== js/modules/06-lyrics/00-built-in-playlists.js ===== */
-function normalizeBuiltInPlaylistRows(rows) {
-  return (Array.isArray(rows) ? rows : []).map(function (playlist) {
-    return Object.assign({}, playlist, {
-      provider: 'shinayuu',
-      source: 'shinayuu',
-      builtin: true,
-      creator: playlist.creator || 'ShinaYuu',
-      shelfPane: 'mine',
-      subscribed: false
-    });
-  }).filter(function (playlist) { return !!playlist.id; });
-}
-
-function applyBuiltInPlaylistSnapshot(result, opts) {
-  opts = opts || {};
-  if (!result || result.ok !== true) return false;
-  builtInPlaylists = normalizeBuiltInPlaylistRows(result.playlists);
-  if (typeof rebuildUserPlaylistsFromCatalog === 'function') {
-    rebuildUserPlaylistsFromCatalog({
-      animate: !!opts.animate,
-      preserveScroll: opts.preserveScroll !== false,
-      reason: opts.reason || 'built-in-playlists'
-    });
-  } else {
-    userPlaylists = builtInPlaylists.concat(neteasePlaylists, qqPlaylists, kugouPlaylists, qishuiPlaylists, spotifyPlaylists);
-    playlistCatalogRevision += 1;
-  }
-  return true;
-}
-
-function builtInPlaylistApiAvailable() {
-  return !!(window.desktopWindow && typeof window.desktopWindow.listBuiltInPlaylists === 'function');
-}
-
-function builtInPlaylistErrorMessage(result, fallback) {
-  var code = String(result && result.error || '');
-  if (code === 'BUILT_IN_PLAYLIST_LIMIT_REACHED') return '内置歌单数量已达到上限';
-  if (code === 'BUILT_IN_PLAYLIST_TRACK_LIMIT_REACHED') return '这个内置歌单已经装满了';
-  if (code === 'BUILT_IN_PLAYLIST_INDEX_TOO_LARGE') return '内置歌单数据已达到存储上限';
-  if (code === 'BUILT_IN_PLAYLIST_TRACK_INVALID') return '这首歌缺少可保存的音源标识';
-  if (code === 'BUILT_IN_PLAYLIST_NOT_FOUND') return '内置歌单已不存在';
-  return fallback || '内置歌单操作失败';
-}
-
-function refreshBuiltInPlaylists(force) {
-  if (!builtInPlaylistApiAvailable()) return Promise.resolve(false);
-  if (builtInPlaylistLoadPromise && !force) return builtInPlaylistLoadPromise;
-  var request = window.desktopWindow.listBuiltInPlaylists().then(function (result) {
-    if (!result || result.ok !== true) throw new Error(result && result.error || 'BUILT_IN_PLAYLIST_READ_FAILED');
-    applyBuiltInPlaylistSnapshot(result, { preserveScroll: true, reason: 'built-in-playlists-refresh' });
-    return true;
-  }).catch(function (error) {
-    console.warn('[BuiltInPlaylists]', error);
-    return false;
-  }).finally(function () {
-    if (builtInPlaylistLoadPromise === request) builtInPlaylistLoadPromise = null;
-  });
-  builtInPlaylistLoadPromise = request;
-  return request;
-}
-
-async function builtInPlaylistTracksPage(id, options) {
-  if (!builtInPlaylistApiAvailable() || typeof window.desktopWindow.readBuiltInPlaylist !== 'function') {
-    return { ok: false, playlist: null, tracks: [], total: 0, hasMore: false, error: 'BUILT_IN_PLAYLIST_UNAVAILABLE' };
-  }
-  return window.desktopWindow.readBuiltInPlaylist(String(id || ''), options || {});
-}
-
-async function createBuiltInPlaylist(name, initialTrack) {
-  name = String(name || '').trim();
-  if (!name) {
-    if (typeof showToast === 'function') showToast('先输入内置歌单名称');
-    return null;
-  }
-  if (!builtInPlaylistApiAvailable() || typeof window.desktopWindow.createBuiltInPlaylist !== 'function') {
-    if (typeof showToast === 'function') showToast('当前环境无法保存内置歌单');
-    return null;
-  }
-  var result = await window.desktopWindow.createBuiltInPlaylist(name);
-  if (!result || result.ok !== true || !result.playlist) {
-    if (typeof showToast === 'function') showToast(builtInPlaylistErrorMessage(result, '创建内置歌单失败'));
-    return null;
-  }
-  applyBuiltInPlaylistSnapshot(result, { animate: true, reason: 'built-in-playlist-create' });
-  if (initialTrack) {
-    var added = await addTrackToBuiltInPlaylist(result.playlist.id, initialTrack, { silentSuccess: true });
-    if (!added) return result.playlist;
-  }
-  if (typeof showToast === 'function') showToast('内置歌单已创建');
-  return result.playlist;
-}
-
-function promptCreateBuiltInPlaylist() {
-  var name = window.prompt(uiText('新建 Mineradio 内置歌单'), uiText('未命名歌单'));
-  if (name == null) return;
-  createBuiltInPlaylist(name).catch(function (error) {
-    console.warn('[BuiltInPlaylistCreate]', error);
-    if (typeof showToast === 'function') showToast('创建内置歌单失败');
-  });
-}
-
-async function addTrackToBuiltInPlaylist(id, track, opts) {
-  opts = opts || {};
-  if (!builtInPlaylistApiAvailable() || typeof window.desktopWindow.addBuiltInPlaylistTrack !== 'function') return false;
-  var result = await window.desktopWindow.addBuiltInPlaylistTrack(String(id || ''), track || {});
-  if (!result || result.ok !== true) {
-    if (typeof showToast === 'function') showToast(builtInPlaylistErrorMessage(result, '加入内置歌单失败'));
-    return false;
-  }
-  applyBuiltInPlaylistSnapshot(result, { preserveScroll: true, reason: 'built-in-playlist-add-track' });
-  if (typeof showToast === 'function' && !opts.silentSuccess) showToast(result.duplicate ? '歌曲已在这个内置歌单中' : '已加入内置歌单');
-  return result.duplicate ? 'duplicate' : true;
-}
-
-async function removeTrackFromBuiltInPlaylist(id, index) {
-  if (!builtInPlaylistApiAvailable() || typeof window.desktopWindow.removeBuiltInPlaylistTrack !== 'function') return false;
-  var result = await window.desktopWindow.removeBuiltInPlaylistTrack(String(id || ''), Number(index));
-  if (!result || result.ok !== true) {
-    if (typeof showToast === 'function') showToast(builtInPlaylistErrorMessage(result, '移除歌曲失败'));
-    return false;
-  }
-  if (playlistPanelDetailState && playlistPanelDetailState.key === 'shinayuu:' + String(id || '')) {
-    playlistPanelDetailState.tracks.splice(Number(index), 1);
-    playlistPanelDetailState.total = Math.max(0, playlistPanelDetailState.tracks.length);
-    playlistPanelDetailState.nextOffset = playlistPanelDetailState.tracks.length;
-    playlistPanelDetailState.hasMore = false;
-  }
-  applyBuiltInPlaylistSnapshot(result, { preserveScroll: true, reason: 'built-in-playlist-remove-track' });
-  if (typeof showToast === 'function') showToast('已从内置歌单移除');
-  return true;
-}
-
-async function renameBuiltInPlaylist(id, currentName) {
-  var name = window.prompt('重命名内置歌单', String(currentName || ''));
-  if (name == null || !String(name).trim()) return false;
-  var result = await window.desktopWindow.renameBuiltInPlaylist(String(id || ''), String(name).trim());
-  if (!result || result.ok !== true) {
-    if (typeof showToast === 'function') showToast(builtInPlaylistErrorMessage(result, '重命名失败'));
-    return false;
-  }
-  if (playlistPanelDetailState && playlistPanelDetailState.key === 'shinayuu:' + String(id || '') && playlistPanelDetailState.playlist) {
-    playlistPanelDetailState.playlist.name = String(name).trim();
-  }
-  applyBuiltInPlaylistSnapshot(result, { preserveScroll: true, reason: 'built-in-playlist-rename' });
-  if (typeof showToast === 'function') showToast('内置歌单已重命名');
-  return true;
-}
-
-async function deleteBuiltInPlaylist(id, currentName) {
-  if (!window.confirm(uiText('删除内置歌单“') + String(currentName || uiText('未命名歌单')) + uiText('”？') + '\n' + uiText('只删除歌单，不会删除平台或本地歌曲。'))) return false;
-  var result = await window.desktopWindow.deleteBuiltInPlaylist(String(id || ''));
-  if (!result || result.ok !== true) {
-    if (typeof showToast === 'function') showToast(builtInPlaylistErrorMessage(result, '删除内置歌单失败'));
-    return false;
-  }
-  if (playlistPanelDetailState && playlistPanelDetailState.key === 'shinayuu:' + String(id || '')) {
-    cancelPlaylistPanelDetailRequest();
-    playlistPanelDetailState.key = '';
-    playlistPanelDetailState.tracks = [];
-    playlistPanelDetailState.playlist = null;
-  }
-  applyBuiltInPlaylistSnapshot(result, { preserveScroll: true, reason: 'built-in-playlist-delete' });
-  if (typeof showToast === 'function') showToast('内置歌单已删除');
-  return true;
-}
-
-;
-
 /* ===== js/modules/06-lyrics/01-playlist-panel-shell.js ===== */
 // ============================================================
 function animateListItems(container, selector, opts) {
@@ -41005,20 +40475,24 @@ function renderQueuePanel(opts) {
   if (opts.animate && seq === queueRenderSeq) animateVisiblePanelList($ql, '.queue-item', document.getElementById('playlist-panel'), '.queue-item.now');
   renderMiniQueuePanel({ scrollCurrent: opts.scrollCurrent !== false && miniQueueOpen });
 }
+var appPlaylists = Array.isArray(window.__shinayuuAppPlaylists) ? window.__shinayuuAppPlaylists : [];
 function playlistCatalogProviderArray(provider) {
+  if (provider === 'app') return appPlaylists;
   return provider === 'spotify' ? spotifyPlaylists : youtubePlaylists;
 }
 function setPlaylistCatalogProviderArray(provider, rows) {
   rows = Array.isArray(rows) ? rows : [];
-  if (provider === 'spotify') spotifyPlaylists = rows;
+  if (provider === 'app') { appPlaylists = rows; window.__shinayuuAppPlaylists = appPlaylists; }
+  else if (provider === 'spotify') spotifyPlaylists = rows;
   else youtubePlaylists = rows;
 }
 function normalizePlaylistCatalogRow(pl, provider) {
   if (!pl || typeof pl !== 'object') return null;
-  provider = provider === 'spotify' ? 'spotify' : 'youtube';
+  provider = provider === 'spotify' ? 'spotify' : (provider === 'app' ? 'app' : 'youtube');
   var rawId = pl.id || pl.playlistId || pl.playlist_id || pl.browseId || pl.browse_id || pl.uri || pl.spotifyUri || pl.contextUri || '';
   rawId = String(rawId || '').trim();
   if (provider === 'spotify') rawId = rawId.replace(/^spotify:playlist:/i, '').replace(/^spotify:/i, '');
+  else if (provider === 'app') rawId = rawId.replace(/^app:/i, '');
   else rawId = rawId.replace(/^(?:youtube|youtube-music|ytmusic|qq):/i, '');
   if (!rawId) return null;
   var images = pl.images;
@@ -41035,7 +40509,7 @@ function normalizePlaylistCatalogRow(pl, provider) {
     provider: provider,
     source: provider,
     realProvider: provider,
-    name: String(pl.name || pl.title || pl.label || (provider === 'spotify' ? 'Spotify playlist' : 'YouTube playlist')),
+    name: String(pl.name || pl.title || pl.label || (provider === 'spotify' ? 'Spotify playlist' : (provider === 'app' ? 'Playlist ShinaYuu' : 'YouTube playlist'))),
     cover: String(cover || ''),
     trackCount: Math.max(0, trackCount)
   });
@@ -41054,18 +40528,15 @@ function ensurePlaylistShelfVisibleAfterCatalog(reason) {
     console.warn('[PlaylistShelfVisibility]', reason || 'playlist-catalog', error);
   }
 }
-function playlistCatalogProviderLoggedIn(provider, allowProbe) {
-  var status = provider === 'spotify' ? spotifyLoginStatus : youtubeLoginStatus;
-  // `allowProbe` no longer means "pretend logged in". The provider session
-  // has already been refreshed by refreshUserPlaylists(true). This prevents a
-  // forced refresh from issuing guaranteed 401 requests and then incorrectly
-  // clearing the catalog.
-  return !!(status && status.loggedIn);
+function playlistCatalogProviderLoggedIn(provider) {
+  if (provider === 'app') return true;
+  return provider === 'spotify' ? !!spotifyLoginStatus.loggedIn : !!youtubeLoginStatus.loggedIn;
 }
 function playlistCatalogPageUrl(provider, offset, limit) {
   offset = Math.max(0, Number(offset) || 0);
   limit = Math.max(1, Number(limit) || PLAYLIST_CATALOG_FIRST_PAGE_SIZE);
-  if (provider === 'spotify') return '/api/spotify/user/playlists?limit=' + Math.min(500, limit) + '&offset=' + offset;
+  if (provider === 'app') return '/api/app/playlists';
+  if (provider === 'spotify') return '/api/spotify/user/playlists?limit=' + Math.min(50, limit) + '&offset=' + offset;
   return '/api/youtube-music/user/playlists';
 }
 function mergePlaylistCatalogRows(existing, incoming, provider) {
@@ -41083,7 +40554,7 @@ function rebuildUserPlaylistsFromCatalog(opts) {
   opts = opts || {};
   youtubePlaylists = validPlaylistCatalogRows(youtubePlaylists, 'youtube');
   spotifyPlaylists = validPlaylistCatalogRows(spotifyPlaylists, 'spotify');
-  userPlaylists = (typeof builtInPlaylists !== 'undefined' ? builtInPlaylists : []).concat(youtubePlaylists, spotifyPlaylists);
+  userPlaylists = appPlaylists.concat(youtubePlaylists, spotifyPlaylists);
   if (typeof applyUserPlaylistOrder === 'function') applyUserPlaylistOrder();
   playlistCatalogRevision += 1;
   renderUserPlaylistsList({ animate: !!opts.animate, reset: !!opts.reset, preserveScroll: opts.preserveScroll !== false });
@@ -41094,7 +40565,7 @@ function rebuildUserPlaylistsFromCatalog(opts) {
 async function loadPlaylistCatalogProviderPage(provider, reason) {
   var root = playlistCatalogSyncState;
   var state = root.providers && root.providers[provider];
-  if (!state || state.loading || !state.hasMore || !state.enabled) return false;
+  if (!state || state.loading || !state.hasMore || !playlistCatalogProviderLoggedIn(provider)) return false;
   var token = root.token;
   var first = state.firstRequest !== false;
   var limit = first ? PLAYLIST_CATALOG_FIRST_PAGE_SIZE : PLAYLIST_CATALOG_BACKGROUND_PAGE_SIZE;
@@ -41105,13 +40576,6 @@ async function loadPlaylistCatalogProviderPage(provider, reason) {
   try {
     var r = await apiJson(url, { timeoutMs: 15000 });
     if (playlistCatalogSyncState.token !== token) return false;
-    if (r && r.loggedIn === false) {
-      state.enabled = false;
-      state.hasMore = false;
-      state.error = 'PLAYLIST_PROVIDER_NOT_CONNECTED';
-      state.firstRequest = false;
-      return false;
-    }
     var incoming = validPlaylistCatalogRows(r && r.playlists || [], provider);
     if (r && r.error && !incoming.length) throw new Error(r.message || r.error);
     // Replace a provider only after its first successful non-empty response.
@@ -41129,6 +40593,8 @@ async function loadPlaylistCatalogProviderPage(provider, reason) {
     setPlaylistCatalogProviderArray(provider, merged);
     state.loaded = merged.length;
     state.total = Math.max(state.loaded, Number(r && r.total) || 0);
+    state.reauthRequired = false;
+    state.authStatus = 0;
     state.nextOffset = r && r.nextOffset != null ? Math.max(0, Number(r.nextOffset) || 0) : (requestOffset + incoming.length);
     var supportsPaging = provider === 'spotify';
     state.hasMore = supportsPaging ? !!(r && r.hasMore) : false;
@@ -41141,23 +40607,26 @@ async function loadPlaylistCatalogProviderPage(provider, reason) {
     if (playlistCatalogSyncState.token !== token) return false;
     console.warn('[PlaylistCatalogPage]', provider, e);
     var errorData = e && e.data || {};
+    var spotifyAuthRequired = provider === 'spotify' && (
+      errorData.reauthRequired === true ||
+      Number(errorData.status || 0) === 401 ||
+      Number(errorData.status || 0) === 403 ||
+      Number(e && e.status || 0) === 401 ||
+      Number(e && e.status || 0) === 403
+    );
     state.error = e && e.message || 'PLAYLIST_CATALOG_PAGE_FAILED';
-    state.reauthRequired = !!errorData.reauthRequired || /SCOPE_REQUIRED|AUTH_REQUIRED|REAUTH/i.test(String(state.error));
     state.firstRequest = false;
     state.hasMore = false;
-    // Do not permanently disable a connected provider after one transient
-    // network/rate-limit failure; the next explicit refresh must be able to retry.
-    state.enabled = !!(provider === 'spotify' ? spotifyLoginStatus.loggedIn : youtubeLoginStatus.loggedIn);
-    playlistCatalogSyncState.error = state.error;
-    playlistCatalogSyncState.providers[provider] = state;
-    if (userPlaylists.length) renderUserPlaylistsList({ preserveScroll: true });
-    else {
-      var message = state.reauthRequired
-        ? localizeUiMessage('Hãy đăng nhập lại trước khi thay đổi trạng thái yêu thích của playlist')
-        : localizeUiMessage('Không thể đọc dữ liệu');
-      var empty = document.getElementById('pl-list');
-      if (empty) empty.innerHTML = '<div class="playlist-empty-state">' + escHtml(message) + '</div>';
+    state.reauthRequired = !!spotifyAuthRequired;
+    state.authStatus = spotifyAuthRequired ? Number(errorData.status || e && e.status || 403) : 0;
+    if (spotifyAuthRequired) {
+      setPlaylistCatalogProviderArray('spotify', []);
+      state.loaded = 0;
+      state.total = 0;
+      state.nextOffset = 0;
     }
+    playlistCatalogSyncState.error = state.error;
+    renderUserPlaylistsList({ preserveScroll: true });
     scheduleShelfRebuild('playlist-catalog-error-' + provider, true);
     ensurePlaylistShelfVisibleAfterCatalog('playlist-catalog-error-' + provider);
     return false;
@@ -41199,31 +40668,6 @@ function requestNextPlaylistCatalogPage(reason) {
   return true;
 }
 async function refreshUserPlaylists(force) {
-  if (typeof refreshBuiltInPlaylists === 'function') await refreshBuiltInPlaylists(!!force);
-  // The playlist panel can be opened before the startup account probes finish.
-  // Never render the logged-out empty state from that transient window.
-  if (!force && !loginStatusChecked && typeof refreshLoginStatus === 'function') {
-    await refreshLoginStatus();
-  }
-  var allowProviderProbe = !!force;
-  // A forced refresh is an explicit user request to synchronize remote catalogs.
-  // Refresh the authoritative provider sessions first so a stale renderer status
-  // cannot make us skip a valid YouTube/Spotify catalog request.
-  if (force) {
-    await Promise.allSettled([
-      (typeof refreshYouTubeLoginStatus === 'function' ? refreshYouTubeLoginStatus({ force: true }) : Promise.resolve()),
-      (typeof refreshSpotifyLoginStatus === 'function' ? refreshSpotifyLoginStatus() : Promise.resolve())
-    ]);
-  }
-  if (!youtubeLoginStatus.loggedIn && !spotifyLoginStatus.loggedIn && !allowProviderProbe) {
-    resetPlaylistPanelRenderLimit();
-    if (Array.isArray(builtInPlaylists) && builtInPlaylists.length) {
-      rebuildUserPlaylistsFromCatalog({ animate: false, reset: true, preserveScroll: true, reason: 'built-in-only-playlists' });
-      return;
-    }
-    document.getElementById('pl-list').innerHTML = '<div class="playlist-empty-state">Kết nối YouTube Music hoặc Spotify để hiển thị playlist của bạn.</div>';
-    return;
-  }
   var catalogNeedsNewProvider = playlistCatalogSyncState.loading && ['youtube', 'spotify'].some(function (provider) {
     var state = playlistCatalogSyncState.providers && playlistCatalogSyncState.providers[provider];
     return playlistCatalogProviderLoggedIn(provider) && (!state || !state.enabled);
@@ -41249,15 +40693,17 @@ async function refreshUserPlaylists(force) {
   if (playlistCatalogSyncState.timer) clearTimeout(playlistCatalogSyncState.timer);
   var token = playlistCatalogSyncState.token + 1;
   playlistCatalogSyncState = { token: token, loading: true, timer: 0, providers: {}, error: '', startedAt: Date.now() };
-  ['youtube', 'spotify'].forEach(function (provider) {
+  ['app', 'youtube', 'spotify'].forEach(function (provider) {
     playlistCatalogSyncState.providers[provider] = {
-      enabled: playlistCatalogProviderLoggedIn(provider, allowProviderProbe),
+      enabled: playlistCatalogProviderLoggedIn(provider),
       loaded: playlistCatalogProviderArray(provider).length,
       total: playlistCatalogProviderArray(provider).length,
       nextOffset: 0,
-      hasMore: playlistCatalogProviderLoggedIn(provider, allowProviderProbe),
+      hasMore: playlistCatalogProviderLoggedIn(provider),
       loading: false,
       error: '',
+      reauthRequired: false,
+      authStatus: 0,
       firstRequest: true,
       emptyRefreshPreserved: false,
       replaceOnFirstSuccess: !!(force && playlistCatalogProviderLoggedIn(provider))
@@ -41265,7 +40711,7 @@ async function refreshUserPlaylists(force) {
   });
   // Never clear userPlaylists before the network result arrives. Clearing here
   // was the direct reason the authenticated right shelf disappeared.
-  var firstPageTasks = Object.keys(playlistCatalogSyncState.providers).filter(function (provider) { return playlistCatalogSyncState.providers[provider].enabled; }).map(function (provider) {
+  var firstPageTasks = Object.keys(playlistCatalogSyncState.providers).filter(playlistCatalogProviderLoggedIn).map(function (provider) {
     return loadPlaylistCatalogProviderPage(provider, 'first-page');
   });
   await Promise.allSettled(firstPageTasks);
@@ -41273,24 +40719,6 @@ async function refreshUserPlaylists(force) {
   playlistCatalogSyncState.loading = playlistCatalogHasPendingPages();
   if ($pl) $pl.classList.remove('playlist-catalog-refreshing');
   if (userPlaylists.length) renderUserPlaylistsList({ animate: isPlaylistPanelVisibleForRender(), preserveScroll: true });
-  else {
-    var providerStates = playlistCatalogSyncState.providers || {};
-    var spotifyState = providerStates.spotify || {};
-    var youtubeState = providerStates.youtube || {};
-    var messages = [];
-    if (spotifyState.reauthRequired || /SCOPE_REQUIRED|AUTH_REQUIRED|REAUTH/i.test(String(spotifyState.error || ''))) {
-      messages.push(localizeUiMessage('Hãy đăng nhập lại trước khi thay đổi trạng thái yêu thích của playlist'));
-    } else if (spotifyLoginStatus.loggedIn && spotifyState.error) {
-      messages.push(localizeUiMessage('Spotify: ') + String(spotifyState.error));
-    }
-    if (youtubeState.reauthRequired || /SCOPE_REQUIRED|AUTH_REQUIRED|REAUTH/i.test(String(youtubeState.error || ''))) {
-      messages.push(localizeUiMessage('Hãy đăng nhập lại trước khi thay đổi trạng thái yêu thích của playlist'));
-    } else if (youtubeLoginStatus.loggedIn && youtubeState.error) {
-      messages.push(localizeUiMessage('YouTube: ') + String(youtubeState.error));
-    }
-    var empty = document.getElementById('pl-list');
-    if (empty) empty.innerHTML = '<div class=\"playlist-empty-state\">' + escHtml(messages.length ? messages.join(' · ') : localizeUiMessage('Kết nối YouTube Music hoặc Spotify để hiển thị playlist của bạn.')) + '</div>';
-  }
   scheduleShelfRebuild('playlist-catalog-all-settled', true);
   ensurePlaylistShelfVisibleAfterCatalog('playlist-catalog-all-settled');
   if (playlistCatalogSyncState.loading) requestNextPlaylistCatalogPage('after-first-pages');
@@ -41299,7 +40727,7 @@ async function refreshUserPlaylists(force) {
 ;
 
 /* ===== js/modules/06-lyrics/02-playlist-detail.js ===== */
-var playlistPanelDetailState = { key: '', loading: false, loadingMore: false, playlist: null, tracks: [], token: 0, total: 0, nextOffset: 0, hasMore: false, scrollTop: 0, controller: null, warmTimer: 0, renderLimit: PLAYLIST_DETAIL_INITIAL_RENDER, error: '', message: '' };
+var playlistPanelDetailState = { key: '', loading: false, loadingMore: false, playlist: null, tracks: [], token: 0, total: 0, nextOffset: 0, hasMore: false, scrollTop: 0, controller: null, warmTimer: 0, renderLimit: PLAYLIST_DETAIL_INITIAL_RENDER, error: '', message: '', selectMode: false, selectedKeys: Object.create(null) };
 function queueVirtualSpacerHtml(height) {
   height = Math.max(0, Math.round(Number(height) || 0));
   return height ? '<div class="queue-virtual-spacer" aria-hidden="true" style="height:' + height + 'px"></div>' : '';
@@ -41421,20 +40849,16 @@ function bindMiniQueueLazyRender() {
   }, { passive: true });
 }
 function normalizePlaylistProvider(provider) {
-  provider = String(provider || '').toLowerCase();
-  if (provider === 'shinayuu' || provider === 'mineradio') return 'shinayuu';
-  if (provider === 'spotify') return 'spotify';
-  return 'youtube';
+  var key = String(provider || '').toLowerCase();
+  return key === 'spotify' ? 'spotify' : (key === 'app' || key === 'local' || key === 'shinayuu' ? 'app' : 'youtube');
 }
 function playlistProviderLabel(provider) {
   provider = normalizePlaylistProvider(provider);
-  if (provider === 'shinayuu') return 'SY';
-  return provider === 'spotify' ? 'SP' : 'YT';
+  return provider === 'spotify' ? 'SP' : (provider === 'app' ? 'SY' : 'YT');
 }
 function playlistProviderName(provider) {
   provider = normalizePlaylistProvider(provider);
-  if (provider === 'shinayuu') return 'ShinaYuu';
-  return provider === 'spotify' ? 'Spotify' : 'YouTube Music';
+  return provider === 'spotify' ? 'Spotify' : (provider === 'app' ? 'ShinaYuu Music' : 'YouTube Music');
 }
 function playlistPanelKey(provider, id) {
   provider = normalizePlaylistProvider(provider);
@@ -41446,7 +40870,7 @@ function playlistPanelProviderId(provider, id) {
 }
 function playlistCardPriority(pl) {
   if (!pl) return 10;
-  if (pl.virtual || String(pl.id || '') === 'spotify-liked' || Number(pl.specialType || 0) === 5) return 0;
+  if (pl.virtual || String(pl.id || '') === 'spotify-liked' || String(pl.id || '') === 'app-liked' || Number(pl.specialType || 0) === 5 || normalizePlaylistProvider(pl.provider) === 'app') return 0;
   return 1;
 }
 function prioritizePlaylistGroupItems(items) {
@@ -41462,12 +40886,145 @@ function playlistPanelNoticeHtml(text, isError) {
   if (!text) text = 'Playlist chưa có bài hát có thể phát';
   return '<div style="text-align:center;padding:14px 10px;color:' + (isError ? 'rgba(255,180,160,.82)' : 'rgba(255,255,255,.30)') + ';font-size:11.5px;line-height:1.55">' + escHtml(text) + '</div>';
 }
+
+function playlistDetailTrackSelectionKey(song) {
+  try {
+    if (typeof queueItemKey === 'function') return String(queueItemKey(song) || '');
+  } catch (_) {}
+  var provider = normalizePlaylistProvider(song && (song.provider || song.source));
+  var id = song && (song.spotifyId || song.providerSongId || song.id || song.videoId || song.mid || song.songmid) || '';
+  return provider + ':' + String(id);
+}
+function playlistDetailIsSelected(song) {
+  var key = playlistDetailTrackSelectionKey(song);
+  return !!(key && playlistPanelDetailState.selectedKeys && playlistPanelDetailState.selectedKeys[key]);
+}
+function playlistDetailSelectedCount() {
+  var selected = playlistPanelDetailState.selectedKeys || {};
+  return Object.keys(selected).filter(function (key) { return !!selected[key]; }).length;
+}
+function playlistDetailSetSelected(song, selected) {
+  var key = playlistDetailTrackSelectionKey(song);
+  if (!key) return false;
+  if (!playlistPanelDetailState.selectedKeys) playlistPanelDetailState.selectedKeys = Object.create(null);
+  if (selected) playlistPanelDetailState.selectedKeys[key] = true;
+  else delete playlistPanelDetailState.selectedKeys[key];
+  return true;
+}
+function playlistDetailClearSelection() {
+  playlistPanelDetailState.selectedKeys = Object.create(null);
+}
+function playlistDetailSelectedAllLoaded() {
+  var tracks = playlistPanelDetailState.tracks || [];
+  if (!tracks.length) return false;
+  return tracks.every(playlistDetailIsSelected);
+}
+async function deleteCurrentAppPlaylist() {
+  var st = playlistPanelDetailState;
+  if (!st || !st.key || !st.playlist) return false;
+  var parts = st.key.split(':');
+  var provider = normalizePlaylistProvider(parts[0]);
+  var pid = parts.slice(1).join(':');
+  if (provider !== 'app' || pid === 'app-liked' || st.playlist.systemPlaylist) return false;
+  if (!window.confirm('Xóa playlist "' + String(st.playlist.name || 'Playlist') + '" khỏi ShinaYuu Music?')) return false;
+  try {
+    var r = await apiJson('/api/app/playlist/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pid: pid }) });
+    if (!r || r.error || r.success === false) throw new Error(r && (r.message || r.error) || 'APP_PLAYLIST_DELETE_FAILED');
+    cancelPlaylistPanelDetailRequest();
+    playlistPanelDetailState = { key: '', loading: false, loadingMore: false, playlist: null, tracks: [], token: playlistPanelDetailState.token + 1, total: 0, nextOffset: 0, hasMore: false, scrollTop: 0, controller: null, warmTimer: 0, renderLimit: PLAYLIST_DETAIL_INITIAL_RENDER, error: '', message: '', selectMode: false, selectedKeys: Object.create(null) };
+    await refreshUserPlaylists(true);
+    renderPlaylistPanelDetailState();
+    showToast('Đã xóa playlist khỏi ShinaYuu Music');
+    return true;
+  } catch (error) {
+    showToast('Xóa playlist thất bại: ' + String(error && error.message || error));
+    return false;
+  }
+}
+
+async function deleteCurrentAppPlaylistCard(pid, name) {
+  pid = String(pid || '');
+  if (!pid || pid === 'app-liked') return false;
+  if (!window.confirm('Xóa playlist "' + String(name || 'Playlist') + '" khỏi ShinaYuu Music?')) return false;
+  try {
+    var r = await apiJson('/api/app/playlist/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pid: pid }) });
+    if (!r || r.error || r.success === false) throw new Error(r && (r.message || r.error) || 'APP_PLAYLIST_DELETE_FAILED');
+    if (playlistPanelDetailState.key === playlistPanelKey('app', pid)) {
+      cancelPlaylistPanelDetailRequest();
+      playlistPanelDetailState = { key: '', loading: false, loadingMore: false, playlist: null, tracks: [], token: playlistPanelDetailState.token + 1, total: 0, nextOffset: 0, hasMore: false, scrollTop: 0, controller: null, warmTimer: 0, renderLimit: PLAYLIST_DETAIL_INITIAL_RENDER, error: '', message: '', selectMode: false, selectedKeys: Object.create(null), reauthRequired: false };
+    }
+    await refreshUserPlaylists(true);
+    renderPlaylistPanelDetailState();
+    showToast('Đã xóa playlist khỏi ShinaYuu Music');
+    return true;
+  } catch (error) {
+    showToast('Xóa playlist thất bại: ' + String(error && error.message || error));
+    return false;
+  }
+}
+
+function enterPlaylistDetailDeleteMode() {
+  var st = playlistPanelDetailState;
+  if (!st || !st.key || normalizePlaylistProvider(st.playlist && st.playlist.provider) !== 'app') return false;
+  playlistDetailClearSelection();
+  st.selectMode = true;
+  renderPlaylistPanelDetailState();
+  return true;
+}
+function exitPlaylistDetailDeleteMode() {
+  var st = playlistPanelDetailState;
+  if (!st) return false;
+  st.selectMode = false;
+  playlistDetailClearSelection();
+  renderPlaylistPanelDetailState();
+  return true;
+}
+async function deleteSelectedAppPlaylistTracks() {
+  var st = playlistPanelDetailState;
+  if (!st || !st.key || normalizePlaylistProvider(st.playlist && st.playlist.provider) !== 'app') return false;
+  var parts = st.key.split(':');
+  var pid = parts.slice(1).join(':');
+  var keys = Object.keys(st.selectedKeys || {}).filter(function (key) { return !!st.selectedKeys[key]; });
+  if (!keys.length) { showToast('Hãy chọn ít nhất một bài hát'); return false; }
+  if (!window.confirm('Xóa ' + keys.length + ' bài khỏi playlist?')) return false;
+  try {
+    var r = await apiJson('/api/app/playlist/remove-tracks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pid: pid, trackKeys: keys }) });
+    if (!r || r.error || r.success === false) throw new Error(r && (r.message || r.error) || 'APP_PLAYLIST_TRACK_DELETE_FAILED');
+    var removedSet = Object.create(null); keys.forEach(function (key) { removedSet[key] = true; });
+    st.tracks = (st.tracks || []).filter(function (song) { return !removedSet[playlistDetailTrackSelectionKey(song)]; });
+    st.total = Math.max(0, Number(r.total) || st.tracks.length);
+    st.nextOffset = st.tracks.length;
+    st.hasMore = !!(st.total > st.tracks.length);
+    st.selectMode = false;
+    playlistDetailClearSelection();
+    if (st.playlist) st.playlist.trackCount = st.total;
+    await refreshUserPlaylists(true);
+    st.playlist = userPlaylists.find(function (pl) { return playlistPanelKey(normalizePlaylistProvider(pl.provider), pl.id) === st.key; }) || st.playlist;
+    renderPlaylistPanelDetailState();
+    showToast((Number(r.removed) || keys.length) + ' bài đã được xóa');
+    return true;
+  } catch (error) {
+    showToast('Xóa bài thất bại: ' + String(error && error.message || error));
+    return false;
+  }
+}
+function togglePlaylistDetailTrackSelection(index, selected) {
+  var song = playlistPanelDetailState.tracks && playlistPanelDetailState.tracks[index];
+  if (!song) return false;
+  playlistDetailSetSelected(song, selected);
+  renderPlaylistPanelDetailState();
+  return true;
+}
+
 function playlistPanelDetailRowsHtml(options) {
   options = options || {};
   var st = playlistPanelDetailState;
   var tracks = st.tracks || [];
   if (st.loading && !tracks.length) {
     return '<div class="pl-detail-row pl-detail-loading-row"><span class="queue-hydration-spinner spinning"></span><div style="flex:1;min-width:0"><div class="pl-detail-row-title">Đang tải các bài đầu tiên</div><div class="pl-detail-row-artist">Có thể duyệt và phát ngay sau khi tải xong</div></div></div>';
+  }
+  if (!tracks.length && st.reauthRequired) {
+    return '<div class="pl-detail-access-required"><div class="pl-detail-access-copy"><strong>Spotify cần cấp lại quyền đọc playlist</strong><small>Hãy kết nối lại Spotify để cấp quyền playlist-read-private rồi mở lại playlist này.</small></div><button class="fx-mini-btn ghost" type="button" data-pl-spotify-reauth="1">Đăng nhập lại Spotify</button></div>';
   }
   if (!tracks.length) return playlistPanelNoticeHtml(st.message || st.error || '', !!st.error);
   var viewport = Math.max(280, Number(options.viewport) || Math.min(620, Math.round((window.innerHeight || 800) * 0.72)));
@@ -41482,8 +41039,11 @@ function playlistPanelDetailRowsHtml(options) {
     var i = start + localIndex;
     var thumb = songCoverSrc(song, 60);
     var imgTag = thumb ? '<img src="' + escHtml(thumb) + '" alt="" loading="lazy" decoding="async" onerror="this.style.opacity=0.2">' : '<div style="width:34px;height:34px;border-radius:7px;background:rgba(255,255,255,.06);flex:0 0 auto"></div>';
-    return '<div class="pl-detail-row" data-pl-detail-row="' + i + '">' +
-      imgTag +
+    var selectMode = !!st.selectMode;
+    var checkbox = selectMode ? '<label class="pl-detail-select" title="Chọn bài"><input type="checkbox" data-pl-detail-select="' + i + '" ' + (playlistDetailIsSelected(song) ? 'checked' : '') + '><span></span></label>' : '';
+    var clickAttr = ' data-pl-detail-row="' + i + '"';
+    return '<div class="pl-detail-row' + (selectMode && playlistDetailIsSelected(song) ? ' selected' : '') + '"' + clickAttr + '>' +
+      checkbox + imgTag +
       '<div style="flex:1;min-width:0"><div class="pl-detail-row-title">' + escHtml(song.name || '') + '</div>' +
       '<button type="button" class="pl-detail-row-artist" data-pl-detail-artist="' + i + '">' + escHtml(song.artist || 'Nghệ sĩ chưa rõ') + '</button></div>' +
       '</div>';
@@ -41566,7 +41126,7 @@ function playlistTracksEndpoint(provider, id, params) {
       query += '&' + encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
     });
   }
-  if (provider === 'shinayuu') return '';
+  if (provider === 'app') return '/api/app/playlist/tracks?' + query;
   return provider === 'spotify' ? '/api/spotify/playlist/tracks?' + query : '/api/youtube-music/playlist/tracks?' + query;
 }
 function playlistPanelDetailHtml(pl, provider, detailWindow) {
@@ -41583,10 +41143,17 @@ function playlistPanelDetailHtml(pl, provider, detailWindow) {
   var collectionButton = canUncollect
     ? '<button class="fx-mini-btn ghost pl-detail-top-btn" type="button" data-pl-detail-collection="0">Bỏ lưu</button>'
     : '';
+  var isApp = provider === 'app';
+  var isLiked = String(pl && pl.id || '') === 'app-liked' || !!pl.systemPlaylist;
+  var selectMode = !!playlistPanelDetailState.selectMode;
+  var selectedCount = playlistDetailSelectedCount();
+  var manageButton = isApp && !selectMode ? '<button class="fx-mini-btn ghost pl-detail-top-btn" type="button" data-pl-detail-delete-mode="1">Xóa bài</button>' : '';
+  var selectedActions = isApp && selectMode ? '<button class="fx-mini-btn ghost pl-detail-top-btn" type="button" data-pl-detail-select-all="1">' + (playlistDetailSelectedAllLoaded() ? 'Bỏ chọn' : 'Chọn tất cả') + '</button><button class="fx-mini-btn danger pl-detail-top-btn" type="button" data-pl-detail-delete-selected="1"' + (selectedCount ? '' : ' disabled') + '>Xóa ' + selectedCount + ' bài</button><button class="fx-mini-btn ghost pl-detail-top-btn" type="button" data-pl-detail-delete-cancel="1">Hủy</button>' : '';
+  var deletePlaylistButton = isApp && !isLiked && !selectMode ? '<button class="fx-mini-btn danger pl-detail-top-btn" type="button" data-pl-detail-delete-playlist="1">Xóa playlist</button>' : '';
   return '<div class="pl-inline-detail" data-pl-detail="' + escHtml(key) + '" style="height:' + playlistPanelDetailShellHeight() + 'px">' +
     '<div class="pl-detail-sticky">' +
     '<div class="pl-detail-head">' + img + '<div style="flex:1;min-width:0"><div class="pl-detail-title">' + escHtml(pl.name || 'Chi tiết playlist') + '</div><div class="pl-detail-sub">' + escHtml((expectedTotal || tracks.length || 0) + ' bài · ' + (pl.creator || playlistProviderName(provider))) + '</div></div><div class="pl-detail-count">' + (loading && !tracks.length ? 'Đang tải' : (tracks.length + (expectedTotal > tracks.length ? '/' + expectedTotal : ''))) + '</div></div>' +
-    '<div class="pl-detail-actions"><button class="pl-detail-play" type="button" data-pl-detail-play="' + escHtml(key) + '"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Phát playlist</button>' + collectionButton + '<button class="fx-mini-btn ghost pl-detail-top-btn" type="button" data-pl-detail-top="1">Về đầu danh sách</button></div>' +
+    '<div class="pl-detail-actions"><button class="pl-detail-play" type="button" data-pl-detail-play="' + escHtml(key) + '"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Phát playlist</button>' + collectionButton + manageButton + selectedActions + deletePlaylistButton + '<button class="fx-mini-btn ghost pl-detail-top-btn" type="button" data-pl-detail-top="1">Về đầu danh sách</button></div>' +
     '</div>' +
     '<div class="pl-detail-list" data-pl-detail-scroll="' + escHtml(key) + '">' + rows + '</div>' +
     '</div>';
@@ -41662,34 +41229,6 @@ async function loadMorePlaylistPanelDetailTracks(reason) {
   var pid = parts.slice(1).join(':');
   var offset = reason === 'initial' ? 0 : Math.max(0, Number(st.nextOffset) || st.tracks.length);
   var token = st.token;
-  if (provider === 'shinayuu' && typeof builtInPlaylistTracksPage === 'function') {
-    try {
-      var localResult = await builtInPlaylistTracksPage(pid, { limit: PLAYLIST_DETAIL_BATCH_SIZE, offset: offset });
-      if (playlistPanelDetailState.token !== token || playlistPanelDetailState.key !== st.key) return false;
-      var localTracks = (localResult && localResult.tracks) || [];
-      var localMapped = localTracks.map(cloneSong);
-      var localAdded = appendPlaylistPanelDetailTracks(st.tracks, localMapped);
-      st.total = Math.max(st.total || 0, Number(localResult && localResult.total) || 0, st.tracks.length);
-      st.nextOffset = Math.max(offset + localTracks.length, Number(localResult && localResult.nextOffset) || 0);
-      st.hasMore = !!(localResult && localResult.hasMore);
-      st.loading = false;
-      st.loadingMore = false;
-      st.error = localResult && localResult.error || '';
-      st.message = localResult && (localResult.message || '') || '';
-      if (localResult && localResult.playlist) st.playlist = Object.assign({}, st.playlist || {}, localResult.playlist);
-      if (reason === 'initial') { renderPlaylistPanelDetailState(); scrollPlaylistPanelDetailIntoView(st.key); }
-      else renderPlaylistPanelDetailRows();
-      return localAdded > 0;
-    } catch (localError) {
-      st.loading = false;
-      st.loadingMore = false;
-      st.hasMore = false;
-      st.error = 'BUILT_IN_PLAYLIST_PAGE_FAILED';
-      st.message = 'Không tải được playlist ShinaYuu.';
-      if (reason === 'initial') renderPlaylistPanelDetailState(); else renderPlaylistPanelDetailRows();
-      return false;
-    }
-  }
   var controller = window.AbortController ? new AbortController() : null;
   var timer = controller ? setTimeout(function () { controller.abort(); }, 12000) : 0;
   st.controller = controller;
@@ -41699,7 +41238,12 @@ async function loadMorePlaylistPanelDetailTracks(reason) {
     var r = await apiJson(playlistTracksEndpoint(provider, pid, { limit: PLAYLIST_DETAIL_BATCH_SIZE, offset: offset }), controller ? { signal: controller.signal } : { timeoutMs: 12000 });
     if (playlistPanelDetailState.token !== token || playlistPanelDetailState.key !== st.key) return false;
     var rawTracks = r && r.tracks || [];
-    if (r && r.error && !rawTracks.length) throw new Error(r.message || r.error);
+    if (r && r.error && !rawTracks.length) {
+      var structured = new Error(r.message || r.error);
+      structured.data = r;
+      structured.status = Number(r.status || 0) || 0;
+      throw structured;
+    }
     var mapped = rawTracks.map(cloneSong);
     var added = appendPlaylistPanelDetailTracks(st.tracks, mapped);
     var responseTotal = Number(r && (r.total || (r.playlist && r.playlist.trackCount))) || 0;
@@ -41711,7 +41255,12 @@ async function loadMorePlaylistPanelDetailTracks(reason) {
     st.loadingMore = false;
     st.error = (r && r.error) || '';
     st.message = (r && (r.message || r.warning)) || '';
+    st.reauthRequired = !!(r && r.reauthRequired) || !!(r && r.playlist && r.playlist.requiresReauthorization);
     if (r && r.playlist) st.playlist = Object.assign({}, st.playlist || {}, r.playlist);
+    if (!mapped.length && r && r.playlist && r.playlist.itemAccess === 'restricted') {
+      st.message = r.warning || 'Spotify không cho phép đọc các bài của playlist mà bạn chỉ theo dõi; chỉ playlist bạn sở hữu hoặc cộng tác mới có thể hiển thị bài hát.';
+      st.hasMore = false;
+    }
     if (reason === 'initial') {
       renderPlaylistPanelDetailState();
       scrollPlaylistPanelDetailIntoView(st.key);
@@ -41731,8 +41280,13 @@ async function loadMorePlaylistPanelDetailTracks(reason) {
     st.loading = false;
     st.loadingMore = false;
     st.hasMore = false;
+    var errorData = e && e.data || {};
+    var isSpotifyAuth = provider === 'spotify' && (errorData.reauthRequired === true || Number(e && e.status) === 401 || Number(e && e.status) === 403);
+    st.reauthRequired = isSpotifyAuth && (errorData.reauthRequired !== false);
     st.error = 'PLAYLIST_DETAIL_PAGE_FAILED';
-    st.message = st.tracks.length ? 'Tải các bài tiếp theo thất bại; tiếp tục cuộn để thử lại' : 'Tải chi tiết playlist thất bại. Hãy thử lại sau.';
+    st.message = st.reauthRequired
+      ? 'Spotify cần cấp lại quyền đọc playlist. Hãy đăng nhập lại Spotify rồi mở lại playlist này.'
+      : (st.tracks.length ? 'Tải các bài tiếp theo thất bại; tiếp tục cuộn để thử lại' : 'Tải chi tiết playlist thất bại. Hãy thử lại sau.');
     if (reason === 'initial') renderPlaylistPanelDetailState();
     else renderPlaylistPanelDetailRows();
     return false;
@@ -41754,12 +41308,13 @@ async function openPlaylistPanelDetail(provider, pid, title) {
     playlistPanelDetailState.renderLimit = PLAYLIST_DETAIL_INITIAL_RENDER;
     playlistPanelDetailState.error = '';
     playlistPanelDetailState.message = '';
+    playlistPanelDetailState.reauthRequired = false;
     renderPlaylistPanelDetailState();
     return;
   }
   cancelPlaylistPanelDetailRequest();
   var token = ++playlistPanelDetailState.token;
-  playlistPanelDetailState = { key: key, loading: true, loadingMore: false, playlist: pl, tracks: [], token: token, total: Number(pl.trackCount) || 0, nextOffset: 0, hasMore: true, scrollTop: 0, controller: null, warmTimer: 0, renderLimit: PLAYLIST_DETAIL_INITIAL_RENDER, error: '', message: '' };
+  playlistPanelDetailState = { key: key, loading: true, loadingMore: false, playlist: pl, tracks: [], token: token, total: Number(pl.trackCount) || 0, nextOffset: 0, hasMore: true, scrollTop: 0, controller: null, warmTimer: 0, renderLimit: PLAYLIST_DETAIL_INITIAL_RENDER, error: '', message: '', selectMode: false, selectedKeys: Object.create(null), reauthRequired: false };
   renderPlaylistPanelDetailState();
   scrollPlaylistPanelDetailIntoView(key);
   await loadMorePlaylistPanelDetailTracks('initial');
@@ -41866,9 +41421,9 @@ function playlistPanelBuildVirtualEntries() {
   if (playlistPanelVirtualCache.revision === playlistCatalogRevision &&
       playlistPanelVirtualCache.detailKey === playlistPanelDetailState.key &&
       playlistPanelVirtualCache.detailSig === detailSig) return playlistPanelVirtualCache;
-  var labels = { shinayuu: 'Playlist ShinaYuu', youtube: 'Playlist YouTube Music', spotify: 'Playlist Spotify' };
-  var order = ['shinayuu', 'youtube', 'spotify'];
-  var groups = { shinayuu: [], youtube: [], spotify: [] };
+  var labels = { app: 'Playlist ShinaYuu', youtube: 'Playlist YouTube Music', spotify: 'Playlist Spotify' };
+  var order = ['app', 'youtube', 'spotify'];
+  var groups = { app: [], youtube: [], spotify: [] };
   userPlaylists.forEach(function (pl, sourceIndex) {
     var key = playlistPanelGroupKey(pl);
     if (!groups[key]) groups[key] = [];
@@ -41917,6 +41472,7 @@ function playlistPanelOffsetIndex(offsets, value) {
 function playlistCatalogFooterHtml() {
   var state = playlistCatalogSyncState || {};
   var providerStates = state.providers || {};
+  var spotifyState = providerStates.spotify || {};
   var totals = Object.keys(providerStates).reduce(function (acc, key) {
     var item = providerStates[key] || {};
     acc.loaded += Number(item.loaded) || 0;
@@ -41924,11 +41480,18 @@ function playlistCatalogFooterHtml() {
     if (item.hasMore || item.loading) acc.pending = true;
     return acc;
   }, { loaded: 0, total: 0, pending: !!state.loading });
-  if (!totals.pending && !state.error) return '';
+  var authNotice = '';
+  if (spotifyState.reauthRequired) {
+    authNotice = '<div class="playlist-catalog-auth-needed">' +
+      '<div><strong>Spotify cần đăng nhập lại</strong><span>Quyền đọc playlist hiện tại chưa đủ hoặc phiên cấp quyền cũ không còn phù hợp. Hãy kết nối lại Spotify để tải đầy đủ bài hát.</span></div>' +
+      '<button class="fx-mini-btn ghost" type="button" data-pl-spotify-catalog-reauth="1">Kết nối lại Spotify</button>' +
+      '</div>';
+  }
+  if (!totals.pending && !state.error) return authNotice;
   var label = state.error
     ? ('Một số playlist tải thất bại · Đã hiển thị ' + userPlaylists.length + ' playlist')
     : ('Đang tải playlist trong nền · ' + totals.loaded + (totals.total ? '/' + totals.total : ''));
-  return '<div class="playlist-catalog-status"><span class="queue-hydration-spinner spinning"></span><span>' + label + '</span></div>';
+  return authNotice + '<div class="playlist-catalog-status"><span class="queue-hydration-spinner spinning"></span><span>' + label + '</span></div>';
 }
 function schedulePlaylistPanelVirtualRender() {
   if (playlistPanelVirtualCache.raf) return;
@@ -41973,7 +41536,7 @@ function renderUserPlaylistsList(opts) {
   if (!userPlaylists.length) {
     $pl.innerHTML = playlistCatalogSyncState && playlistCatalogSyncState.loading
       ? miniQueueSkeleton() + playlistCatalogFooterHtml()
-      : '<div style="text-align:center;padding:24px 0;color:rgba(255,255,255,.32);font-size:11.5px">Không tìm thấy playlist</div>';
+      : playlistCatalogFooterHtml() + '<div style="text-align:center;padding:24px 0;color:rgba(255,255,255,.32);font-size:11.5px">Không tìm thấy playlist</div>';
     return;
   }
   var panel = document.getElementById('playlist-panel');
@@ -41986,9 +41549,13 @@ function renderUserPlaylistsList(opts) {
     var key = playlistPanelKey(provider, pl.id);
     var isExpanded = playlistPanelDetailState.key === key;
     var expanded = isExpanded ? ' expanded' : '';
+    var appDelete = provider === 'app' && String(pl.id || '') !== 'app-liked' && !pl.systemPlaylist
+      ? '<div class="pl-card-app-actions"><button type="button" class="pl-card-delete fx-mini-btn ghost" data-pl-card-delete="1" aria-label="Xóa playlist" title="Xóa playlist"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h8m-7 0v12m6-12v12M5 6h14M9 6V4h6v2m-8 0 1 14h6l1-14"/></svg></button></div>'
+      : '';
     return '<div class="pl-card' + expanded + '" aria-expanded="' + (isExpanded ? 'true' : 'false') + '" data-playlist-provider="' + provider + '" data-playlist-id="' + escHtml(String(pl.id || '')) + '" data-playlist-title="' + escHtml(pl.name || '') + '" data-playlist-index="' + sourceIndex + '">' +
       imgTag +
       '<div style="flex:1;min-width:0"><div class="pl-name">' + escHtml(pl.name) + '<span class="tag-source ' + provider + '" style="margin-left:6px;vertical-align:1px">' + providerLabel + '</span></div><div class="pl-sub">' + pl.trackCount + ' bài · ' + escHtml(pl.creator || '') + '</div></div>' +
+      appDelete +
       '</div>';
   }
   var cache = playlistPanelBuildVirtualEntries();
@@ -42021,6 +41588,13 @@ function renderUserPlaylistsList(opts) {
   if (opts.animate && seq === playlistRenderSeq) animateVisiblePanelList($pl, '.pl-card', document.getElementById('playlist-panel'));
 }
 document.getElementById('pl-list').addEventListener('click', function (e) {
+  var cardDelete = e.target && e.target.closest ? e.target.closest('[data-pl-card-delete]') : null;
+  if (cardDelete) {
+    e.preventDefault(); e.stopPropagation();
+    var deleteCard = cardDelete.closest('.pl-card[data-playlist-provider="app"]');
+    if (deleteCard) deleteCurrentAppPlaylistCard(deleteCard.getAttribute('data-playlist-id') || '', deleteCard.getAttribute('data-playlist-title') || '');
+    return;
+  }
   var loadMore = e.target && e.target.closest ? e.target.closest('[data-pl-load-more]') : null;
   if (loadMore) {
     e.preventDefault();
@@ -42035,6 +41609,38 @@ document.getElementById('pl-list').addEventListener('click', function (e) {
     growPlaylistPanelDetailRenderLimit();
     return;
   }
+
+  var deleteMode = e.target && e.target.closest ? e.target.closest('[data-pl-detail-delete-mode]') : null;
+  if (deleteMode) { e.preventDefault(); e.stopPropagation(); enterPlaylistDetailDeleteMode(); return; }
+  var deleteCancel = e.target && e.target.closest ? e.target.closest('[data-pl-detail-delete-cancel]') : null;
+  if (deleteCancel) { e.preventDefault(); e.stopPropagation(); exitPlaylistDetailDeleteMode(); return; }
+  var deleteSelected = e.target && e.target.closest ? e.target.closest('[data-pl-detail-delete-selected]') : null;
+  if (deleteSelected) { e.preventDefault(); e.stopPropagation(); deleteSelectedAppPlaylistTracks(); return; }
+  var selectAll = e.target && e.target.closest ? e.target.closest('[data-pl-detail-select-all]') : null;
+  if (selectAll) {
+    e.preventDefault(); e.stopPropagation();
+    var selectAllOn = !playlistDetailSelectedAllLoaded();
+    (playlistPanelDetailState.tracks || []).forEach(function (song) { playlistDetailSetSelected(song, selectAllOn); });
+    renderPlaylistPanelDetailState();
+    return;
+  }
+  var selectBox = e.target && e.target.closest ? e.target.closest('[data-pl-detail-select]') : null;
+  if (selectBox) {
+    e.preventDefault(); e.stopPropagation();
+    togglePlaylistDetailTrackSelection(Number(selectBox.getAttribute('data-pl-detail-select')), !!selectBox.checked);
+    return;
+  }
+  var deletePlaylist = e.target && e.target.closest ? e.target.closest('[data-pl-detail-delete-playlist]') : null;
+  if (deletePlaylist) { e.preventDefault(); e.stopPropagation(); deleteCurrentAppPlaylist(); return; }
+
+  var spotifyReauth = e.target && e.target.closest ? e.target.closest('[data-pl-spotify-reauth]') : null;
+  if (spotifyReauth) {
+    e.preventDefault(); e.stopPropagation();
+    if (typeof showLoginModal === 'function') showLoginModal({ provider: 'spotify' });
+    else if (typeof openLoginModal === 'function') openLoginModal('spotify');
+    return;
+  }
+
   var detailTop = e.target && e.target.closest ? e.target.closest('[data-pl-detail-top]') : null;
   if (detailTop) {
     e.preventDefault();
@@ -42067,7 +41673,12 @@ document.getElementById('pl-list').addEventListener('click', function (e) {
   if (row) {
     e.preventDefault();
     e.stopPropagation();
-    playPlaylistPanelDetailTrack(Number(row.getAttribute('data-pl-detail-row')));
+    var rowIndex = Number(row.getAttribute('data-pl-detail-row'));
+    if (playlistPanelDetailState.selectMode) {
+      togglePlaylistDetailTrackSelection(rowIndex, !playlistDetailIsSelected(playlistPanelDetailState.tracks[rowIndex]));
+    } else {
+      playPlaylistPanelDetailTrack(rowIndex);
+    }
     return;
   }
   var card = e.target && e.target.closest ? e.target.closest('.pl-card') : null;
@@ -42083,8 +41694,7 @@ document.getElementById('pl-list').addEventListener('click', function (e) {
 // Playlist queue loader for YouTube Music and Spotify.
 function playlistQueueSource(id) {
   var raw = String(id || '');
-  if (raw.indexOf('shinayuu:') === 0) return { provider: 'shinayuu', id: raw.slice(9), requestId: raw };
-  if (raw.indexOf('mineradio:') === 0) return { provider: 'shinayuu', id: raw.slice(10), requestId: 'shinayuu:' + raw.slice(10) };
+  if (raw.indexOf('app:') === 0) return { provider: 'app', id: raw.slice(4), requestId: raw };
   if (raw.indexOf('spotify:') === 0) return { provider: 'spotify', id: raw.slice(8), requestId: raw };
   if (raw.indexOf('netease:') === 0) return { provider: 'spotify', id: raw.slice(8), requestId: 'spotify:' + raw.slice(8) };
   if (raw.indexOf('youtube:') === 0) return { provider: 'youtube', id: raw.slice(8), requestId: raw };
@@ -42092,8 +41702,8 @@ function playlistQueueSource(id) {
   return { provider: 'youtube', id: raw, requestId: 'youtube:' + raw };
 }
 function playlistQueuePageSize(provider, initial) {
-  if (provider === 'spotify') return initial ? 96 : 100;
-  if (provider === 'shinayuu') return initial ? 96 : 160;
+  if (provider === 'app') return initial ? 100 : 100;
+  if (provider === 'spotify') return initial ? 50 : 50;
   return initial ? PLAYLIST_QUEUE_INITIAL_BATCH_SIZE : PLAYLIST_QUEUE_BACKGROUND_BATCH_SIZE;
 }
 function playlistQueuePageUrl(source, offset, limit) {
@@ -42135,10 +41745,7 @@ async function hydratePlaylistQueueNextPage(reason) {
   var limit = playlistQueuePageSize(state.provider, false);
   state.loading = true;
   state.pausedForBuffer = false;
-  var pageRequest = state.provider === 'shinayuu' && typeof builtInPlaylistTracksPage === 'function'
-    ? builtInPlaylistTracksPage(source.id, { offset: offset, limit: limit })
-    : apiJson(playlistQueuePageUrl(source, offset, limit), { timeoutMs: 16000 });
-  state.promise = Promise.resolve(pageRequest).then(function (r) {
+  state.promise = apiJson(playlistQueuePageUrl(source, offset, limit), { timeoutMs: 16000 }).then(function (r) {
     if (!playlistQueueHydrationValid(state, token)) return false;
     var rawTracks = r && r.tracks || [];
     if (r && r.error && !rawTracks.length) throw new Error(r.message || r.error);
@@ -42226,9 +41833,7 @@ async function loadPlaylistIntoQueueById(id, autoplay, title, opts) {
   var seedTracks = Array.isArray(opts.seedTracks) && opts.seedTracks.length ? opts.seedTracks.map(cloneSong) : [];
   try {
     if (!seedTracks.length) {
-      r = source.provider === 'shinayuu' && typeof builtInPlaylistTracksPage === 'function'
-        ? await builtInPlaylistTracksPage(source.id, { offset: 0, limit: playlistQueuePageSize(source.provider, true) })
-        : await apiJson(playlistQueuePageUrl(source, 0, playlistQueuePageSize(source.provider, true)), { timeoutMs: 16000 });
+      r = await apiJson(playlistQueuePageUrl(source, 0, playlistQueuePageSize(source.provider, true)), { timeoutMs: 16000 });
       if (
         playlistPlaybackOpts
         && typeof playbackSelectionIntentIsActive === 'function'
@@ -42471,20 +42076,13 @@ function activeAutoMixHandoffClock() {
   return clock;
 }
 function getPlaybackDurationSeconds() {
-  var currentSong = currentCoverSong();
-  var currentProvider = currentSong && String(currentSong.provider || currentSong.source || currentSong.type || '').toLowerCase();
-  var declaredDuration = playbackDurationFromSong(currentSong);
-  // SoundCloud is delivered through a live/transcoded proxy. Chromium and an
-  // AutoMix handoff media element can expose a bogus multi-hour duration for
-  // this kind of stream. The catalog duration is authoritative.
-  if (currentProvider === 'soundcloud' && declaredDuration > 0) return declaredDuration;
   var handoff = activeAutoMixHandoffClock();
   if (handoff) {
     var liveDuration = Number(handoff.media.duration) || Number(handoff.duration) || 0;
     if (liveDuration > 0) return liveDuration;
   }
-  if (audio && isFinite(audio.duration) && audio.duration > 0 && audio.duration < 24 * 60 * 60) return audio.duration;
-  return declaredDuration;
+  if (audio && isFinite(audio.duration) && audio.duration > 0) return audio.duration;
+  return playbackDurationFromSong(currentCoverSong());
 }
 function getPlaybackCurrentSeconds() {
   var handoff = activeAutoMixHandoffClock();
@@ -42909,15 +42507,6 @@ function primeProgressSeekPlayback(media, mediaSrc, serial) {
     return false;
   }
 }
-function soundCloudSeekMediaUrl(song, targetTime) {
-  song = song || {};
-  var base = String(song.externalUrl || song.soundcloudPermalink || song.soundcloudUrl || '').trim();
-  if (!base) return '';
-  return '/api/soundcloud/media?url=' + encodeURIComponent(base)
-    + '&start=' + encodeURIComponent(Math.max(0, Number(targetTime) || 0).toFixed(3))
-    + '&seekFormat=mp4';
-}
-
 function commitProgressSeek(targetTime, resumeAfterSeek) {
   var spotifyActive = window.spotifyDirectState && window.spotifyDirectState.active && typeof window.seekSpotifyDirect === 'function';
   var media = progressDragState.media || audio;
@@ -42950,55 +42539,8 @@ function commitProgressSeek(targetTime, resumeAfterSeek) {
   if (!media) return;
   if (!durationSec) return;
   targetTime = clampRange(Number(targetTime) || 0, 0, durationSec);
-  var currentSongForSeek = currentCoverSong();
-  var currentProviderForSeek = currentSongForSeek ? String(currentSongForSeek.provider || currentSongForSeek.source || currentSongForSeek.type || '').toLowerCase() : '';
-  var serial = ++progressDragState.commitSerial;
-  if (currentProviderForSeek === 'soundcloud' && media) {
-    var soundCloudSeekUrl = soundCloudSeekMediaUrl(currentSongForSeek, targetTime);
-    if (!soundCloudSeekUrl) return false;
-    var soundCloudOldPaused = !!media.paused;
-    progressDragState.previewTime = targetTime;
-    progressDragState.previewDuration = durationSec;
-    progressDragState.previewHoldSerial = serial;
-    progressDragState.previewHoldUntil = performance.now() + 1800;
-    progressDragState.previewClockShouldRun = !!resumeAfterSeek;
-    progressDragState.previewClockRunning = !!resumeAfterSeek;
-    progressDragState.previewClockBase = targetTime;
-    progressDragState.previewClockStartedAt = performance.now();
-    if (typeof setAudioOutputGainImmediate === 'function') setAudioOutputGainImmediate(0);
-    try { media.pause(); } catch (_) {}
-    try {
-      audio.__shinayuuSoundCloudSeekOffset = targetTime;
-      audio.src = soundCloudSeekUrl;
-      progressDragState.mediaSrc = soundCloudSeekUrl;
-      media.load();
-      if (typeof onPlaybackClockDiscontinuity === 'function') onPlaybackClockDiscontinuity(targetTime, 'soundcloud-progress-seek');
-    } catch (err) {
-      console.warn('[SoundCloudSeek] source handoff failed:', err && (err.message || err));
-      progressDragState.previewClockRunning = false;
-      finishProgressPreviewHold(serial, 48);
-      if (typeof restorePlaybackGain === 'function') restorePlaybackGain();
-      return false;
-    }
-    renderProgressPreview(targetTime, durationSec);
-    syncBeatMapPlaybackCursor(targetTime, true);
-    saveLastPlaybackSnapshot(true, 'soundcloud-seek');
-    // Start immediately after swapping the source. Waiting for canplay/loadeddata
-    // here adds the stream startup time twice (once in the browser, once in the
-    // handoff gate). HTMLMediaElement will buffer naturally before audible output.
-    if (resumeAfterSeek) {
-      primeProgressSeekPlayback(media, soundCloudSeekUrl, serial);
-    } else {
-      try { media.pause(); } catch (_) {}
-    }
-    waitForProgressSeekReady(media, targetTime, serial, 2400).then(function () {
-      if (serial !== progressDragState.commitSerial || audio !== media) return;
-      if (!soundCloudOldPaused && resumeAfterSeek) primeProgressSeekPlayback(media, soundCloudSeekUrl, serial);
-      finishProgressPreviewHold(serial, 64);
-    });
-    return true;
-  }
   var mediaSrc = progressDragState.mediaSrc || (media.currentSrc || media.src || '');
+  var serial = ++progressDragState.commitSerial;
   if (!progressSeekMediaStillCurrent(media, mediaSrc)) {
     clearProgressPreviewHold();
     progressDragState.resumePlaySerial = 0;
@@ -43096,18 +42638,9 @@ progressBar.addEventListener('pointercancel', function (e) { endProgressDrag(e, 
 progressBar.addEventListener('lostpointercapture', function (e) { endProgressDrag(e, true); });
 setInterval(function () {
   if (!audio) {
-    var spotifyOwnsProgress = !!(
-      (typeof window.isSpotifyPlaybackActive === 'function' && window.isSpotifyPlaybackActive())
-      || window.activePlaybackTransport === 'spotify'
-      || window.activePlaybackTransport === 'spotify-pending'
-    );
-    // The restore snapshot is only a placeholder before a real transport owns
-    // the clock. Reapplying it every 200 ms while Spotify renders its own clock
-    // made the progress fill oscillate between the previous and current track.
-    if (!spotifyOwnsProgress && restoredLastPlaybackSnapshot && pendingPlaybackResumeAt > 0) applyRestoredPlaybackProgressUi(restoredLastPlaybackSnapshot);
+    if (restoredLastPlaybackSnapshot && pendingPlaybackResumeAt > 0) applyRestoredPlaybackProgressUi(restoredLastPlaybackSnapshot);
     else updatePlaybackProgressUi({ forceText: true });
     if (playbackProgressTickerShouldRun()) startPlaybackProgressTicker();
-    if (spotifyOwnsProgress) saveLastPlaybackSnapshot(false, 'spotify-tick');
     return;
   }
   if (progressDragState.active) {
@@ -45373,7 +44906,6 @@ function applyCustomBackground() {
   var override = albumMode || !!media || customColor || opacity < 1 || windowOpacity < 0.999 || glassActive;
   var root = document.documentElement;
   var layer = document.getElementById('custom-bg');
-  var coverImage = document.getElementById('custom-bg-image');
   var video = document.getElementById('custom-bg-video');
   root.style.setProperty('--custom-bg-color', color);
   root.style.setProperty('--custom-bg-color-rgb', rgb.r + ', ' + rgb.g + ', ' + rgb.b);
@@ -45383,22 +44915,12 @@ function applyCustomBackground() {
   document.body.classList.toggle('custom-background-flat', override && !media);
   document.body.classList.toggle('custom-background-album-cover', albumMode);
   document.body.classList.toggle('custom-background-video', hasVideo);
-  document.body.classList.toggle('custom-background-image-cover', albumMode && !!image);
   document.body.classList.toggle('custom-window-transparent', windowOpacity < 0.999);
   document.body.classList.toggle('custom-bg-glass-active', glassActive);
   if (layer) {
     layer.style.setProperty('--custom-bg-image', image ? 'url("' + cssImageUrl(image) + '")' : 'none');
     layer.style.setProperty('--custom-bg-image-opacity', image ? opacity.toFixed(3) : '0');
     layer.style.setProperty('--custom-bg-video-opacity', hasVideo ? opacity.toFixed(3) : '0');
-    if (coverImage) {
-      var coverSrc = albumMode ? image : '';
-      if (coverImage.getAttribute('src') !== coverSrc) coverImage.setAttribute('src', coverSrc);
-      coverImage.alt = albumMode ? 'Album cover' : '';
-      coverImage.style.setProperty('--custom-bg-cover-opacity', albumMode && image ? opacity.toFixed(3) : '0');
-      coverImage.style.setProperty('--custom-bg-cover-position-x', customBackgroundCropNumber('backgroundMediaCropX', fxDefaults.backgroundMediaCropX == null ? 50 : fxDefaults.backgroundMediaCropX, 0, 100).toFixed(1) + '%');
-      coverImage.style.setProperty('--custom-bg-cover-position-y', customBackgroundCropNumber('backgroundMediaCropY', fxDefaults.backgroundMediaCropY == null ? 50 : fxDefaults.backgroundMediaCropY, 0, 100).toFixed(1) + '%');
-      coverImage.style.setProperty('--custom-bg-cover-zoom', customBackgroundCropNumber('backgroundMediaZoom', fxDefaults.backgroundMediaZoom == null ? 1 : fxDefaults.backgroundMediaZoom, 1, 2.8).toFixed(3));
-    }
     layer.style.setProperty('--custom-bg-base-opacity', windowOpacity.toFixed(3));
     layer.style.setProperty('--custom-bg-overlay-opacity', overlayOpacity.toFixed(3));
     layer.style.setProperty('--custom-bg-glass-opacity', glassOpacity.toFixed(3));
@@ -48093,22 +47615,6 @@ function restartWallpaperEngineAfterHostBoundsChange() {
 }
 
 function handleWallpaperEngineHostBoundsChange(payload) {
-  if (payload && payload.phase === 'resident') {
-    var residentSessionId = String(payload.sessionId || '');
-    var nativeStatus = wallpaperEngineRuntimeState || {};
-    if (!wallpaperEngineSelected || !wallpaperEngineSelected.active || residentSessionId !== String(nativeStatus.sessionId || '') || String(nativeStatus.captureMode || '') !== 'dwm-thumbnail') return;
-    wallpaperEngineHostBoundsPreparing = false;
-    wallpaperEngineDesktopPreviewActive = false;
-    wallpaperEngineDesktopPreviewUsesAsset = false;
-    applyWallpaperEngineVisualSettings(true);
-    clearWallpaperEngineFreezeFrame(false);
-    if (!wallpaperEngineGlassCaptureStream || !wallpaperEngineGlassCaptureStream.getVideoTracks || !wallpaperEngineGlassCaptureStream.getVideoTracks().some(function (track) { return track.readyState === 'live'; })) {
-      scheduleWallpaperEngineGlassSamplerCapture(residentSessionId, wallpaperEngineLayerToken, 0);
-    }
-    updateWallpaperEngineEntryUi();
-    return;
-  }
-
   var phase = String(payload && payload.phase || 'restart');
   if (phase === 'restart') {
     if (!wallpaperEngineHostBoundsPreparing && !wallpaperEngineDesktopPreviewActive) return;
@@ -52512,13 +52018,10 @@ function syncAccountProviderOrderUi() {
 function platformMeta(provider) {
   if (provider === 'youtube') return { key: 'youtube', short: 'YT', label: 'YouTube Music', app: 'YouTube', dot: 'youtube' };
   if (provider === 'spotify') return { key: 'spotify', short: 'SP', label: 'Spotify', app: 'Spotify', dot: 'spotify' };
-  if (provider === 'soundcloud') return { key: 'soundcloud', short: 'SC', label: 'SoundCloud', app: 'SoundCloud', dot: 'soundcloud' };
   return { key: 'youtube', short: 'YT', label: 'YouTube Music', app: 'YouTube', dot: 'youtube' };
 }
 function platformStatus(provider) {
-  if (provider === 'spotify') return spotifyLoginStatus;
-  if (provider === 'soundcloud') return soundcloudLoginStatus;
-  return youtubeLoginStatus;
+  return provider === 'spotify' ? spotifyLoginStatus : youtubeLoginStatus;
 }
 function providerVipType(provider, status) {
   status = status || platformStatus(provider) || {};
@@ -52717,48 +52220,6 @@ function bindTopAccountPillSorting() {
 /* ===== js/modules/08-account/02-login-status.js ===== */
 'use strict';
 
-
-function normalizeSoundCloudLoginStatus(info) {
-  info = info || {};
-  return Object.assign({
-    provider: 'soundcloud',
-    loggedIn: false,
-    configured: false,
-    searchReady: false,
-    publicCatalog: false,
-    nickname: 'SoundCloud',
-    userId: '',
-    avatar: '',
-    vipType: 0,
-    vipLevel: 'none',
-    isVip: false,
-    isSvip: false,
-    playbackKeyReady: false,
-    playbackMode: 'direct'
-  }, info, {
-    provider: 'soundcloud',
-    loggedIn: false,
-    configured: !!info.configured,
-    searchReady: !!info.searchReady,
-    publicCatalog: !!info.publicCatalog,
-    nickname: 'SoundCloud',
-    playbackKeyReady: !!info.searchReady,
-    playbackMode: 'direct'
-  });
-}
-
-async function refreshSoundCloudLoginStatus() {
-  try {
-    var info = await apiJson('/api/soundcloud/status?t=' + Date.now());
-    soundcloudLoginStatus = normalizeSoundCloudLoginStatus(info);
-  } catch (error) {
-    console.warn('SoundCloud status failed:', error);
-    soundcloudLoginStatus = normalizeSoundCloudLoginStatus(null);
-  }
-  renderUserBtn();
-  return soundcloudLoginStatus;
-}
-
 function providerVipAuditSnapshot(provider, status) { return { provider: provider, loggedIn: !!(status && status.loggedIn) }; }
 function providerVipAuditLabel(provider, snapshot) { return snapshot && snapshot.loggedIn ? localizeUiMessage('Đã kết nối') : localizeUiMessage('Chưa kết nối'); }
 function auditProviderVipState() {}
@@ -52831,11 +52292,7 @@ async function refreshYouTubeLoginStatus() {
     return youtubeLoginStatus;
   } catch (error) {
     console.warn('YouTube login status failed:', error);
-    if (youtubeLoginStatus && youtubeLoginStatus.loggedIn) {
-      youtubeLoginStatus = normalizeYouTubeLoginStatus(Object.assign({}, youtubeLoginStatus, { stale: true, statusError: String(error && (error.message || error) || 'YOUTUBE_STATUS_UNAVAILABLE') }));
-    } else {
-      youtubeLoginStatus = normalizeYouTubeLoginStatus(null);
-    }
+    youtubeLoginStatus = normalizeYouTubeLoginStatus(null);
     loginStatus = Object.assign({}, youtubeLoginStatus);
     renderUserBtn();
     return youtubeLoginStatus;
@@ -52928,13 +52385,7 @@ async function refreshSpotifyLoginStatus() {
     return spotifyLoginStatus;
   } catch (error) {
     console.warn('Spotify login status failed:', error);
-    // A transient status request failure must not erase a previously valid
-    // OAuth session and make Playlist / Playback appear logged out.
-    if (spotifyLoginStatus && spotifyLoginStatus.loggedIn) {
-      spotifyLoginStatus = normalizeSpotifyLoginStatus(Object.assign({}, spotifyLoginStatus, { stale: true, statusError: String(error && (error.message || error) || 'SPOTIFY_STATUS_UNAVAILABLE') }));
-    } else {
-      spotifyLoginStatus = normalizeSpotifyLoginStatus(null);
-    }
+    spotifyLoginStatus = normalizeSpotifyLoginStatus(null);
     renderUserBtn();
     return spotifyLoginStatus;
   }
@@ -52948,7 +52399,7 @@ function startSpotifyLoginStatusAutoRefresh() {
 }
 
 async function refreshLoginStatus() {
-  var results = await Promise.allSettled([refreshYouTubeLoginStatus(), refreshSpotifyLoginStatus(), refreshSoundCloudLoginStatus()]);
+  var results = await Promise.allSettled([refreshYouTubeLoginStatus(), refreshSpotifyLoginStatus()]);
   loginStatusChecked = true;
   loginStatusCheckFailed = results.every(function (result) { return result.status === 'rejected'; });
   return { youtube: youtubeLoginStatus, spotify: spotifyLoginStatus };
@@ -52997,23 +52448,13 @@ var providerConfigSnapshot = {
   spotifyRedirectUri: spotifyRedirectUri,
   youtubeClientId: '',
   youtubeConfigured: false,
-  youtubeRedirectUri: '',
-  soundcloudClientId: '',
-  soundcloudConfigured: true,
-  soundcloudClientSecretConfigured: false
+  youtubeRedirectUri: ''
 };
 var providerConfigOpen = false;
 
-function normalizeLoginProviderKey(provider) {
-  provider = String(provider || '').toLowerCase();
-  if (provider === 'spotify') return 'spotify';
-  if (provider === 'soundcloud') return 'soundcloud';
-  return 'youtube';
-}
+function normalizeLoginProviderKey(provider) { return provider === 'spotify' ? 'spotify' : 'youtube'; }
 function loginProviderSupportsCookieMode() { return false; }
 function loginProviderOfficialModeText(provider) {
-  provider = normalizeLoginProviderKey(provider);
-  if (provider === 'soundcloud') return { title: 'Web Search', sub: localizeUiMessage('Tìm kiếm SoundCloud công khai; ShinaYuu tự resolve đúng URL track khi phát.') };
   return provider === 'spotify'
     ? { title: 'OAuth', sub: localizeUiMessage('Mở trang ủy quyền Spotify trong trình duyệt mặc định.') }
     : { title: 'Google OAuth', sub: localizeUiMessage('Mở trang đăng nhập Google trong trình duyệt mặc định.') };
@@ -53042,27 +52483,19 @@ function startQrPoll() {}
 function stopQrPoll() {}
 
 function providerDisplayName(provider) {
-  provider = normalizeLoginProviderKey(provider);
-  if (provider === 'spotify') return 'Spotify';
-  if (provider === 'soundcloud') return 'SoundCloud';
-  return 'YouTube Music';
+  return normalizeLoginProviderKey(provider) === 'spotify' ? 'Spotify' : 'YouTube Music';
 }
 function providerStatusObject(provider) {
-  provider = normalizeLoginProviderKey(provider);
-  if (provider === 'spotify') return spotifyLoginStatus || {};
-  if (provider === 'soundcloud') return soundcloudLoginStatus || {};
-  return youtubeLoginStatus || {};
+  return normalizeLoginProviderKey(provider) === 'spotify' ? (spotifyLoginStatus || {}) : (youtubeLoginStatus || {});
 }
 function providerConfigured(provider) {
   provider = normalizeLoginProviderKey(provider);
   if (provider === 'spotify') return !!providerConfigSnapshot.spotifyConfigured;
-  if (provider === 'soundcloud') return !!providerConfigSnapshot.soundcloudConfigured;
   return !!providerConfigSnapshot.youtubeConfigured;
 }
 function providerConnectedText(provider, status) {
   provider = normalizeLoginProviderKey(provider);
   status = status || providerStatusObject(provider);
-  if (provider === 'soundcloud') return localizeUiMessage('Sẵn sàng · Không cần Client ID');
   if (status.loggedIn) {
     var nickname = status.nickname || status.displayName || providerDisplayName(provider);
     return localizeUiMessage('Đã kết nối') + (nickname ? ' · ' + nickname : '');
@@ -53088,11 +52521,6 @@ function youtubeLoginStatusText(info) {
   }
   return localizeUiMessage('Sẵn sàng đăng nhập Google để đồng bộ playlist YouTube Music.');
 }
-function soundcloudLoginStatusText(info) {
-  info = info || soundcloudLoginStatus || {};
-  return localizeUiMessage('SoundCloud đã sẵn sàng · không cần Client ID / Client Secret.');
-}
-
 
 async function loadProviderConfig(force) {
   if (!force && providerConfigSnapshot.__loaded) return providerConfigSnapshot;
@@ -53117,14 +52545,10 @@ function syncProviderConfigInputs() {
   var market = document.getElementById('spotify-market-input');
   var youtubeUri = document.getElementById('youtube-redirect-uri');
   var spotifyUri = document.getElementById('spotify-redirect-uri');
-  var soundcloudId = document.getElementById('soundcloud-client-id-input');
-  var soundcloudSecret = document.getElementById('soundcloud-client-secret-input');
   if (youtubeId && document.activeElement !== youtubeId) youtubeId.value = providerConfigSnapshot.youtubeClientId || '';
   // The secret is intentionally never returned by the backend.
   if (youtubeSecret && document.activeElement !== youtubeSecret && !youtubeSecret.value) youtubeSecret.value = '';
   if (spotifyId && document.activeElement !== spotifyId) spotifyId.value = providerConfigSnapshot.spotifyClientId || '';
-  if (soundcloudId && document.activeElement !== soundcloudId) soundcloudId.value = providerConfigSnapshot.soundcloudClientId || '';
-  if (soundcloudSecret && document.activeElement !== soundcloudSecret) soundcloudSecret.value = '';
   if (market && document.activeElement !== market) market.value = providerConfigSnapshot.spotifyMarket || 'VN';
   if (youtubeUri) youtubeUri.textContent = providerConfigSnapshot.youtubeRedirectUri || localizeUiMessage('Được tạo sau khi ứng dụng khởi động');
   if (spotifyUri) spotifyUri.textContent = providerConfigSnapshot.spotifyRedirectUri || spotifyRedirectUri;
@@ -53155,9 +52579,6 @@ async function saveProviderConfig(provider) {
       if (spotifyInput) spotifyInput.focus();
       return { ok: false, error: 'SPOTIFY_CLIENT_ID_REQUIRED' };
     }
-  } else if (provider === 'soundcloud') {
-    if (statusEl) { statusEl.className = 'ok'; statusEl.textContent = localizeUiMessage('SoundCloud không cần cấu hình Client ID / Client Secret.'); }
-    return { ok: true, provider: 'soundcloud' };
   } else {
     var youtubeInput = document.getElementById('youtube-client-id-input');
     var secretInput = document.getElementById('youtube-client-secret-input');
@@ -53179,7 +52600,7 @@ async function saveProviderConfig(provider) {
     providerConfigSnapshot = Object.assign({}, providerConfigSnapshot, info || {}, { __loaded: true });
     syncProviderConfigInputs();
     updateLoginProviderUi();
-    if (statusEl) { statusEl.className = 'ok'; statusEl.textContent = provider === 'soundcloud' ? localizeUiMessage('Đã lưu cấu hình SoundCloud. Nguồn đã sẵn sàng để kiểm tra.') : localizeUiMessage('Đã lưu cấu hình. Bạn có thể bắt đầu đăng nhập.'); }
+    if (statusEl) { statusEl.className = 'ok'; statusEl.textContent = localizeUiMessage('Đã lưu cấu hình. Bạn có thể bắt đầu đăng nhập.'); }
     return { ok: true, provider: provider };
   } catch (error) {
     if (statusEl) { statusEl.className = 'fail'; statusEl.textContent = localizeUiMessage('Không thể lưu cấu hình: ') + (error.message || error); }
@@ -53208,31 +52629,22 @@ function openSpotifyDeveloperDashboard() { window.open('https://developer.spotif
 function updateLoginProviderUi() {
   var provider = normalizeLoginProviderKey(loginProvider);
   var isSpotify = provider === 'spotify';
-  var isSoundCloud = provider === 'soundcloud';
   var youtubeCard = document.getElementById('login-provider-youtube');
   var spotifyCard = document.getElementById('login-provider-spotify');
-  var soundcloudCard = document.getElementById('login-provider-soundcloud');
   var youtubeStatus = providerConnectedText('youtube', youtubeLoginStatus);
   var spotifyStatus = providerConnectedText('spotify', spotifyLoginStatus);
-  var soundcloudStatusText = providerConnectedText('soundcloud', soundcloudLoginStatus);
   if (youtubeCard) {
-    youtubeCard.classList.toggle('active', !isSpotify && !isSoundCloud);
+    youtubeCard.classList.toggle('active', !isSpotify);
     youtubeCard.classList.toggle('connected', !!(youtubeLoginStatus && youtubeLoginStatus.loggedIn));
   }
   if (spotifyCard) {
     spotifyCard.classList.toggle('active', isSpotify);
     spotifyCard.classList.toggle('connected', !!(spotifyLoginStatus && spotifyLoginStatus.loggedIn));
   }
-  if (soundcloudCard) {
-    soundcloudCard.classList.toggle('active', isSoundCloud);
-    soundcloudCard.classList.toggle('connected', !!(soundcloudLoginStatus && soundcloudLoginStatus.configured && soundcloudLoginStatus.searchReady));
-  }
   var youtubeState = document.getElementById('login-provider-youtube-state');
   var spotifyState = document.getElementById('login-provider-spotify-state');
-  var soundcloudState = document.getElementById('login-provider-soundcloud-state');
   if (youtubeState) youtubeState.textContent = youtubeStatus;
   if (spotifyState) spotifyState.textContent = spotifyStatus;
-  if (soundcloudState) soundcloudState.textContent = soundcloudStatusText;
 
   var title = document.getElementById('login-modal-title');
   var desc = document.getElementById('login-modal-desc');
@@ -53241,38 +52653,32 @@ function updateLoginProviderUi() {
   var startButton = document.getElementById('refresh-qr-btn');
   var logoutButton = document.getElementById('provider-logout-btn');
   var currentStatus = providerStatusObject(provider);
-  if (title) title.textContent = isSoundCloud ? localizeUiMessage('Cấu hình SoundCloud') : (isSpotify ? localizeUiMessage('Kết nối Spotify') : localizeUiMessage('Kết nối YouTube Music'));
-  if (desc) desc.textContent = isSoundCloud
-    ? localizeUiMessage('SoundCloud dùng Client ID + Client Secret để tìm kiếm và phát các track công khai. Không cần đăng nhập tài khoản SoundCloud.')
-    : (isSpotify
-      ? localizeUiMessage('Đăng nhập Spotify bằng OAuth chính thức để đồng bộ playlist, Liked Songs và phát trực tiếp bằng tài khoản Premium.')
-      : localizeUiMessage('YouTube Music có thể tìm và phát công khai. Đăng nhập Google chỉ cần thiết để đồng bộ playlist cá nhân.'));
+  if (title) title.textContent = isSpotify ? localizeUiMessage('Kết nối Spotify') : localizeUiMessage('Kết nối YouTube Music');
+  if (desc) desc.textContent = isSpotify
+    ? localizeUiMessage('Đăng nhập Spotify bằng OAuth chính thức để đồng bộ playlist, Liked Songs và phát trực tiếp bằng tài khoản Premium.')
+    : localizeUiMessage('YouTube Music có thể tìm và phát công khai. Đăng nhập Google chỉ cần thiết để đồng bộ playlist cá nhân.');
   if (statusEl && !/^(loading|ok|fail)$/.test(statusEl.className || '')) {
-    statusEl.textContent = isSoundCloud ? soundcloudLoginStatusText(soundcloudLoginStatus) : (isSpotify ? spotifyLoginStatusText(spotifyLoginStatus) : youtubeLoginStatusText(youtubeLoginStatus));
+    statusEl.textContent = isSpotify ? spotifyLoginStatusText(spotifyLoginStatus) : youtubeLoginStatusText(youtubeLoginStatus);
   }
   if (badge) {
-    var ready = isSoundCloud ? !!(currentStatus.configured && currentStatus.searchReady) : !!currentStatus.loggedIn;
-    badge.className = 'provider-status-badge' + (ready ? ' connected' : (providerConfigured(provider) ? ' ready' : ' needs-config'));
-    badge.textContent = ready ? localizeUiMessage(isSoundCloud ? 'Sẵn sàng' : 'Đã kết nối') : (providerConfigured(provider) ? localizeUiMessage('Sẵn sàng') : localizeUiMessage('Cần cấu hình'));
+    badge.className = 'provider-status-badge' + (currentStatus.loggedIn ? ' connected' : (providerConfigured(provider) ? ' ready' : ' needs-config'));
+    badge.textContent = currentStatus.loggedIn ? localizeUiMessage('Đã kết nối') : (providerConfigured(provider) ? localizeUiMessage('Sẵn sàng') : localizeUiMessage('Cần cấu hình'));
   }
   if (startButton) {
-    startButton.textContent = isSoundCloud
-      ? (currentStatus.configured ? localizeUiMessage('Kiểm tra SoundCloud') : localizeUiMessage('Cấu hình SoundCloud'))
-      : (currentStatus.loggedIn ? localizeUiMessage('Đăng nhập lại') : (isSpotify ? localizeUiMessage('Kết nối Spotify') : localizeUiMessage('Kết nối YouTube Music')));
+    startButton.textContent = currentStatus.loggedIn
+      ? localizeUiMessage('Đăng nhập lại')
+      : (isSpotify ? localizeUiMessage('Kết nối Spotify') : localizeUiMessage('Kết nối YouTube Music'));
   }
-  if (logoutButton) logoutButton.disabled = isSoundCloud || !currentStatus.loggedIn;
+  if (logoutButton) logoutButton.disabled = !currentStatus.loggedIn;
 
   var youtubeGroup = document.getElementById('youtube-config-group');
   var spotifyGroup = document.getElementById('spotify-config-group');
-  var soundcloudGroup = document.getElementById('soundcloud-config-group');
-  if (youtubeGroup) youtubeGroup.hidden = isSpotify || isSoundCloud;
+  if (youtubeGroup) youtubeGroup.hidden = isSpotify;
   if (spotifyGroup) spotifyGroup.hidden = !isSpotify;
-  if (soundcloudGroup) soundcloudGroup.hidden = !isSoundCloud;
   var graph = document.getElementById('provider-login-source-grid');
   if (graph) graph.setAttribute('data-provider', provider);
   syncProviderConfigInputs();
 }
-
 function updateLoginNodeGraphUi() { updateLoginProviderUi(); }
 
 async function showLoginModal(opts) {
@@ -53281,7 +52687,7 @@ async function showLoginModal(opts) {
   openGsapModal(document.getElementById('login-modal'));
   var statusEl = document.getElementById('qr-status');
   if (statusEl) { statusEl.className = 'loading'; statusEl.textContent = localizeUiMessage('Đang kiểm tra trạng thái các nguồn nhạc…'); }
-  await Promise.allSettled([loadProviderConfig(true), refreshYouTubeLoginStatus(), refreshSpotifyLoginStatus(), refreshSoundCloudLoginStatus()]);
+  await Promise.allSettled([loadProviderConfig(true), refreshYouTubeLoginStatus(), refreshSpotifyLoginStatus()]);
   if (statusEl) statusEl.className = '';
   updateLoginProviderUi();
 }
@@ -53292,9 +52698,9 @@ function setLoginProvider(provider, silent) {
   var statusEl = document.getElementById('qr-status');
   if (statusEl) statusEl.className = '';
   updateLoginProviderUi();
-  if (!silent && statusEl) statusEl.textContent = loginProvider === 'soundcloud'
-    ? soundcloudLoginStatusText(soundcloudLoginStatus)
-    : (loginProvider === 'spotify' ? spotifyLoginStatusText(spotifyLoginStatus) : youtubeLoginStatusText(youtubeLoginStatus));
+  if (!silent && statusEl) statusEl.textContent = loginProvider === 'spotify'
+    ? spotifyLoginStatusText(spotifyLoginStatus)
+    : youtubeLoginStatusText(youtubeLoginStatus);
   return loginProvider;
 }
 
@@ -53317,32 +52723,6 @@ async function beginProviderLogin(provider) {
   await loadProviderConfig(false);
   var statusEl = document.getElementById('qr-status');
   var button = document.getElementById('refresh-qr-btn');
-  if (provider === 'soundcloud') {
-    if (!providerConfigured(provider)) {
-      toggleProviderConfigPanel(true);
-      updateLoginProviderUi();
-      if (statusEl) { statusEl.className = 'fail'; statusEl.textContent = localizeUiMessage('Hãy nhập và lưu SoundCloud Client ID + Client Secret trước khi kiểm tra.'); }
-      var scInput = document.getElementById('soundcloud-client-id-input');
-      if (scInput) scInput.focus();
-      return { ok: false, provider: provider, error: 'SOUNDCLOUD_CLIENT_CREDENTIALS_REQUIRED' };
-    }
-    if (button) button.disabled = true;
-    try {
-      if (statusEl) { statusEl.className = 'loading'; statusEl.textContent = localizeUiMessage('Đang kiểm tra kết nối SoundCloud…'); }
-      var scResult = await apiJson('/api/soundcloud/status?t=' + Date.now(), { timeoutMs: 12000 });
-      soundcloudLoginStatus = normalizeSoundCloudLoginStatus(scResult);
-      if (!soundcloudLoginStatus.searchReady) throw new Error(scResult && (scResult.message || scResult.error) || 'SOUNDCLOUD_NOT_READY');
-      if (statusEl) { statusEl.className = 'ok'; statusEl.textContent = localizeUiMessage('SoundCloud API đã sẵn sàng.'); }
-      updateLoginProviderUi();
-      return { ok: true, provider: provider };
-    } catch (error) {
-      if (statusEl) { statusEl.className = 'fail'; statusEl.textContent = localizeUiMessage('Không thể kết nối SoundCloud: ') + (error.message || error); }
-      updateLoginProviderUi();
-      return { ok: false, provider: provider, error: error.message || 'SOUNDCLOUD_STATUS_FAILED' };
-    } finally {
-      if (button) button.disabled = false;
-    }
-  }
   if (!providerConfigured(provider)) {
     toggleProviderConfigPanel(true);
     updateLoginProviderUi();
@@ -53423,15 +52803,9 @@ async function refreshSelectedProviderStatus() {
   if (statusEl) { statusEl.className = 'loading'; statusEl.textContent = localizeUiMessage('Đang làm mới trạng thái đăng nhập…'); }
   try {
     await loadProviderConfig(true);
-    if (loginProvider === 'soundcloud') await refreshSoundCloudLoginStatus();
-    else if (loginProvider === 'spotify') await refreshSpotifyLoginStatus();
+    if (loginProvider === 'spotify') await refreshSpotifyLoginStatus();
     else await refreshYouTubeLoginStatus({ force: true });
-    if (statusEl) {
-      var refreshStatus = providerStatusObject(loginProvider);
-      var refreshReady = loginProvider === 'soundcloud' ? !!(refreshStatus.configured && refreshStatus.searchReady) : !!refreshStatus.loggedIn;
-      statusEl.className = refreshReady ? 'ok' : '';
-      statusEl.textContent = loginProvider === 'soundcloud' ? soundcloudLoginStatusText(soundcloudLoginStatus) : (loginProvider === 'spotify' ? spotifyLoginStatusText(spotifyLoginStatus) : youtubeLoginStatusText(youtubeLoginStatus));
-    }
+    if (statusEl) { statusEl.className = providerStatusObject(loginProvider).loggedIn ? 'ok' : ''; statusEl.textContent = loginProvider === 'spotify' ? spotifyLoginStatusText(spotifyLoginStatus) : youtubeLoginStatusText(youtubeLoginStatus); }
     updateLoginProviderUi();
     renderUserBtn();
     return { ok: true };
@@ -53447,10 +52821,6 @@ async function logoutSelectedLoginProvider() {
   var provider = normalizeLoginProviderKey(loginProvider);
   var statusEl = document.getElementById('qr-status');
   try {
-    if (provider === 'soundcloud') {
-      if (statusEl) { statusEl.className = ''; statusEl.textContent = localizeUiMessage('SoundCloud là nguồn API công khai; hãy sửa Client ID/Secret trong phần cấu hình.'); }
-      return { ok: false, provider: provider, error: 'SOUNDCLOUD_NOT_ACCOUNT_LOGIN' };
-    }
     var bridge = window.desktopWindow;
     if (provider === 'spotify') {
       if (bridge && typeof bridge.clearSpotifyMusicLogin === 'function') await bridge.clearSpotifyMusicLogin();
@@ -54558,28 +53928,6 @@ var particleSpin = { vx: 0, vy: 0, damping: 0.90 };
 // 手势驱动的总旋转 (累计角度), 输出到 particles
 var gestureRotation = { x: 0, y: 0 };
 var gestureGrip = { value: 0, target: 0, openness: 1, lastState: 'open', pulse: 0 };
-var gestureActionState = {
-  candidate: '',
-  since: 0,
-  fired: false,
-  cooldownUntil: 0,
-  swipeAnchor: null,
-  volumeArmed: false,
-  volumeBaseY: 0,
-  volumeBaseValue: 0,
-  volumeLastApply: 0,
-  lastAction: ''
-};
-var gestureStartEpoch = 0;
-var gestureStartPromise = null;
-var gestureInferenceBusy = false;
-var gestureLastInferenceAt = 0;
-var gestureLastInferenceErrorAt = 0;
-var gestureInferenceErrorCount = 0;
-var gestureLifecycleState = 'off';
-var gestureHostResumeTimer = 0;
-var gestureLastHudSignature = '';
-var gestureLastHudAt = 0;
 var PARTICLE_POINTER_SPIN_X = 0.0032;
 var PARTICLE_POINTER_SPIN_Y = 0.0034;
 var PARTICLE_HAND_SPIN_X = 4.15;
@@ -54637,415 +53985,50 @@ var handCanvas = null, handCanvasCtx = null;
 // 平滑系数 (越小越平滑, 但反应越慢)
 var HAND_SMOOTH_ALPHA = 0.35;
 
-function normalizeGestureSensitivity(value) {
-  value = String(value || '').trim().toLowerCase();
-  return /^(steady|balanced|quick)$/.test(value) ? value : 'balanced';
-}
-
-function gestureSensitivityProfile() {
-  var mode = normalizeGestureSensitivity(fx && fx.gestureSensitivity);
-  if (mode === 'steady') return { hold: 820, volumeHold: 620, swipeDistance: 0.245, swipeWindow: 620, cooldown: 1320 };
-  if (mode === 'quick') return { hold: 470, volumeHold: 350, swipeDistance: 0.165, swipeWindow: 520, cooldown: 860 };
-  return { hold: 640, volumeHold: 470, swipeDistance: 0.205, swipeWindow: 570, cooldown: 1080 };
-}
-
-function gestureLandmarkDistance(a, b) {
-  if (!a || !b) return 0;
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function gestureFingerExtended(lm, tipIndex, pipIndex, mcpIndex, palm) {
-  var span = Math.max(0.045, gestureLandmarkDistance(lm[5], lm[17]));
-  var tipPalm = gestureLandmarkDistance(lm[tipIndex], palm);
-  var pipPalm = gestureLandmarkDistance(lm[pipIndex], palm);
-  var tipMcp = gestureLandmarkDistance(lm[tipIndex], lm[mcpIndex]);
-  var pipMcp = gestureLandmarkDistance(lm[pipIndex], lm[mcpIndex]);
-  return tipPalm > pipPalm + span * 0.13 && tipMcp > pipMcp * 1.18;
-}
-
-function classifyGesturePlayerPose(lm, palm, pinchDist) {
-  var span = Math.max(0.045, gestureLandmarkDistance(lm[5], lm[17]));
-  var index = gestureFingerExtended(lm, 8, 6, 5, palm);
-  var middle = gestureFingerExtended(lm, 12, 10, 9, palm);
-  var ring = gestureFingerExtended(lm, 16, 14, 13, palm);
-  var pinky = gestureFingerExtended(lm, 20, 18, 17, palm);
-  var thumbReach = gestureLandmarkDistance(lm[4], palm);
-  var thumbUp = thumbReach > span * 0.78 && lm[4].y < palm.y - span * 0.52;
-  if (thumbUp && !index && !middle && !ring && !pinky) return 'like';
-  if (index && middle && !ring && !pinky && gestureLandmarkDistance(lm[8], lm[12]) > span * 0.26) return 'play';
-  if (index && middle && ring && !pinky) return 'lyrics';
-  if (index && !middle && !ring && !pinky && pinchDist > span * 0.30) return 'volume';
-  return '';
-}
-
-function resetGesturePlayerActionState(keepCooldown) {
-  gestureActionState.candidate = '';
-  gestureActionState.since = 0;
-  gestureActionState.fired = false;
-  gestureActionState.swipeAnchor = null;
-  gestureActionState.volumeArmed = false;
-  gestureActionState.volumeLastApply = 0;
-  if (!keepCooldown) gestureActionState.cooldownUntil = 0;
-}
-
-function gesturePlayerActionsAllowed() {
-  if (!gestureActive || !fx || fx.gesturePlayerActions === false) return false;
-  if (!gestureHostVisible()) return false;
-  if (document.body && document.body.classList.contains('desktop-software-locked')) return false;
-  if (typeof progressDragState !== 'undefined' && progressDragState && progressDragState.active) return false;
-  if (document.querySelector('.modal-mask.show,.modal.show,.login-easter-overlay.show,.login-easter-overlay.active')) return false;
-  var active = document.activeElement;
-  if (active && (/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName) || active.isContentEditable)) return false;
-  return true;
-}
-
-function setGestureCandidate(candidate, now, holdMs, label, detail) {
-  if (gestureActionState.candidate !== candidate) {
-    gestureActionState.candidate = candidate;
-    gestureActionState.since = now;
-    gestureActionState.fired = false;
-  }
-  var progress = Math.max(0, Math.min(1, (now - gestureActionState.since) / Math.max(1, holdMs)));
-  showGestureHUD(label, progress, gestureActionState.fired ? 'Đã thực hiện; thả tay để kích hoạt lại' : detail);
-  return progress;
-}
-
-function executeGesturePlayerAction(action, now, cooldownMs) {
-  if (gestureActionState.fired || now < gestureActionState.cooldownUntil) return false;
-  gestureActionState.fired = true;
-  gestureActionState.lastAction = action;
-  gestureActionState.cooldownUntil = now + cooldownMs;
-  try {
-    if (action === 'play') {
-      Promise.resolve(togglePlay()).catch(function () { });
-      showToast('Cử chỉ: phát / tạm dừng');
-    } else if (action === 'like') {
-      if (typeof toggleLikeCurrent === 'function') toggleLikeCurrent();
-      showToast('Cử chỉ: thích bài hiện tại');
-    } else if (action === 'lyrics') {
-      if (typeof setParticleLyricsSilently === 'function') {
-        setParticleLyricsSilently(!fx.particleLyrics);
-        saveLyricLayout({ user: true, reason: 'gesture-lyrics' });
-        showToast(fx.particleLyrics ? 'Cử chỉ: đã hiện lyrics' : 'Cử chỉ: đã ẩn lyrics');
-      }
-    } else if (action === 'next') {
-      nextTrack(true);
-      showToast('Cử chỉ: bài tiếp theo');
-    } else if (action === 'previous') {
-      prevTrack(true);
-      showToast('Cử chỉ: bài trước');
-    }
-    return true;
-  } catch (e) {
-    console.warn('[GestureAction]', action, e);
-    return false;
-  }
-}
-
-function updateGestureSwipeAction(palm, openness, now, profile) {
-  if (openness < 0.72) {
-    gestureActionState.swipeAnchor = null;
-    return false;
-  }
-  var anchor = gestureActionState.swipeAnchor;
-  if (!anchor || now - anchor.time > profile.swipeWindow) {
-    gestureActionState.swipeAnchor = { x: palm.x, y: palm.y, time: now };
-    return false;
-  }
-  var dx = palm.x - anchor.x;
-  var dy = palm.y - anchor.y;
-  if (Math.abs(dy) > 0.16 || Math.abs(dx) < profile.swipeDistance || Math.abs(dx) < Math.abs(dy) * 1.65 || now < gestureActionState.cooldownUntil) return false;
-  var action = dx < 0 ? 'next' : 'previous';
-  gestureActionState.candidate = action;
-  gestureActionState.since = now;
-  gestureActionState.fired = false;
-  gestureActionState.swipeAnchor = null;
-  executeGesturePlayerAction(action, now, profile.cooldown);
-  showGestureHUD(dx < 0 ? '左滑 · 下一首' : '右滑 · 上一首', 1, '已执行，回到中央后可继续');
-  return true;
-}
-
-function updateGesturePlayerActions(lm, palm, openness, pinchDist, isPinch, isFist, now) {
-  if (!gesturePlayerActionsAllowed()) {
-    resetGesturePlayerActionState(true);
-    return false;
-  }
-  var profile = gestureSensitivityProfile();
-  if (!isPinch && !isFist && updateGestureSwipeAction(palm, openness, now, profile)) return true;
-  if (isPinch || isFist || openness > 0.72) {
-    if (openness <= 0.72) gestureActionState.swipeAnchor = null;
-    gestureActionState.candidate = '';
-    gestureActionState.since = 0;
-    gestureActionState.fired = false;
-    gestureActionState.volumeArmed = false;
-    return false;
-  }
-
-  var pose = classifyGesturePlayerPose(lm, palm, pinchDist);
-  if (!pose) {
-    gestureActionState.candidate = '';
-    gestureActionState.since = 0;
-    gestureActionState.fired = false;
-    gestureActionState.volumeArmed = false;
-    return false;
-  }
-  if (pose === 'volume') {
-    var volumeProgress = setGestureCandidate('volume', now, profile.volumeHold, 'Âm lượng bằng ngón trỏ', 'Giữ rồi di chuyển lên/xuống để chỉnh âm lượng');
-    if (volumeProgress >= 1 && !gestureActionState.volumeArmed) {
-      gestureActionState.volumeArmed = true;
-      gestureActionState.volumeBaseY = palm.y;
-      gestureActionState.volumeBaseValue = typeof targetVolume === 'number' ? targetVolume : 0.7;
-      gestureActionState.volumeLastApply = 0;
-    }
-    if (gestureActionState.volumeArmed) {
-      var nextVolume = Math.max(0, Math.min(1, gestureActionState.volumeBaseValue + (gestureActionState.volumeBaseY - palm.y) * 1.85));
-      if (now - gestureActionState.volumeLastApply >= 80) {
-        gestureActionState.volumeLastApply = now;
-        if (typeof setVolume === 'function') setVolume(nextVolume, true);
-      }
-      showGestureHUD('音量 ' + Math.round(nextVolume * 100) + '%', nextVolume, '食指向上增加 · 向下降低');
-    }
-    return true;
-  }
-
-  var labels = {
-    play: ['V 手势 · 播放', 'Giữ để phát / tạm dừng'],
-    like: ['拇指向上 · 喜欢', 'Giữ để thích / bỏ thích'],
-    lyrics: ['三指 · 歌词', 'Giữ để hiện / ẩn lyrics']
-  };
-  var progress = setGestureCandidate(pose, now, profile.hold, labels[pose][0], labels[pose][1]);
-  if (progress >= 1) executeGesturePlayerAction(pose, now, profile.cooldown);
-  return true;
-}
-
-function applyGestureSettingsUi() {
-  if (!fx) return;
-  var actions = document.getElementById('t-gesturePlayerActions');
-  if (actions) actions.classList.toggle('on', fx.gesturePlayerActions !== false);
-  var overlay = document.getElementById('t-gestureHandOverlay');
-  if (overlay) overlay.classList.toggle('on', fx.gestureHandOverlay !== false);
-  var mode = normalizeGestureSensitivity(fx.gestureSensitivity);
-  document.querySelectorAll('#gesture-sensitivity-seg button').forEach(function (button) {
-    button.classList.toggle('active', button.dataset.gestureSensitivity === mode);
-  });
-  if (handCanvas) handCanvas.classList.toggle('show', gestureActive && fx.gestureHandOverlay !== false);
-}
-
-function toggleGesturePlayerActions() {
-  fx.gesturePlayerActions = fx.gesturePlayerActions === false;
-  resetGesturePlayerActionState(true);
-  applyGestureSettingsUi();
-  saveLyricLayout({ user: true, reason: 'gesturePlayerActions' });
-  showToast(fx.gesturePlayerActions ? 'Điều khiển trình phát bằng cử chỉ đã bật' : 'Chỉ giữ cử chỉ hiệu ứng');
-}
-
-function toggleGestureHandOverlay() {
-  fx.gestureHandOverlay = fx.gestureHandOverlay === false;
-  applyGestureSettingsUi();
-  if (!fx.gestureHandOverlay && handCanvasCtx) handCanvasCtx.clearRect(0, 0, handCanvas.width, handCanvas.height);
-  saveLyricLayout({ user: true, reason: 'gestureHandOverlay' });
-  showToast(fx.gestureHandOverlay ? 'Hiệu ứng bàn tay đã bật' : 'Ẩn hiệu ứng bàn tay, nhận diện vẫn chạy');
-}
-
-function setGestureSensitivity(mode) {
-  fx.gestureSensitivity = normalizeGestureSensitivity(mode);
-  resetGesturePlayerActionState(true);
-  applyGestureSettingsUi();
-  saveLyricLayout({ user: true, reason: 'gestureSensitivity' });
-}
-
-function gestureInferenceIntervalMs() {
-  var quality = fx && String(fx.performanceQuality || 'eco');
-  if (quality === 'high' || quality === 'ultra') return 42;
-  if (quality === 'balanced') return 55;
-  return 72;
-}
-
-function gestureModelComplexity() {
-  // 手势是显式开启的交互能力，识别可靠性优先于模型降档。
-  // 帧率仍按性能档限流，低配机不会因此把推理频率拉高。
-  return 1;
-}
-
-function gestureHostVisible() {
-  if (typeof desktopRuntimeState === 'object' && desktopRuntimeState && desktopRuntimeState.desktop) {
-    // 完整桌面模式会把同一个 Mineradio HWND 嵌入桌面；此时 Electron
-    // 的 isVisible/isMinimized 可能不代表用户肉眼看到的桌面宿主。
-    if (desktopRuntimeState.embedded === true || desktopRuntimeState.interactive === true) return true;
-    return desktopRuntimeState.minimized !== true && desktopRuntimeState.visible !== false;
-  }
-  return !document.hidden;
-}
-
-function syncGestureCameraUi() {
-  if (!fx) return;
-  var wantsGesture = fx.cam === 'gesture';
-  var starting = wantsGesture && gestureLifecycleState === 'starting';
-  var running = wantsGesture && gestureActive && gestureLifecycleState === 'active';
-  document.querySelectorAll('#cam-seg button').forEach(function (button) {
-    var mode = button.dataset.cam;
-    button.classList.toggle('active', mode === 'gesture' ? (running || starting) : !wantsGesture);
-    button.classList.toggle('pending', mode === 'gesture' && starting);
-    button.setAttribute('aria-busy', mode === 'gesture' && starting ? 'true' : 'false');
-    button.setAttribute('aria-pressed', mode === 'gesture' ? String(running) : String(!wantsGesture));
-  });
-}
-
-function setGestureLifecycleState(state) {
-  gestureLifecycleState = String(state || 'off');
-  syncGestureCameraUi();
-}
-
-function persistGestureCameraDisabled(reason) {
-  fx.cam = 'off';
-  syncGestureCameraUi();
-  try { saveLyricLayout({ user: true, reason: 'cam', syncDisk: true }); } catch (e) { }
-  if (reason) console.warn('[GestureCamera] disabled:', reason);
-}
-
-function resumeSavedGestureControl(reason) {
-  if (!fx || fx.cam !== 'gesture') {
-    syncGestureCameraUi();
-    return Promise.resolve(false);
-  }
-  if ((document.body && document.body.classList.contains('splash-active')) || !gestureHostVisible()) {
-    setGestureLifecycleState('suspended');
-    return Promise.resolve(false);
-  }
-  return Promise.resolve(startGestureControl()).then(function (started) {
-    syncGestureCameraUi();
-    return started === true;
-  });
-}
-
-function syncGestureControlHostVisibility(reason) {
-  if (gestureHostResumeTimer) {
-    clearTimeout(gestureHostResumeTimer);
-    gestureHostResumeTimer = 0;
-  }
-  if (!fx || fx.cam !== 'gesture') {
-    if (gestureActive || gestureStartPromise || gestureVideo || gestureCamera || gestureHands) stopGestureControl();
-    else syncGestureCameraUi();
-    return;
-  }
-  if (!gestureHostVisible()) {
-    gestureStartEpoch++;
-    gestureStartPromise = null;
-    if (gestureActive || gestureVideo || gestureCamera || gestureHands) cleanupGestureControlRuntime('suspended');
-    else setGestureLifecycleState('suspended');
-    return;
-  }
-  if (document.body && document.body.classList.contains('splash-active')) return;
-  gestureHostResumeTimer = setTimeout(function () {
-    gestureHostResumeTimer = 0;
-    resumeSavedGestureControl(reason || 'host-visible');
-  }, 120);
-}
-
 async function startGestureControl() {
-  if (gestureActive) return true;
-  if (gestureStartPromise) return gestureStartPromise;
-  var epoch = ++gestureStartEpoch;
-  setGestureLifecycleState('starting');
-  gestureStartPromise = startGestureControlInternal(epoch);
-  try { return await gestureStartPromise; }
-  finally {
-    if (epoch === gestureStartEpoch) {
-      gestureStartPromise = null;
-      if (!gestureActive && gestureLifecycleState === 'starting') {
-        setGestureLifecycleState(fx && fx.cam === 'gesture' ? 'suspended' : 'off');
-      }
-    }
-  }
-}
-
-async function startGestureControlInternal(epoch) {
-  showToast('Đang tải nhận diện cử chỉ…');
+  if (gestureActive) return;
+  showToast('正在加载手势识别…');
   try {
-    var desktopApi = typeof getDesktopWindowApi === 'function' ? getDesktopWindowApi() : window.desktopWindow;
-    if (desktopApi && typeof desktopApi.requestGestureCameraPermission === 'function') {
-      var permissionGrant = await desktopApi.requestGestureCameraPermission();
-      if (!permissionGrant || permissionGrant.ok !== true) {
-        throw new Error(permissionGrant && permissionGrant.error || 'GESTURE_CAMERA_PERMISSION_GRANT_FAILED');
-      }
-    }
     await loadScriptOnce('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js');
     await loadScriptOnce('https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js');
-    if (epoch !== gestureStartEpoch || fx.cam !== 'gesture') return false;
     gestureVideo = document.createElement('video');
     gestureVideo.playsInline = true; gestureVideo.muted = true;
     gestureVideo.style.display = 'none';
     document.body.appendChild(gestureVideo);
     gestureHands = new Hands({ locateFile: function (f) { return 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/' + f; } });
     // modelComplexity:1 比 0 更稳定, 但仍流畅. 提高 confidence 减少误检
-    gestureHands.setOptions({ maxNumHands: 1, modelComplexity: gestureModelComplexity(), minDetectionConfidence: 0.58, minTrackingConfidence: 0.55 });
+    gestureHands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
     gestureHands.onResults(function (res) {
       if (!gestureActive) return;
       var lm = res.multiHandLandmarks && res.multiHandLandmarks[0];
       if (!lm) { onHandLost(); return; }
       processHandFrame(lm);
     });
-    gestureCamera = new Camera(gestureVideo, { onFrame: async function () {
-      if (!gestureHands || gestureInferenceBusy || !gestureHostVisible()) return;
-      var now = performance.now();
-      if (now - gestureLastInferenceAt < gestureInferenceIntervalMs()) return;
-      gestureLastInferenceAt = now;
-      gestureInferenceBusy = true;
-      try {
-        await gestureHands.send({ image: gestureVideo });
-      } catch (error) {
-        // camera_utils 只会在 onFrame Promise resolve 后排下一帧；这里若把
-        // 单帧错误继续抛出，整条摄像头 RAF 会永久停止。
-        gestureInferenceErrorCount++;
-        if (now - gestureLastInferenceErrorAt > 5000) {
-          gestureLastInferenceErrorAt = now;
-          console.warn('[GestureCamera] inference frame recovered:', error && (error.message || error.name) || error);
-        }
-        onHandLost();
-      }
-      finally { gestureInferenceBusy = false; }
-    }, width: 480, height: 360 });
+    gestureCamera = new Camera(gestureVideo, { onFrame: async function () { if (gestureHands) await gestureHands.send({ image: gestureVideo }); }, width: 480, height: 360 });
     await gestureCamera.start();
-    if (epoch !== gestureStartEpoch || fx.cam !== 'gesture') {
-      cleanupGestureControlRuntime();
-      return false;
-    }
     gestureActive = true;
-    setGestureLifecycleState('active');
     // 准备 hand canvas
     handCanvas = document.getElementById('hand-canvas');
     handCanvasCtx = handCanvas.getContext('2d');
     resizeHandCanvas();
-    handCanvas.classList.toggle('show', fx.gestureHandOverlay !== false);
-    applyGestureSettingsUi();
-    showToast('Đã bật cử chỉ: điều khiển hạt + trình phát');
-    showGestureHUD('Chờ', 0, 'Đưa tay vào vùng camera');
-    return true;
+    handCanvas.classList.add('show');
+    showToast('手势已开启: 手掌推开 · 捏合旋转 · 握拳收束');
+    showGestureHUD('待命', 0, '把手放进视野');
   } catch (e) {
-    if (epoch !== gestureStartEpoch || !fx || fx.cam !== 'gesture') {
-      cleanupGestureControlRuntime(fx && fx.cam === 'gesture' ? 'suspended' : 'off');
-      return false;
-    }
     console.warn('Gesture failed:', e);
-    cleanupGestureControlRuntime('error');
-    var denied = /NotAllowed|Permission|permission|GESTURE_CAMERA/i.test(String(e && (e.name + ' ' + e.message) || e || ''));
-    showToast(denied ? 'Chưa cấp quyền camera. Hãy cho phép ứng dụng desktop truy cập camera trong Windows' : 'Không thể bật cử chỉ. Hãy kiểm tra camera có đang bị ứng dụng khác sử dụng không');
-    persistGestureCameraDisabled(e && (e.message || e.name) || e || 'startup-failed');
-    return false;
+    showToast('手势启动失败 (需要摄像头权限)');
+    fx.cam = 'off';
+    document.querySelectorAll('#cam-seg button').forEach(function (b) { b.classList.toggle('active', b.dataset.cam === 'off'); });
   }
 }
 
-function cleanupGestureControlRuntime(nextState) {
+function stopGestureControl() {
+  if (!gestureActive) return;
   try { if (gestureCamera && gestureCamera.stop) gestureCamera.stop(); } catch (e) { }
   try { if (gestureVideo && gestureVideo.srcObject) gestureVideo.srcObject.getTracks().forEach(function (t) { t.stop(); }); } catch (e) { }
-  try { if (gestureHands && gestureHands.close) gestureHands.close(); } catch (e) { }
   try { if (gestureVideo) gestureVideo.remove(); } catch (e) { }
   gestureVideo = null; gestureHands = null; gestureCamera = null;
   gestureActive = false;
-  gestureInferenceBusy = false;
-  gestureLastInferenceAt = 0;
-  gestureLastInferenceErrorAt = 0;
-  gestureInferenceErrorCount = 0;
   pinchState.active = false;
   handLmSmooth = null;
   uniforms.uHandActive.value = 0;
@@ -55053,26 +54036,16 @@ function cleanupGestureControlRuntime(nextState) {
   gestureGrip.value = 0;
   gestureGrip.target = 0;
   gestureGrip.openness = 1;
-  resetGesturePlayerActionState(false);
   document.getElementById('gesture-hud').classList.remove('show');
   if (handCanvas) {
     handCanvas.classList.remove('show');
     if (handCanvasCtx) handCanvasCtx.clearRect(0, 0, handCanvas.width, handCanvas.height);
   }
-  setGestureLifecycleState(nextState || 'off');
-}
-
-function stopGestureControl() {
-  gestureStartEpoch++;
-  gestureStartPromise = null;
-  if (!gestureActive && !gestureVideo && !gestureCamera && !gestureHands) return;
-  cleanupGestureControlRuntime('off');
 }
 
 function resizeHandCanvas() {
   if (!handCanvas) return;
-  var eco = fx && fx.performanceQuality === 'eco';
-  var dpr = eco ? 1 : Math.min(devicePixelRatio || 1, 2);
+  var dpr = Math.min(devicePixelRatio || 1, 2);
   handCanvas.width = innerWidth * dpr;
   handCanvas.height = innerHeight * dpr;
   handCanvas.style.width = innerWidth + 'px';
@@ -55085,13 +54058,12 @@ function onHandLost() {
   // 平滑淡出, 不立即清零 — 给一点缓冲
   if (pinchState.active) pinchState.active = false;
   gestureGrip.target = 0;
-  resetGesturePlayerActionState(true);
   uniforms.uHandActive.value *= 0.9;
   if (uniforms.uHandActive.value < 0.02) uniforms.uHandActive.value = 0;
   if (performance.now() - handLmLastSeen > 600) {
     handLmSmooth = null;
     if (handCanvasCtx) handCanvasCtx.clearRect(0, 0, innerWidth, innerHeight);
-    showGestureHUD('Chờ', 0, 'Đưa tay vào vùng camera');
+    showGestureHUD('待命', 0, '把手放进视野');
   }
 }
 
@@ -55157,7 +54129,6 @@ function processHandFrame(rawLm) {
   var pinchDist = Math.hypot(lm[8].x - lm[4].x, lm[8].y - lm[4].y);
   var isPinch = pinchDist < 0.075 && openness > 0.28;
   var isFist = !isPinch && gripTarget > 0.68;
-  var playerActionVisible = updateGesturePlayerActions(lm, palm, openness, pinchDist, isPinch, isFist, performance.now());
 
   if (isPinch && !pinchState.active) {
     unlockCenteredView();
@@ -55167,7 +54138,7 @@ function processHandFrame(rawLm) {
     pinchState.lastT = performance.now();
     particleSpin.vx = particleSpin.vy = 0;
     gestureGrip.target = Math.min(0.34, gestureGrip.target);
-    if (!playerActionVisible) showGestureHUD('捏合拖动', 1, '移动手掌 -> 旋转封面');
+    showGestureHUD('捏合拖动', 1, '移动手掌 -> 旋转封面');
   } else if (isPinch && pinchState.active) {
     unlockCenteredView();
     var dx = palm.x - pinchState.lastX;
@@ -55185,27 +54156,26 @@ function processHandFrame(rawLm) {
     pinchState.lastY = palm.y;
     pinchState.lastT = nowPinch;
     gestureGrip.target = Math.min(0.34, gestureGrip.target);
-    if (!playerActionVisible) showGestureHUD('拖动中', 1, 'Thả tay để giữ quán tính');
+    showGestureHUD('拖动中', 1, '松手后保留惯性');
   } else if (!isPinch && pinchState.active) {
     pinchState.active = false;
-    if (!playerActionVisible) showGestureHUD('松开', 0.4, '可继续触碰或捏合');
+    showGestureHUD('松开', 0.4, '可继续触碰或捏合');
   } else if (isFist) {
     if (gestureGrip.lastState !== 'fist') {
       gestureGrip.pulse = 1;
       uniforms.uBurstAmt.value = Math.max(uniforms.uBurstAmt.value, 0.26);
     }
     gestureGrip.lastState = 'fist';
-    if (!playerActionVisible) showGestureHUD('握拳收束', Math.max(0.55, gripTarget), '粒子向中心收缩');
+    showGestureHUD('握拳收束', Math.max(0.55, gripTarget), '粒子向中心收缩');
   } else {
     if (gestureGrip.lastState === 'fist' && openness > 0.58) {
       uniforms.uBurstAmt.value = Math.max(uniforms.uBurstAmt.value, 0.18);
     }
     gestureGrip.lastState = openness > 0.62 ? 'open' : 'hover';
-    if (!playerActionVisible) showGestureHUD(openness > 0.62 ? '张开恢复' : '悬停', 0.30 + openness * 0.34, openness > 0.72 ? 'Vuốt trái/phải nhanh để đổi bài' : 'Đẩy hạt / chụm xoay / nắm để gom');
+    showGestureHUD(openness > 0.62 ? '张开恢复' : '悬停', 0.30 + openness * 0.34, '手掌推开粒子 / 捏合旋转 / 握拳收束');
   }
 
-  if (fx.gestureHandOverlay !== false) drawHandSkeleton(lm, isPinch, openness, isFist);
-  else if (handCanvasCtx) handCanvasCtx.clearRect(0, 0, innerWidth, innerHeight);
+  drawHandSkeleton(lm, isPinch, openness, isFist);
 }
 
 // 画手掌骨架: 连线 + 关节圆点
@@ -55326,18 +54296,10 @@ function tickGestureRotation(dt) {
 function showGestureHUD(label, progress, detail) {
   var hud = document.getElementById('gesture-hud');
   if (!hud) return;
-  var safeLabel = label || 'Chờ';
-  var safeDetail = detail || '将手放进摄像头视野';
-  var safeProgress = Math.max(0, Math.min(100, (progress || 0) * 100));
-  var signature = safeLabel + '|' + safeDetail + '|' + Math.round(safeProgress / 2);
-  var now = performance.now();
-  if (signature === gestureLastHudSignature && now - gestureLastHudAt < 100) return;
-  gestureLastHudSignature = signature;
-  gestureLastHudAt = now;
-  document.getElementById('gesture-label').textContent = safeLabel;
-  document.getElementById('gesture-confirm').textContent = safeDetail;
+  document.getElementById('gesture-label').textContent = label || '待命';
+  document.getElementById('gesture-confirm').textContent = detail || '将手放进摄像头视野';
   var fill = document.getElementById('gesture-fill');
-  if (fill) fill.style.width = safeProgress + '%';
+  if (fill) fill.style.width = Math.max(0, Math.min(100, (progress || 0) * 100)) + '%';
   hud.classList.add('show');
 }
 function showGestureCursor() { }  // stub: 兼容旧调用
@@ -58066,23 +57028,6 @@ function applyWallpaperModeState(force) {
   normalizeDevelopmentLockedFxState();
   var payload = wallpaperPayload();
   if (typeof api.setWallpaperMode !== 'function') return Promise.resolve({ ok: false, enabled: false, error: 'WALLPAPER_DESKTOP_API_UNAVAILABLE' });
-  // Renderer bootstrap/reload must first rehydrate the native runtime state.
-  // Calling setWallpaperMode(true) unconditionally here re-enters the native
-  // Desktop Mode transition and briefly tears down/rebinds the visual surface,
-  // which is exactly the wallpaper flash seen after Ctrl+R/F5. Explicit user
-  // toggles still use the normal enable/disable path via force=true.
-  if (force !== true && typeof api.getWallpaperModeStatus === 'function') {
-    return Promise.resolve().then(function () { return api.getWallpaperModeStatus(); }).then(function (runtimeResult) {
-      var runtimeStatus = runtimeResult && runtimeResult.status ? runtimeResult.status : runtimeResult;
-      if (runtimeStatus && (runtimeStatus.enabled === true || runtimeStatus.active === true || runtimeStatus.attaching === true)) {
-        applyDesktopWallpaperRuntimeStatus(runtimeStatus);
-        return { ok: true, enabled: true, preserved: true, status: runtimeStatus, reason: 'renderer-rehydrate' };
-      }
-      return applyWallpaperModeState(true);
-    }).catch(function () {
-      return applyWallpaperModeState(true);
-    });
-  }
   var operation = ++desktopWallpaperRendererOperation;
   if (payload.enabled) {
     desktopWallpaperRuntimeState = Object.assign({}, desktopWallpaperRuntimeState, { attaching: true, enabled: true, lastError: '' });

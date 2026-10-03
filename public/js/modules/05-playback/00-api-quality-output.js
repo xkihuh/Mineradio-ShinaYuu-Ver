@@ -42,7 +42,6 @@ function normalizePlaybackQuality(value) {
 }
 function normalizePlaybackProvider(provider) {
   if (provider === 'spotify') return 'spotify';
-  if (provider === 'soundcloud') return 'soundcloud';
   if (provider === 'local') return 'local';
   return 'youtube';
 }
@@ -50,7 +49,6 @@ function normalizePlaybackQualityForProvider(value, provider) {
   provider = normalizePlaybackProvider(provider);
   var q = normalizePlaybackQuality(value);
   if (provider === 'youtube' && q === 'jymaster') return 'hires';
-  if (provider === 'soundcloud' && q !== 'low') return 'standard';
   return q;
 }
 function playbackQualityOptions(provider) {
@@ -170,7 +168,7 @@ function playbackResolvedQualityText(data, provider) {
   return br ? (label + ' · ' + br) : label;
 }
 function readPlaybackQualityPreference() {
-  var fallback = { youtube: PLAYBACK_QUALITY_DEFAULTS.youtube, spotify: PLAYBACK_QUALITY_DEFAULTS.spotify, soundcloud: PLAYBACK_QUALITY_DEFAULTS.soundcloud };
+  var fallback = { youtube: PLAYBACK_QUALITY_DEFAULTS.youtube, spotify: PLAYBACK_QUALITY_DEFAULTS.spotify };
   try {
     var raw = localStorage.getItem(PLAYBACK_QUALITY_STORE_KEY) || '';
     if (!raw) return fallback;
@@ -672,18 +670,6 @@ function openAudioOutputWorkflowPanel() {
 function closeAudioOutputWorkflowPanel() {
   closeGsapModal(document.getElementById('audio-output-workflow-modal'));
 }
-function reapplyNativeAudioOutputRoute(reason) {
-  if (!window.desktopWindow || typeof window.desktopWindow.routeAudioOutput !== 'function') return Promise.resolve(null);
-  var selected = audioOutputDeviceId ? audioOutputDeviceById(audioOutputDeviceId) : null;
-  return window.desktopWindow.routeAudioOutput({
-    deviceLabel: selected && selected.label || '',
-    clear: !audioOutputDeviceId,
-    reason: reason || 'refresh'
-  }).catch(function (error) {
-    console.warn('[AudioOutputNative]', error);
-    return null;
-  });
-}
 async function refreshAudioOutputDevices(showNotice) {
   if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
     audioOutputDevices = [];
@@ -695,7 +681,6 @@ async function refreshAudioOutputDevices(showNotice) {
   try {
     var devices = await navigator.mediaDevices.enumerateDevices();
     audioOutputDevices = devices.filter(function (device) { return device && device.kind === 'audiooutput' && device.deviceId !== 'default'; });
-    reapplyNativeAudioOutputRoute('device-refresh');
     audioInputDevices = devices.filter(function (device) { return device && device.kind === 'audioinput' && device.deviceId !== 'default'; });
     if (audioInputBridgeState && audioInputBridgeState.enabled && audioInputBridgeState.deviceId && !audioOutputDeviceById(audioInputBridgeState.deviceId)) {
       audioInputBridgeState.enabled = false;
@@ -884,13 +869,7 @@ function setAudioOutputDevice(deviceId, showNotice) {
   saveAudioOutputMirrorPreference();
   saveAudioOutputDevicePreference();
   renderAudioOutputDeviceUi();
-  var nativeRoutePromise = reapplyNativeAudioOutputRoute('user-select');
-  Promise.all([Promise.resolve(applyAudioOutputDevice(audio)), nativeRoutePromise]).then(function (results) {
-    var ok = results[0];
-    var nativeRoute = results[1];
-    if (nativeRoute && nativeRoute.ok !== true && requestedDeviceId) {
-      console.warn('[AudioOutputNative] Spotify/system route unavailable');
-    }
+  Promise.resolve(applyAudioOutputDevice(audio)).then(function (ok) {
     if (!showNotice) return;
     if (!requestedDeviceId) showToast('Đã chuyển về đầu ra mặc định hệ thống');
     else if (ok === true) showToast('Đã chuyển thiết bị đầu ra');

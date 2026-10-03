@@ -489,20 +489,24 @@ function renderQueuePanel(opts) {
   if (opts.animate && seq === queueRenderSeq) animateVisiblePanelList($ql, '.queue-item', document.getElementById('playlist-panel'), '.queue-item.now');
   renderMiniQueuePanel({ scrollCurrent: opts.scrollCurrent !== false && miniQueueOpen });
 }
+var appPlaylists = Array.isArray(window.__shinayuuAppPlaylists) ? window.__shinayuuAppPlaylists : [];
 function playlistCatalogProviderArray(provider) {
+  if (provider === 'app') return appPlaylists;
   return provider === 'spotify' ? spotifyPlaylists : youtubePlaylists;
 }
 function setPlaylistCatalogProviderArray(provider, rows) {
   rows = Array.isArray(rows) ? rows : [];
-  if (provider === 'spotify') spotifyPlaylists = rows;
+  if (provider === 'app') { appPlaylists = rows; window.__shinayuuAppPlaylists = appPlaylists; }
+  else if (provider === 'spotify') spotifyPlaylists = rows;
   else youtubePlaylists = rows;
 }
 function normalizePlaylistCatalogRow(pl, provider) {
   if (!pl || typeof pl !== 'object') return null;
-  provider = provider === 'spotify' ? 'spotify' : 'youtube';
+  provider = provider === 'spotify' ? 'spotify' : (provider === 'app' ? 'app' : 'youtube');
   var rawId = pl.id || pl.playlistId || pl.playlist_id || pl.browseId || pl.browse_id || pl.uri || pl.spotifyUri || pl.contextUri || '';
   rawId = String(rawId || '').trim();
   if (provider === 'spotify') rawId = rawId.replace(/^spotify:playlist:/i, '').replace(/^spotify:/i, '');
+  else if (provider === 'app') rawId = rawId.replace(/^app:/i, '');
   else rawId = rawId.replace(/^(?:youtube|youtube-music|ytmusic|qq):/i, '');
   if (!rawId) return null;
   var images = pl.images;
@@ -519,7 +523,7 @@ function normalizePlaylistCatalogRow(pl, provider) {
     provider: provider,
     source: provider,
     realProvider: provider,
-    name: String(pl.name || pl.title || pl.label || (provider === 'spotify' ? 'Spotify playlist' : 'YouTube playlist')),
+    name: String(pl.name || pl.title || pl.label || (provider === 'spotify' ? 'Spotify playlist' : (provider === 'app' ? 'Playlist ShinaYuu' : 'YouTube playlist'))),
     cover: String(cover || ''),
     trackCount: Math.max(0, trackCount)
   });
@@ -538,18 +542,15 @@ function ensurePlaylistShelfVisibleAfterCatalog(reason) {
     console.warn('[PlaylistShelfVisibility]', reason || 'playlist-catalog', error);
   }
 }
-function playlistCatalogProviderLoggedIn(provider, allowProbe) {
-  var status = provider === 'spotify' ? spotifyLoginStatus : youtubeLoginStatus;
-  // `allowProbe` no longer means "pretend logged in". The provider session
-  // has already been refreshed by refreshUserPlaylists(true). This prevents a
-  // forced refresh from issuing guaranteed 401 requests and then incorrectly
-  // clearing the catalog.
-  return !!(status && status.loggedIn);
+function playlistCatalogProviderLoggedIn(provider) {
+  if (provider === 'app') return true;
+  return provider === 'spotify' ? !!spotifyLoginStatus.loggedIn : !!youtubeLoginStatus.loggedIn;
 }
 function playlistCatalogPageUrl(provider, offset, limit) {
   offset = Math.max(0, Number(offset) || 0);
   limit = Math.max(1, Number(limit) || PLAYLIST_CATALOG_FIRST_PAGE_SIZE);
-  if (provider === 'spotify') return '/api/spotify/user/playlists?limit=' + Math.min(500, limit) + '&offset=' + offset;
+  if (provider === 'app') return '/api/app/playlists';
+  if (provider === 'spotify') return '/api/spotify/user/playlists?limit=' + Math.min(50, limit) + '&offset=' + offset;
   return '/api/youtube-music/user/playlists';
 }
 function mergePlaylistCatalogRows(existing, incoming, provider) {
@@ -567,7 +568,7 @@ function rebuildUserPlaylistsFromCatalog(opts) {
   opts = opts || {};
   youtubePlaylists = validPlaylistCatalogRows(youtubePlaylists, 'youtube');
   spotifyPlaylists = validPlaylistCatalogRows(spotifyPlaylists, 'spotify');
-  userPlaylists = (typeof builtInPlaylists !== 'undefined' ? builtInPlaylists : []).concat(youtubePlaylists, spotifyPlaylists);
+  userPlaylists = appPlaylists.concat(youtubePlaylists, spotifyPlaylists);
   if (typeof applyUserPlaylistOrder === 'function') applyUserPlaylistOrder();
   playlistCatalogRevision += 1;
   renderUserPlaylistsList({ animate: !!opts.animate, reset: !!opts.reset, preserveScroll: opts.preserveScroll !== false });
@@ -578,7 +579,7 @@ function rebuildUserPlaylistsFromCatalog(opts) {
 async function loadPlaylistCatalogProviderPage(provider, reason) {
   var root = playlistCatalogSyncState;
   var state = root.providers && root.providers[provider];
-  if (!state || state.loading || !state.hasMore || !state.enabled) return false;
+  if (!state || state.loading || !state.hasMore || !playlistCatalogProviderLoggedIn(provider)) return false;
   var token = root.token;
   var first = state.firstRequest !== false;
   var limit = first ? PLAYLIST_CATALOG_FIRST_PAGE_SIZE : PLAYLIST_CATALOG_BACKGROUND_PAGE_SIZE;
@@ -589,13 +590,6 @@ async function loadPlaylistCatalogProviderPage(provider, reason) {
   try {
     var r = await apiJson(url, { timeoutMs: 15000 });
     if (playlistCatalogSyncState.token !== token) return false;
-    if (r && r.loggedIn === false) {
-      state.enabled = false;
-      state.hasMore = false;
-      state.error = 'PLAYLIST_PROVIDER_NOT_CONNECTED';
-      state.firstRequest = false;
-      return false;
-    }
     var incoming = validPlaylistCatalogRows(r && r.playlists || [], provider);
     if (r && r.error && !incoming.length) throw new Error(r.message || r.error);
     // Replace a provider only after its first successful non-empty response.
@@ -613,6 +607,8 @@ async function loadPlaylistCatalogProviderPage(provider, reason) {
     setPlaylistCatalogProviderArray(provider, merged);
     state.loaded = merged.length;
     state.total = Math.max(state.loaded, Number(r && r.total) || 0);
+    state.reauthRequired = false;
+    state.authStatus = 0;
     state.nextOffset = r && r.nextOffset != null ? Math.max(0, Number(r.nextOffset) || 0) : (requestOffset + incoming.length);
     var supportsPaging = provider === 'spotify';
     state.hasMore = supportsPaging ? !!(r && r.hasMore) : false;
@@ -625,23 +621,26 @@ async function loadPlaylistCatalogProviderPage(provider, reason) {
     if (playlistCatalogSyncState.token !== token) return false;
     console.warn('[PlaylistCatalogPage]', provider, e);
     var errorData = e && e.data || {};
+    var spotifyAuthRequired = provider === 'spotify' && (
+      errorData.reauthRequired === true ||
+      Number(errorData.status || 0) === 401 ||
+      Number(errorData.status || 0) === 403 ||
+      Number(e && e.status || 0) === 401 ||
+      Number(e && e.status || 0) === 403
+    );
     state.error = e && e.message || 'PLAYLIST_CATALOG_PAGE_FAILED';
-    state.reauthRequired = !!errorData.reauthRequired || /SCOPE_REQUIRED|AUTH_REQUIRED|REAUTH/i.test(String(state.error));
     state.firstRequest = false;
     state.hasMore = false;
-    // Do not permanently disable a connected provider after one transient
-    // network/rate-limit failure; the next explicit refresh must be able to retry.
-    state.enabled = !!(provider === 'spotify' ? spotifyLoginStatus.loggedIn : youtubeLoginStatus.loggedIn);
-    playlistCatalogSyncState.error = state.error;
-    playlistCatalogSyncState.providers[provider] = state;
-    if (userPlaylists.length) renderUserPlaylistsList({ preserveScroll: true });
-    else {
-      var message = state.reauthRequired
-        ? localizeUiMessage('Hãy đăng nhập lại trước khi thay đổi trạng thái yêu thích của playlist')
-        : localizeUiMessage('Không thể đọc dữ liệu');
-      var empty = document.getElementById('pl-list');
-      if (empty) empty.innerHTML = '<div class="playlist-empty-state">' + escHtml(message) + '</div>';
+    state.reauthRequired = !!spotifyAuthRequired;
+    state.authStatus = spotifyAuthRequired ? Number(errorData.status || e && e.status || 403) : 0;
+    if (spotifyAuthRequired) {
+      setPlaylistCatalogProviderArray('spotify', []);
+      state.loaded = 0;
+      state.total = 0;
+      state.nextOffset = 0;
     }
+    playlistCatalogSyncState.error = state.error;
+    renderUserPlaylistsList({ preserveScroll: true });
     scheduleShelfRebuild('playlist-catalog-error-' + provider, true);
     ensurePlaylistShelfVisibleAfterCatalog('playlist-catalog-error-' + provider);
     return false;
@@ -683,31 +682,6 @@ function requestNextPlaylistCatalogPage(reason) {
   return true;
 }
 async function refreshUserPlaylists(force) {
-  if (typeof refreshBuiltInPlaylists === 'function') await refreshBuiltInPlaylists(!!force);
-  // The playlist panel can be opened before the startup account probes finish.
-  // Never render the logged-out empty state from that transient window.
-  if (!force && !loginStatusChecked && typeof refreshLoginStatus === 'function') {
-    await refreshLoginStatus();
-  }
-  var allowProviderProbe = !!force;
-  // A forced refresh is an explicit user request to synchronize remote catalogs.
-  // Refresh the authoritative provider sessions first so a stale renderer status
-  // cannot make us skip a valid YouTube/Spotify catalog request.
-  if (force) {
-    await Promise.allSettled([
-      (typeof refreshYouTubeLoginStatus === 'function' ? refreshYouTubeLoginStatus({ force: true }) : Promise.resolve()),
-      (typeof refreshSpotifyLoginStatus === 'function' ? refreshSpotifyLoginStatus() : Promise.resolve())
-    ]);
-  }
-  if (!youtubeLoginStatus.loggedIn && !spotifyLoginStatus.loggedIn && !allowProviderProbe) {
-    resetPlaylistPanelRenderLimit();
-    if (Array.isArray(builtInPlaylists) && builtInPlaylists.length) {
-      rebuildUserPlaylistsFromCatalog({ animate: false, reset: true, preserveScroll: true, reason: 'built-in-only-playlists' });
-      return;
-    }
-    document.getElementById('pl-list').innerHTML = '<div class="playlist-empty-state">Kết nối YouTube Music hoặc Spotify để hiển thị playlist của bạn.</div>';
-    return;
-  }
   var catalogNeedsNewProvider = playlistCatalogSyncState.loading && ['youtube', 'spotify'].some(function (provider) {
     var state = playlistCatalogSyncState.providers && playlistCatalogSyncState.providers[provider];
     return playlistCatalogProviderLoggedIn(provider) && (!state || !state.enabled);
@@ -733,15 +707,17 @@ async function refreshUserPlaylists(force) {
   if (playlistCatalogSyncState.timer) clearTimeout(playlistCatalogSyncState.timer);
   var token = playlistCatalogSyncState.token + 1;
   playlistCatalogSyncState = { token: token, loading: true, timer: 0, providers: {}, error: '', startedAt: Date.now() };
-  ['youtube', 'spotify'].forEach(function (provider) {
+  ['app', 'youtube', 'spotify'].forEach(function (provider) {
     playlistCatalogSyncState.providers[provider] = {
-      enabled: playlistCatalogProviderLoggedIn(provider, allowProviderProbe),
+      enabled: playlistCatalogProviderLoggedIn(provider),
       loaded: playlistCatalogProviderArray(provider).length,
       total: playlistCatalogProviderArray(provider).length,
       nextOffset: 0,
-      hasMore: playlistCatalogProviderLoggedIn(provider, allowProviderProbe),
+      hasMore: playlistCatalogProviderLoggedIn(provider),
       loading: false,
       error: '',
+      reauthRequired: false,
+      authStatus: 0,
       firstRequest: true,
       emptyRefreshPreserved: false,
       replaceOnFirstSuccess: !!(force && playlistCatalogProviderLoggedIn(provider))
@@ -749,7 +725,7 @@ async function refreshUserPlaylists(force) {
   });
   // Never clear userPlaylists before the network result arrives. Clearing here
   // was the direct reason the authenticated right shelf disappeared.
-  var firstPageTasks = Object.keys(playlistCatalogSyncState.providers).filter(function (provider) { return playlistCatalogSyncState.providers[provider].enabled; }).map(function (provider) {
+  var firstPageTasks = Object.keys(playlistCatalogSyncState.providers).filter(playlistCatalogProviderLoggedIn).map(function (provider) {
     return loadPlaylistCatalogProviderPage(provider, 'first-page');
   });
   await Promise.allSettled(firstPageTasks);
@@ -757,24 +733,6 @@ async function refreshUserPlaylists(force) {
   playlistCatalogSyncState.loading = playlistCatalogHasPendingPages();
   if ($pl) $pl.classList.remove('playlist-catalog-refreshing');
   if (userPlaylists.length) renderUserPlaylistsList({ animate: isPlaylistPanelVisibleForRender(), preserveScroll: true });
-  else {
-    var providerStates = playlistCatalogSyncState.providers || {};
-    var spotifyState = providerStates.spotify || {};
-    var youtubeState = providerStates.youtube || {};
-    var messages = [];
-    if (spotifyState.reauthRequired || /SCOPE_REQUIRED|AUTH_REQUIRED|REAUTH/i.test(String(spotifyState.error || ''))) {
-      messages.push(localizeUiMessage('Hãy đăng nhập lại trước khi thay đổi trạng thái yêu thích của playlist'));
-    } else if (spotifyLoginStatus.loggedIn && spotifyState.error) {
-      messages.push(localizeUiMessage('Spotify: ') + String(spotifyState.error));
-    }
-    if (youtubeState.reauthRequired || /SCOPE_REQUIRED|AUTH_REQUIRED|REAUTH/i.test(String(youtubeState.error || ''))) {
-      messages.push(localizeUiMessage('Hãy đăng nhập lại trước khi thay đổi trạng thái yêu thích của playlist'));
-    } else if (youtubeLoginStatus.loggedIn && youtubeState.error) {
-      messages.push(localizeUiMessage('YouTube: ') + String(youtubeState.error));
-    }
-    var empty = document.getElementById('pl-list');
-    if (empty) empty.innerHTML = '<div class=\"playlist-empty-state\">' + escHtml(messages.length ? messages.join(' · ') : localizeUiMessage('Kết nối YouTube Music hoặc Spotify để hiển thị playlist của bạn.')) + '</div>';
-  }
   scheduleShelfRebuild('playlist-catalog-all-settled', true);
   ensurePlaylistShelfVisibleAfterCatalog('playlist-catalog-all-settled');
   if (playlistCatalogSyncState.loading) requestNextPlaylistCatalogPage('after-first-pages');

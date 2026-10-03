@@ -12,7 +12,6 @@ const {
 } = require('./wallpaper-engine-library');
 const { WallpaperEngineRuntime } = require('./wallpaper-engine-runtime');
 const { FullDesktopModeRuntime } = require('./full-desktop-mode-runtime');
-const { BuiltInPlaylistLibrary } = require('./built-in-playlist-library');
 const { registerShinaYuuMediaScheme, createShinaYuuNativeServices } = require('./shinayuu-native-services');
 
 registerWallpaperEngineScheme(protocol);
@@ -198,7 +197,6 @@ const NATIVE_HELPER_TEMP_PATH = INITIAL_CACHE_SETTINGS.nativePath;
 fs.mkdirSync(NATIVE_HELPER_TEMP_PATH, { recursive: true });
 process.env.MINERADIO_NATIVE_TEMP_DIR = NATIVE_HELPER_TEMP_PATH;
 systemMemory.setNativeTempPath(NATIVE_HELPER_TEMP_PATH);
-const builtInPlaylistLibrary = new BuiltInPlaylistLibrary({ userDataPath: STABLE_USER_DATA_PATH });
 const wallpaperEngineLibrary = new WallpaperEngineLibrary({ userDataPath: STABLE_USER_DATA_PATH });
 const wallpaperEngineRuntime = new WallpaperEngineRuntime({
   library: wallpaperEngineLibrary,
@@ -226,7 +224,6 @@ let wallpaperEngineHostBoundsStopPromise = null;
 let wallpaperEngineHostBoundsOperation = 0;
 let wallpaperEngineHostBoundsFollowupReason = '';
 let wallpaperEngineHostVisibilitySuspended = false;
-let wallpaperEngineHostVisibilityResidentMinimized = false;
 let wallpaperEngineHostVisibilityResumePending = false;
 let wallpaperEngineHostVisibilityResumeTimer = null;
 let wallpaperEngineHostVisibilityOperation = 0;
@@ -241,8 +238,6 @@ const WALLPAPER_ENGINE_CAPTURE_PREPARE_TIMEOUT_MS = 9000;
 const WALLPAPER_ENGINE_CAPTURE_RETRY_DELAY_MS = 720;
 const WALLPAPER_ENGINE_MAX_CAPTURE_FPS = 240;
 const WALLPAPER_ENGINE_HOST_RESUME_TIMEOUT_MS = 30000;
-const GESTURE_CAMERA_PERMISSION_GRANT_MS = 45000;
-let gestureCameraPermissionGrant = null;
 // ShinaYuu is a visual music player. The MV layer, lyrics clock and scene must
 // continue while the window is covered by another application. Electron's
 // default background throttling pauses exactly those renderer/video tasks.
@@ -745,7 +740,7 @@ function flushMainWindowFxAutosave(reason) {
   ]).catch((e) => ({ ok: false, error: e.message || String(e) }));
 }
 
-const LOCAL_APP_PERMISSION_ALLOWLIST = new Set(['speaker-selection', 'pointerLock', 'pointer-lock', 'geolocation']);
+const LOCAL_APP_PERMISSION_ALLOWLIST = new Set(['speaker-selection', 'pointerLock', 'pointer-lock']);
 const SPOTIFY_PERMISSION_HOST_SUFFIXES = Object.freeze([
   'spotify.com',
   'scdn.co',
@@ -820,42 +815,6 @@ function isTrustedMainWindowIpc(event) {
   } catch (_) {
     return false;
   }
-}
-
-function clearGestureCameraPermissionGrant() {
-  gestureCameraPermissionGrant = null;
-}
-
-function createGestureCameraPermissionGrant(event) {
-  if (!isTrustedMainWindowIpc(event)) return null;
-  const sourceUrl = event.senderFrame && event.senderFrame.url || event.sender.getURL();
-  gestureCameraPermissionGrant = {
-    webContentsId: event.sender.id,
-    origin: sourceUrl,
-    expiresAt: Date.now() + GESTURE_CAMERA_PERMISSION_GRANT_MS,
-  };
-  return gestureCameraPermissionGrant;
-}
-
-function isTrustedGestureCameraMediaPermission(webContents, origin, details) {
-  const grant = gestureCameraPermissionGrant;
-  if (!grant || Date.now() > grant.expiresAt) {
-    clearGestureCameraPermissionGrant();
-    return false;
-  }
-  try {
-    if (!webContents || webContents.isDestroyed() || webContents.id !== grant.webContentsId) return false;
-    if (!mainWindow || mainWindow.isDestroyed() || webContents !== mainWindow.webContents) return false;
-    if (!isTrustedMainDocumentUrl(origin) || !isTrustedMainDocumentUrl(grant.origin)) return false;
-    if (details && details.isMainFrame === false) return false;
-    const mediaType = String(details && details.mediaType || '').toLowerCase();
-    const mediaTypes = details && Array.isArray(details.mediaTypes)
-      ? details.mediaTypes.map((value) => String(value || '').toLowerCase()).filter(Boolean) : [];
-    if (mediaType.includes('audio') || mediaTypes.some((value) => value.includes('audio'))) return false;
-    if (mediaType && !mediaType.includes('video')) return false;
-    if (mediaTypes.length && !mediaTypes.every((value) => value.includes('video'))) return false;
-    return true;
-  } catch (_) { return false; }
 }
 
 function isTrustedWallpaperEngineIpc(event) {
@@ -1257,18 +1216,6 @@ function finishWallpaperEngineVisibleHostResume(win) {
 
 function suspendWallpaperEngineForHiddenHost(win, reason = 'hidden') {
   if (!win || win.isDestroyed()) return Promise.resolve({ ok: true, stopped: false });
-  const normalizedReason = String(reason || 'hidden').toLowerCase();
-  const runtimeStatus = wallpaperEngineRuntime.getStatus();
-  if (/^minimi[sz]e(?:d)?$/.test(normalizedReason)
-    && runtimeStatus && runtimeStatus.active === true
-    && runtimeStatus.captureMode === 'dwm-thumbnail'
-    && runtimeStatus.dwmSurfaceReady === true) {
-    wallpaperEngineHostVisibilityResidentMinimized = true;
-    finishWallpaperEngineVisibleHostResume(win);
-    cancelWallpaperEngineHostBoundsRestart();
-    return Promise.resolve({ ok: true, stopped: false, preserved: true, sessionId: String(runtimeStatus.sessionId || '') });
-  }
-  wallpaperEngineHostVisibilityResidentMinimized = false;
   if (wallpaperEngineHostVisibilitySuspended) {
     return wallpaperEngineHostVisibilityStopPromise || Promise.resolve({ ok: true, stopped: true });
   }
@@ -1290,26 +1237,7 @@ function resumeWallpaperEngineForVisibleHost(win, reason = 'visible') {
   const desktopMode = fullDesktopModeRuntime.getStatus('wallpaper-engine-visible-host');
   if (appQuitting || (desktopMode.enabled === true
     && (desktopMode.interactive !== true || desktopMode.phase !== 'interactive'))) return;
-  if (!wallpaperEngineHostVisibilitySuspended) {
-    if (!wallpaperEngineHostVisibilityResidentMinimized) return;
-    wallpaperEngineHostVisibilityResidentMinimized = false;
-    const residentStatus = wallpaperEngineRuntime.getStatus();
-    if (!residentStatus || residentStatus.active !== true || residentStatus.captureMode !== 'dwm-thumbnail') return;
-    setMainWindowBackgroundThrottling(win, false);
-    syncWallpaperEngineDesktopIconLayering(`resident-${reason || 'visible'}`).catch(() => false);
-    const notifyResident = () => {
-      if (!win || win.isDestroyed() || !win.isVisible() || win.isMinimized()) return;
-      try {
-        win.webContents.send('mineradio-wallpaper-engine-host-bounds-changed', {
-          phase: 'resident', reason: String(reason || 'visible'), sessionId: String(residentStatus.sessionId || ''), forceVisibleHost: true,
-        });
-      } catch (_) { }
-    };
-    setTimeout(notifyResident, 80);
-    setTimeout(notifyResident, 420);
-    setTimeout(() => finishWallpaperEngineVisibleHostResume(win), 900);
-    return;
-  }
+  if (!wallpaperEngineHostVisibilitySuspended) return;
   wallpaperEngineHostVisibilitySuspended = false;
   wallpaperEngineHostVisibilityResumePending = true;
   const visibilityOperation = ++wallpaperEngineHostVisibilityOperation;
@@ -1726,24 +1654,6 @@ async function readYouTubeCookiesFromElectronSession() {
   return { cookies: rows };
 }
 
-function configureSpotifyWidevineNetworkDiagnostics() {
-  const ses = session.defaultSession;
-  if (!ses || ses._shinayuuSpotifyWidevineDiagnosticsConfigured) return;
-  ses._shinayuuSpotifyWidevineDiagnosticsConfigured = true;
-  const filter = { urls: ['https://api.spotify.com/v1/widevine-license/*'] };
-  try {
-    ses.webRequest.onCompleted(filter, (details) => {
-      const status = Number(details && details.statusCode || 0);
-      console.log(`[SpotifyDRM] license completed status=${status} method=${String(details && details.method || '-')} resource=${String(details && details.resourceType || '-')} duration=${Math.round(Number(details && details.webRequestId || 0))}`);
-    });
-    ses.webRequest.onErrorOccurred(filter, (details) => {
-      console.warn(`[SpotifyDRM] license network error error=${String(details && details.error || '-')} method=${String(details && details.method || '-')} resource=${String(details && details.resourceType || '-')}`);
-    });
-  } catch (error) {
-    console.warn('[SpotifyDRM] license diagnostics unavailable:', error && (error.message || error));
-  }
-}
-
 function configureLocalAppPermissions() {
   const ses = session.defaultSession;
   if (!ses || ses._mineradioPermissionsConfigured) return;
@@ -1751,7 +1661,7 @@ function configureLocalAppPermissions() {
   ses.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
     const origin = requestingOrigin || (details && (details.requestingOrigin || details.requestingUrl || details.securityOrigin)) || (webContents && webContents.getURL && webContents.getURL()) || '';
     if (permission === 'display-capture') return isTrustedWallpaperEngineDisplayCapturePermission(webContents, origin, details);
-    if (permission === 'media') return isTrustedWallpaperEnginePreparationMediaPermission(webContents, origin, details) || isTrustedGestureCameraMediaPermission(webContents, origin, details);
+    if (permission === 'media') return isTrustedWallpaperEnginePreparationMediaPermission(webContents, origin, details);
     if (permission === 'mediaKeySystem') {
       const allowed = isTrustedSpotifyDrmPermission(permission, origin, details, webContents);
       logSpotifyDrmPermissionDecision(allowed, origin, details);
@@ -1766,7 +1676,7 @@ function configureLocalAppPermissions() {
       return;
     }
     if (permission === 'media') {
-      callback(isTrustedWallpaperEnginePreparationMediaPermission(webContents, origin, details) || isTrustedGestureCameraMediaPermission(webContents, origin, details));
+      callback(isTrustedWallpaperEnginePreparationMediaPermission(webContents, origin, details));
       return;
     }
     if (permission === 'mediaKeySystem') {
@@ -2627,6 +2537,13 @@ function getWindowedBounds(win) {
   const display = getWindowDisplay(win);
   const area = getDisplayArea(display);
   const basis = display.bounds || area;
+  const scaleFactor = Math.max(0.75, Math.min(4, Number(display && display.scaleFactor) || 1));
+  // Electron exposes display.bounds/workArea in DIP, not physical pixels.
+  // Build the reference window from the physical display size so a 125%/150%
+  // Windows scale does not silently shrink the CSS viewport and trigger the
+  // two-row control layout. The resulting BrowserWindow dimensions remain DIP.
+  const physicalDisplayWidth = Math.max(360, Math.round(Number(basis.width) * scaleFactor));
+  const physicalDisplayHeight = Math.max(360, Math.round(Number(basis.height) * scaleFactor));
   const portrait = isPortraitDisplayArea(area);
   const margin = Math.min(WINDOWED_MARGIN, Math.max(12, Math.round(Math.min(area.width, area.height) * 0.04)));
   const maxWidth = Math.max(360, area.width - margin);
@@ -2646,13 +2563,11 @@ function getWindowedBounds(win) {
       width = Math.round(height * aspect);
     }
   } else {
-    width = Math.round(basis.width * WINDOWED_SCALE);
-    height = Math.round(width / WINDOWED_ASPECT);
-    const scaledHeight = Math.round(basis.height * WINDOWED_SCALE);
-    if (height > scaledHeight) {
-      height = scaledHeight;
-      width = Math.round(height * WINDOWED_ASPECT);
-    }
+    // Keep the same reference CSS viewport across Windows DPI settings: the
+    // physical monitor resolution determines the target, while BrowserWindow
+    // dimensions stay in DIP as required by Electron.
+    width = Math.round(physicalDisplayWidth * WINDOWED_SCALE);
+    height = Math.round(physicalDisplayHeight * WINDOWED_SCALE);
   }
 
   if (width < minimum.width && maxWidth >= minimum.width) {
@@ -3078,36 +2993,6 @@ function closeOverlayWindows(reason = 'overlay-close') {
   });
 }
 
-async function routeShinaYuuAudioOutput(sender, payload = {}) {
-  if (process.platform !== 'win32') return { ok: false, supported: false, reason: 'windows-only' };
-  const label = String(payload.deviceLabel || '').trim().slice(0, 256);
-  const clear = payload.clear === true || label === '';
-  let rootPid = 0;
-  try {
-    rootPid = sender && sender.getOSProcessId ? Number(sender.getOSProcessId()) : 0;
-  } catch (_) {}
-  if (!rootPid) return { ok: false, supported: true, reason: 'renderer-pid-unavailable' };
-  const scriptPath = path.join(__dirname, 'audio-output-router.ps1');
-  const args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, '-RootPid', String(Math.round(rootPid))];
-  if (clear) args.push('-Clear');
-  else args.push('-DeviceLabel', label);
-  return await new Promise((resolve) => {
-    execFile('powershell.exe', args, { windowsHide: true, timeout: 12000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
-      const out = String(stdout || '').trim();
-      const err = String(stderr || '').trim();
-      if (error) {
-        console.warn('[AudioOutputNative]', err || error.message || error);
-        resolve({ ok: false, supported: true, reason: 'native-route-failed', error: err || error.message || String(error) });
-        return;
-      }
-      console.info('[AudioOutputNative] ' + (out || (clear ? 'clear' : 'route')));
-      resolve({ ok: true, supported: true, clear, deviceLabel: clear ? '' : label, output: out });
-    });
-  });
-}
-
-ipcMain.handle('shinayuu-audio-output-route', async (event, payload = {}) => routeShinaYuuAudioOutput(event.sender, payload));
-
 ipcMain.handle('desktop-window-minimize', async (event) => {
   const win = getSenderWindow(event);
   if (win === mainWindow && fullDesktopModeRuntime.getStatus('window-minimize').enabled === true) {
@@ -3162,6 +3047,39 @@ ipcMain.handle('desktop-window-exit-fullscreen-windowed', (event) => {
 ipcMain.handle('desktop-window-get-state', (event) => {
   return getWindowState(getSenderWindow(event));
 });
+
+function getDisplayMetricsForWindow(win) {
+  const display = getWindowDisplay(win);
+  const scaleFactor = Math.max(0.75, Math.min(4, Number(display && display.scaleFactor) || 1));
+  const bounds = display && display.bounds ? display.bounds : { x: 0, y: 0, width: 1280, height: 720 };
+  const workArea = display && display.workArea ? display.workArea : bounds;
+  const windowBounds = win && !win.isDestroyed() ? win.getBounds() : bounds;
+  return {
+    ok: true,
+    displayId: display && display.id || null,
+    isPrimary: !!(display && screen.getPrimaryDisplay() && display.id === screen.getPrimaryDisplay().id),
+    scaleFactor,
+    osScalePercent: Math.round(scaleFactor * 100),
+    pixelWidth: Math.max(1, Math.round(Number(bounds.width) * scaleFactor)),
+    pixelHeight: Math.max(1, Math.round(Number(bounds.height) * scaleFactor)),
+    physicalDisplayWidth: Math.max(1, Math.round(Number(bounds.width) * scaleFactor)),
+    physicalDisplayHeight: Math.max(1, Math.round(Number(bounds.height) * scaleFactor)),
+    referenceWindowCssWidth: Math.max(1, Math.round(Number(bounds.width) * scaleFactor * WINDOWED_SCALE)),
+    referenceWindowCssHeight: Math.max(1, Math.round(Number(bounds.height) * scaleFactor * WINDOWED_SCALE)),
+    cssWidth: Math.max(1, Math.round(Number(workArea.width) || Number(bounds.width) || 1280)),
+    cssHeight: Math.max(1, Math.round(Number(workArea.height) || Number(bounds.height) || 720)),
+    bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
+    workArea: { x: workArea.x, y: workArea.y, width: workArea.width, height: workArea.height },
+    windowCssWidth: Math.max(1, Math.round(Number(windowBounds.width) || 1280)),
+    windowCssHeight: Math.max(1, Math.round(Number(windowBounds.height) || 720)),
+  };
+}
+
+ipcMain.handle('shinayuu-display-get-metrics', (event) => {
+  const win = getSenderWindow(event);
+  return getDisplayMetricsForWindow(win);
+});
+
 
 ipcMain.on('mineradio-full-desktop-icon-shields', (event, payload = {}) => {
   if (!isTrustedMainWindowIpc(event)) return;
@@ -3955,12 +3873,6 @@ ipcMain.handle('mineradio-desktop-lyrics-move-by', async (_event, dx, dy) => {
   }
 });
 
-ipcMain.handle('mineradio-gesture-camera-request-permission', async (event) => {
-  const grant = createGestureCameraPermissionGrant(event);
-  if (!grant) return { ok: false, error: 'GESTURE_CAMERA_UNTRUSTED_SENDER' };
-  return { ok: true, expiresAt: grant.expiresAt };
-});
-
 ipcMain.handle('mineradio-wallpaper-set-enabled', async (event, enabled, payload) => {
   try {
     if (!isTrustedMainWindowIpc(event)) return { ok: false, enabled: false, error: 'WALLPAPER_UNTRUSTED_SENDER' };
@@ -4042,8 +3954,7 @@ async function ensureLocalServerStarted() {
     if (injectedDelay) await startupDelay(injectedDelay);
     const port = await withStartupTimeout(findOpenPort(3000), 5000, 'findOpenPort');
     mainServerPort = port;
-      configureSpotifyWidevineNetworkDiagnostics();
-configureLocalAppPermissions();
+    configureLocalAppPermissions();
     configureLocalServerEnvironment(port);
     migrateLegacyAuthStorage();
 
@@ -4235,6 +4146,25 @@ async function createWindowOnce() {
   });
   mainWindow = win;
   hookExplorerRestartForFullDesktop(win);
+  const sendDisplayMetrics = () => {
+    if (win.isDestroyed()) return;
+    try { win.webContents.send('shinayuu-display-metrics-changed', getDisplayMetricsForWindow(win)); } catch (_) {}
+  };
+  win.on('resize', sendDisplayMetrics);
+  win.on('move', sendDisplayMetrics);
+  if (!mainWindow.__shinayuuDisplayMetricsHooked) {
+    mainWindow.__shinayuuDisplayMetricsHooked = true;
+    const onDisplayMetricsChanged = () => setTimeout(sendDisplayMetrics, 120);
+    screen.on('display-metrics-changed', onDisplayMetricsChanged);
+    screen.on('display-added', onDisplayMetricsChanged);
+    screen.on('display-removed', onDisplayMetricsChanged);
+    win.__shinayuuDisplayMetricsCleanup = () => {
+      try { screen.removeListener('display-metrics-changed', onDisplayMetricsChanged); } catch (_) {}
+      try { screen.removeListener('display-added', onDisplayMetricsChanged); } catch (_) {}
+      try { screen.removeListener('display-removed', onDisplayMetricsChanged); } catch (_) {}
+    };
+    win.on('closed', () => { try { win.__shinayuuDisplayMetricsCleanup?.(); } catch (_) {} });
+  }
   writeStartupState('window-created', { windowCreatedAt: Date.now() });
 
   win.__mineradioStartupShowTimer = setTimeout(() => {
@@ -4252,18 +4182,8 @@ async function createWindowOnce() {
   });
   win.webContents.on('did-start-navigation', (_event, url, isInPlace, isMainFrame) => {
     if (!isMainFrame || isInPlace || !isTrustedMainDocumentUrl(url)) return;
-    // F5/Ctrl+R reloads the renderer document, not the native wallpaper session.
-    // Keep the DWM composition and full-desktop host alive so the wallpaper does
-    // not disappear and reappear during renderer bootstrap. Real teardown still
-    // happens on webContents destruction or an explicit wallpaper disable.
-    const wallpaperStatus = wallpaperEngineRuntime.getStatus('main-frame-navigation');
-    const desktopStatus = fullDesktopModeRuntime.getStatus('main-frame-navigation');
-    if (wallpaperStatus.active !== true && desktopStatus.enabled !== true) {
-      stopWallpaperEngineRuntimeForRenderer('main-frame-navigation');
-      closeWallpaperWindow('main-frame-navigation').catch(() => {});
-    } else {
-      console.info('[Wallpaper Engine] preserving native session across renderer reload');
-    }
+    stopWallpaperEngineRuntimeForRenderer('main-frame-navigation');
+    closeWallpaperWindow('main-frame-navigation').catch(() => {});
   });
   win.webContents.once('destroyed', () => {
     stopWallpaperEngineRuntimeForRenderer('webcontents-destroyed');
@@ -4273,25 +4193,6 @@ async function createWindowOnce() {
   win.webContents.on('did-finish-load', () => {
     markMainRuntimeHealthy('did-finish-load');
     showMainWindowSafely(win, 'did-finish-load');
-    const nativeWallpaper = wallpaperEngineRuntime.getStatus('renderer-reload-finished');
-    broadcastDesktopWallpaperStatus(nativeWallpaper);
-    if (nativeWallpaper && nativeWallpaper.active === true
-      && nativeWallpaper.captureMode === 'dwm-thumbnail'
-      && nativeWallpaper.dwmSurfaceReady === true) {
-      const notifyResident = () => {
-        if (!win || win.isDestroyed() || !win.isVisible() || win.isMinimized()) return;
-        try {
-          win.webContents.send('mineradio-wallpaper-engine-host-bounds-changed', {
-            phase: 'resident',
-            reason: 'renderer-reload',
-            sessionId: String(nativeWallpaper.sessionId || ''),
-            forceVisibleHost: true,
-          });
-        } catch (_) { }
-      };
-      setTimeout(notifyResident, 80);
-      setTimeout(notifyResident, 420);
-    }
   });
   win.webContents.on('dom-ready', () => {
     markMainRuntimeHealthy('dom-ready');

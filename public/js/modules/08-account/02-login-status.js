@@ -1,47 +1,5 @@
 'use strict';
 
-
-function normalizeSoundCloudLoginStatus(info) {
-  info = info || {};
-  return Object.assign({
-    provider: 'soundcloud',
-    loggedIn: false,
-    configured: false,
-    searchReady: false,
-    publicCatalog: false,
-    nickname: 'SoundCloud',
-    userId: '',
-    avatar: '',
-    vipType: 0,
-    vipLevel: 'none',
-    isVip: false,
-    isSvip: false,
-    playbackKeyReady: false,
-    playbackMode: 'direct'
-  }, info, {
-    provider: 'soundcloud',
-    loggedIn: false,
-    configured: !!info.configured,
-    searchReady: !!info.searchReady,
-    publicCatalog: !!info.publicCatalog,
-    nickname: 'SoundCloud',
-    playbackKeyReady: !!info.searchReady,
-    playbackMode: 'direct'
-  });
-}
-
-async function refreshSoundCloudLoginStatus() {
-  try {
-    var info = await apiJson('/api/soundcloud/status?t=' + Date.now());
-    soundcloudLoginStatus = normalizeSoundCloudLoginStatus(info);
-  } catch (error) {
-    console.warn('SoundCloud status failed:', error);
-    soundcloudLoginStatus = normalizeSoundCloudLoginStatus(null);
-  }
-  renderUserBtn();
-  return soundcloudLoginStatus;
-}
-
 function providerVipAuditSnapshot(provider, status) { return { provider: provider, loggedIn: !!(status && status.loggedIn) }; }
 function providerVipAuditLabel(provider, snapshot) { return snapshot && snapshot.loggedIn ? localizeUiMessage('Đã kết nối') : localizeUiMessage('Chưa kết nối'); }
 function auditProviderVipState() {}
@@ -114,11 +72,7 @@ async function refreshYouTubeLoginStatus() {
     return youtubeLoginStatus;
   } catch (error) {
     console.warn('YouTube login status failed:', error);
-    if (youtubeLoginStatus && youtubeLoginStatus.loggedIn) {
-      youtubeLoginStatus = normalizeYouTubeLoginStatus(Object.assign({}, youtubeLoginStatus, { stale: true, statusError: String(error && (error.message || error) || 'YOUTUBE_STATUS_UNAVAILABLE') }));
-    } else {
-      youtubeLoginStatus = normalizeYouTubeLoginStatus(null);
-    }
+    youtubeLoginStatus = normalizeYouTubeLoginStatus(null);
     loginStatus = Object.assign({}, youtubeLoginStatus);
     renderUserBtn();
     return youtubeLoginStatus;
@@ -211,13 +165,7 @@ async function refreshSpotifyLoginStatus() {
     return spotifyLoginStatus;
   } catch (error) {
     console.warn('Spotify login status failed:', error);
-    // A transient status request failure must not erase a previously valid
-    // OAuth session and make Playlist / Playback appear logged out.
-    if (spotifyLoginStatus && spotifyLoginStatus.loggedIn) {
-      spotifyLoginStatus = normalizeSpotifyLoginStatus(Object.assign({}, spotifyLoginStatus, { stale: true, statusError: String(error && (error.message || error) || 'SPOTIFY_STATUS_UNAVAILABLE') }));
-    } else {
-      spotifyLoginStatus = normalizeSpotifyLoginStatus(null);
-    }
+    spotifyLoginStatus = normalizeSpotifyLoginStatus(null);
     renderUserBtn();
     return spotifyLoginStatus;
   }
@@ -231,7 +179,7 @@ function startSpotifyLoginStatusAutoRefresh() {
 }
 
 async function refreshLoginStatus() {
-  var results = await Promise.allSettled([refreshYouTubeLoginStatus(), refreshSpotifyLoginStatus(), refreshSoundCloudLoginStatus()]);
+  var results = await Promise.allSettled([refreshYouTubeLoginStatus(), refreshSpotifyLoginStatus()]);
   loginStatusChecked = true;
   loginStatusCheckFailed = results.every(function (result) { return result.status === 'rejected'; });
   return { youtube: youtubeLoginStatus, spotify: spotifyLoginStatus };

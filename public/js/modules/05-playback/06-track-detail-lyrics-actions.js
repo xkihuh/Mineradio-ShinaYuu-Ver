@@ -4,15 +4,13 @@ function currentCoverSong() {
 }
 function songDurationLabel(song) {
   var sec = playbackDurationFromSong(song);
-  var provider = song && String(song.provider || song.source || song.type || '').toLowerCase();
-  if (!sec && provider !== 'soundcloud' && audio && isFinite(audio.duration) && audio.duration > 0) sec = audio.duration;
+  if (!sec && audio && isFinite(audio.duration) && audio.duration > 0) sec = audio.duration;
   if (!sec) return 'Không rõ';
   return formatProgramTime(sec);
 }
 function songSourceLabel(song) {
   if (!song) return 'Không rõ';
   if (song.provider === 'spotify' || song.source === 'spotify' || song.type === 'spotify' || song.spotifyId || song.spotifyUri) return 'Spotify';
-  if (song.provider === 'soundcloud' || song.source === 'soundcloud' || song.type === 'soundcloud' || song.soundcloudId || song.soundcloudPermalink) return 'SoundCloud';
   if (song.sourceType === 'video' || song.youtubeSourceType === 'video' || song.provider === 'youtube-video' || song.source === 'youtube-video') return 'YouTube Video';
   if (song.provider === 'youtube' || song.source === 'youtube' || song.type === 'youtube' || song.provider === 'qq' || song.source === 'qq' || song.youtubeId || song.videoId) return 'YouTube Music';
   if (song.type === 'local' || song.source === 'local' || song.localKey) return localizeUiMessage('Nhạc cục bộ');
@@ -1049,27 +1047,20 @@ function deleteCustomLyricForCurrent() {
 var SONG_ACCOUNT_ACTION_ADAPTERS = {
   spotify: {
     provider: 'spotify', label: 'Spotify', like: true, collect: true, createPlaylist: true,
-    likeCheckUrl: '/api/spotify/song/like/check', likeUrl: '/api/spotify/song/like',
-    playlistAddUrl: '/api/spotify/playlist/add-song', playlistCreateUrl: '/api/spotify/playlist/create',
+    likeCheckUrl: '/api/app/liked/check', likeUrl: '/api/app/liked/toggle',
+    playlistAddUrl: '/api/app/playlist/add-song', playlistCreateUrl: '/api/app/playlist/create',
     playlistTracksUrl: '/api/spotify/playlist/tracks'
   },
   youtube: {
-    provider: 'youtube', label: 'YouTube Music', like: false, collect: false, createPlaylist: false,
-    likeCheckUrl: '', likeUrl: '', playlistAddUrl: '', playlistCreateUrl: '',
+    provider: 'youtube', label: 'YouTube Music', like: true, collect: true, createPlaylist: true,
+    likeCheckUrl: '/api/app/liked/check', likeUrl: '/api/app/liked/toggle',
+    playlistAddUrl: '/api/app/playlist/add-song', playlistCreateUrl: '/api/app/playlist/create',
     playlistTracksUrl: '/api/youtube-music/playlist/tracks'
-  },
-  soundcloud: {
-    provider: 'soundcloud', label: 'SoundCloud', like: false, collect: false, createPlaylist: false,
-    likeCheckUrl: '', likeUrl: '', playlistAddUrl: '', playlistCreateUrl: '',
-    playlistTracksUrl: ''
   }
 };
 function songAccountProvider(song) {
   if (!song) return 'youtube';
-  var provider = songProviderKey(song);
-  if (provider === 'spotify') return 'spotify';
-  if (provider === 'soundcloud') return 'soundcloud';
-  return 'youtube';
+  return songProviderKey(song) === 'spotify' ? 'spotify' : 'youtube';
 }
 function songAccountAdapter(songOrProvider) {
   var provider = typeof songOrProvider === 'string' ? normalizePlaybackProvider(songOrProvider) : songAccountProvider(songOrProvider);
@@ -1100,8 +1091,7 @@ function playlistAccountProvider(playlist) { return String(playlist && (playlist
 function songAccountLoginStatus(provider) { return provider === 'spotify' ? (spotifyLoginStatus || {}) : (youtubeLoginStatus || {}); }
 function isSongAccountLoggedIn(provider) { var status = songAccountLoginStatus(provider); return provider === 'youtube' ? true : !!status.loggedIn; }
 function songAccountUnsupportedMessage(provider, action) {
-  if (provider === 'youtube') return action === 'collect' ? 'YouTube Music chưa hỗ trợ thêm trực tiếp vào playlist trong ứng dụng' : 'YouTube Music chưa hỗ trợ đồng bộ yêu thích trong ứng dụng';
-  return 'Nguồn này chưa hỗ trợ thao tác tài khoản';
+  return action === 'collect' ? 'Không thể thêm bài vào playlist ShinaYuu' : 'Không thể cập nhật Nhạc Yêu Thích';
 }
 function isCloudSong(song) {
   return false;
@@ -1153,50 +1143,31 @@ function songActionHtml(kind, source, index, song) {
 }
 function syncLikeStatusForSongs(songs) {
   if (!songs || !songs.length) return;
-  var groups = Object.create(null);
-  songs.forEach(function (song) {
-    var provider = songAccountProvider(song);
-    var adapter = songAccountAdapter(provider);
-    var id = songAccountId(song, provider);
-    if (!adapter || !adapter.like || !adapter.likeCheckUrl || !id || !isSongAccountLoggedIn(provider)) return;
-    if (!groups[provider]) groups[provider] = { adapter: adapter, ids: [], seen: Object.create(null) };
-    if (groups[provider].seen[id]) return;
-    groups[provider].seen[id] = true;
-    groups[provider].ids.push(id);
+  var keys = [];
+  var seen = Object.create(null);
+  (songs || []).forEach(function (song) {
+    var key = songAccountStateKey(song);
+    if (!key || seen[key]) return;
+    seen[key] = true;
+    keys.push(key);
   });
-  var providers = Object.keys(groups);
-  if (!providers.length) return;
+  if (!keys.length) return;
   var token = ++likeStatusToken;
-  var requests = [];
-  providers.forEach(function (provider) {
-    var group = groups[provider];
-    var batchSize = provider === 'spotify' ? 40 : 200;
-    for (var offset = 0; offset < group.ids.length; offset += batchSize) {
-      (function (batchIds) {
-        var url = group.adapter.likeCheckUrl + '?' + group.adapter.likeCheckParam + '=' + encodeURIComponent(batchIds.join(','));
-        requests.push(apiJson(url).then(function (r) {
-          if (token < likeStatusToken - 3 || !r || !r.liked) return;
-          var responseLiked = r.liked || {};
-          batchIds.forEach(function (id) {
-            var responseId = String(id);
-            var liked = responseLiked[responseId];
-            if (liked == null) liked = responseLiked[id];
-            if (liked == null) return;
-            likedSongMap[provider + ':' + responseId] = !!liked;
-          });
-        }).catch(function (err) {
-          console.warn(provider + ' like check failed:', err);
-        }));
-      })(group.ids.slice(offset, offset + batchSize));
-    }
-  });
-  Promise.all(requests).then(function () {
+  apiJson('/api/app/liked/check?keys=' + encodeURIComponent(keys.join(','))).then(function (r) {
+    if (token < likeStatusToken - 3 || !r || !r.liked) return;
+    keys.forEach(function (key) {
+      if (Object.prototype.hasOwnProperty.call(r.liked, key)) likedSongMap[key] = !!r.liked[key];
+    });
+  }).catch(function (err) {
+    console.warn('app liked check failed:', err);
+  }).finally(function () {
     if (token < likeStatusToken - 3) return;
     safeRenderQueuePanel('like-status-sync', { scrollCurrent: miniQueueOpen });
     if ($results && $results.classList.contains('show')) refreshSearchResultActionStates();
     updateLikeButtons();
   });
 }
+
 function syncLikeStatusForSong(song) {
   var adapter = songAccountAdapter(song);
   if (!adapter || !adapter.like) { updateLikeButtons(song); return; }
@@ -1234,17 +1205,11 @@ function refreshSearchResultActionStates() {
   });
 }
 async function toggleLikeSong(song) {
-  var provider = songAccountProvider(song);
-  var adapter = songAccountAdapter(provider);
-  if (!adapter || !adapter.like || !adapter.likeUrl) {
-    showToast(songAccountUnsupportedMessage(provider, 'like'));
-    return;
-  }
-  if (!ensureLoggedInForAction(provider)) return;
-  var id = songAccountId(song, provider);
+  if (!song) { showToast('Hãy phát hoặc chọn một bài hát trước'); return; }
+  var id = songAccountId(song, songAccountProvider(song));
   var stateKey = songAccountStateKey(song);
   if (!id || !stateKey) {
-    showToast('Bài hiện tại thiếu ' + adapter.label + 'mã bài hát');
+    showToast('Bài hiện tại thiếu mã bài hát');
     return;
   }
   if (likeBusyMap[stateKey]) return;
@@ -1255,24 +1220,30 @@ async function toggleLikeSong(song) {
   safeRenderQueuePanel('like-toggle-optimistic', { scrollCurrent: miniQueueOpen });
   refreshSearchResultActionStates();
   try {
-    var r = await apiJson(adapter.likeUrl, {
+    var r = await apiJson('/api/app/liked/toggle', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: id, like: next, song: song })
+      body: JSON.stringify({ like: next, song: song })
     });
     if (r && (r.error || r.success === false)) throw new Error(r.error || r.message || 'LIKE_FAILED');
     likedSongMap[stateKey] = r && r.liked != null ? !!r.liked : next;
-    showToast(next ? 'Đã thêm vào yêu thích' : 'Đã bỏ yêu thích');
+    showToast(next ? 'Đã thêm vào Nhạc Yêu Thích' : 'Đã bỏ khỏi Nhạc Yêu Thích');
+    await refreshUserPlaylists(true).catch(function () {});
+    if (typeof playlistPanelDetailState !== 'undefined' && playlistPanelDetailState.key === 'app:app-liked') {
+      var updatedTracks = Array.isArray(playlistPanelDetailState.tracks) ? playlistPanelDetailState.tracks.slice() : [];
+      if (next && !updatedTracks.some(function (item) { return songAccountStateKey(item) === stateKey; })) updatedTracks.unshift(cloneSong(song));
+      if (!next) updatedTracks = updatedTracks.filter(function (item) { return songAccountStateKey(item) !== stateKey; });
+      playlistPanelDetailState.tracks = updatedTracks;
+      playlistPanelDetailState.total = updatedTracks.length;
+      playlistPanelDetailState.nextOffset = updatedTracks.length;
+      playlistPanelDetailState.hasMore = false;
+      if (typeof renderPlaylistPanelDetailState === 'function') renderPlaylistPanelDetailState();
+    }
   } catch (err) {
     likedSongMap[stateKey] = !next;
     var errorText = String(err && err.message || '');
-    if (/SCOPE|PERMISSION/i.test(errorText)) {
-      showToast('Quyền hiện tại chưa cho phép ghi playlist; hãy cấp quyền lại');
-    } else if (/LOGIN_REQUIRED|AUTH_REQUIRED/i.test(errorText)) {
-      showToast(adapter.label + ' phiên đăng nhập đã hết hạn; hãy đăng nhập lại');
-    } else {
-      showToast(errorText ? ('Thao tác yêu thích thất bại: ' + errorText) : 'Thao tác yêu thích thất bại');
-    }
+    if (/LOGIN_REQUIRED|AUTH_REQUIRED/i.test(errorText)) showToast('Không thể cập nhật Nhạc Yêu Thích');
+    else showToast(errorText ? ('Thao tác yêu thích thất bại: ' + errorText) : 'Thao tác yêu thích thất bại');
   } finally {
     delete likeBusyMap[stateKey];
     updateLikeButtons(song);
@@ -1280,18 +1251,14 @@ async function toggleLikeSong(song) {
     refreshSearchResultActionStates();
   }
 }
+
 function toggleLikeCurrent() { toggleLikeSong(currentCoverSong()); }
 function toggleLikeSearchResult(i) { if (playlist[i]) toggleLikeSong(playlist[i]); }
 function toggleLikeQueueIndex(i) { if (playQueue[i]) toggleLikeSong(playQueue[i]); }
 function toggleLikeDetailSong(song) { toggleLikeSong(song); }
 function openCollectModal(song) {
-  var provider = songAccountProvider(song);
-  var adapter = songAccountAdapter(provider);
-  if (!adapter || !adapter.collect || !adapter.playlistAddUrl) {
-    showToast(songAccountUnsupportedMessage(provider, 'collect'));
-    return;
-  }
-  if (!ensureLoggedInForAction(provider)) return;
+  song = song || currentCoverSong();
+  if (!song) { showToast('Hãy phát hoặc chọn một bài hát trước'); return; }
   collectTargetSong = song;
   renderCollectModal();
   openGsapModal(document.getElementById('collect-modal'));
@@ -1316,82 +1283,47 @@ function renderCollectModal() {
   var cover = songCoverSrc(song, 80);
   current.innerHTML = (cover ? '<img src="' + cover + '" alt="">' : '<div class="cover-placeholder"></div>') +
     '<div style="min-width:0"><div class="collect-title">' + escHtml(song.name || 'Bài hiện tại') + '</div><div class="collect-sub">' + escHtml(song.artist || '') + '</div></div>';
-  var builtIn = Array.isArray(builtInPlaylists) ? builtInPlaylists.filter(function (pl) { return pl && !pl.subscribed && !pl.virtual; }) : [];
-  var builtInHtml = builtIn.length ? '<div class="collect-section-label">Playlist ShinaYuu</div>' + builtIn.map(function (pl) {
-    var thumb = pl.cover ? coverUrlWithSize(pl.cover, 80) : '';
-    return '<div class="collect-item" data-collect-provider="shinayuu" data-collect-pid="' + escHtml(String(pl.id || '')) + '" onclick="addCollectTargetToPlaylist(this.getAttribute(\'data-collect-pid\'), \'shinayuu\')">' +
-      (thumb ? '<img src="' + thumb + '" alt="">' : '<div class="cover-placeholder"></div>') +
-      '<div style="min-width:0"><div class="collect-title">' + escHtml(pl.name || '') + '</div><div class="collect-sub">' + (pl.trackCount || 0) + ' bài</div></div>' +
-      '</div>';
-  }).join('') : '';
-
-  var provider = songAccountProvider(song);
-  var adapter = songAccountAdapter(provider);
-  var providerHtml = '';
-  var providerMessage = '';
-  if (!adapter || !adapter.collect) {
-    providerMessage = songAccountUnsupportedMessage(provider, 'collect');
-  } else if (!isSongAccountLoggedIn(provider)) {
-    providerMessage = 'Đăng nhập ' + adapter.label + ' để hiển thị playlist của bạn';
-  } else {
-    var mine = userPlaylists.filter(function (pl) {
-      return playlistAccountProvider(pl) === provider && !pl.subscribed && !pl.virtual;
-    });
-    providerHtml = mine.map(function (pl) {
-      var thumb = pl.cover ? coverUrlWithSize(pl.cover, 80) : '';
-      return '<div class="collect-item" data-collect-provider="' + escHtml(provider) + '" data-collect-pid="' + escHtml(String(pl.id || '')) + '" onclick="addCollectTargetToPlaylist(this.getAttribute(\'data-collect-pid\'), this.getAttribute(\'data-collect-provider\'))">' +
-        (thumb ? '<img src="' + thumb + '" alt="">' : '<div class="cover-placeholder"></div>') +
-        '<div style="min-width:0"><div class="collect-title">' + escHtml(pl.name || '') + '</div><div class="collect-sub">' + (pl.trackCount || 0) + ' bài</div></div>' +
-        '</div>';
-    }).join('');
-    if (!mine.length) providerMessage = 'Chưa có playlist ' + adapter.label + ' có thể ghi; hãy tạo một playlist trước';
-  }
-
-  if (!builtIn.length && !providerHtml) {
-    list.innerHTML = '<div class="collect-empty">' + escHtml(providerMessage || 'Chưa có playlist có thể ghi; hãy tạo một playlist trước') + '</div>';
+  var rows = [];
+  (Array.isArray(appPlaylists) ? appPlaylists : []).forEach(function (pl) {
+    rows.push('<div class="collect-item" data-collect-pid="' + escHtml(String(pl.id || '')) + '" data-collect-provider="app" onclick="addCollectTargetToPlaylist(this.getAttribute(\'data-collect-pid\'), \'app\')">' +
+      (pl.cover ? '<img src="' + escHtml(coverUrlWithSize(pl.cover, 80)) + '" alt="">' : '<div class="cover-placeholder"></div>') +
+      '<div style="min-width:0"><div class="collect-title">' + escHtml(pl.name || 'Playlist ShinaYuu') + '</div><div class="collect-sub">' + (pl.trackCount || 0) + ' bài · ShinaYuu Music</div></div></div>');
+  });
+  if (!rows.length) {
+    list.innerHTML = '<div class="collect-empty">Chưa có playlist ShinaYuu. Hãy tạo một playlist mới ở phía trên.</div>';
     return;
   }
-  list.innerHTML = builtInHtml + (providerHtml ? '<div class="collect-section-label">' + escHtml(adapter.label) + '</div>' + providerHtml : (providerMessage ? '<div class="collect-provider-note">' + escHtml(providerMessage) + '</div>' : ''));
+  list.innerHTML = rows.join('');
   if (window.gsap) animateListItems(list, '.collect-item', { x: 0, y: 6, stagger: 0.012, duration: 0.18, limit: 18 });
 }
-function setCollectBusyPid(pid, busy, provider) {
+
+function setCollectBusyPid(pid, busy) {
   var list = document.getElementById('collect-list');
   if (!list) return;
   list.querySelectorAll('.collect-item').forEach(function (item) {
-    var sameId = item.getAttribute('data-collect-pid') === String(pid);
-    var sameProvider = !provider || item.getAttribute('data-collect-provider') === String(provider);
-    item.classList.toggle('busy', !!busy && sameId && sameProvider);
+    item.classList.toggle('busy', !!busy && item.getAttribute('data-collect-pid') === String(pid));
   });
 }
 async function createPlaylistFromCollect() {
-  var provider = songAccountProvider(collectTargetSong);
-  var adapter = songAccountAdapter(provider);
-  if (!adapter || !adapter.createPlaylist || !adapter.playlistCreateUrl) {
-    showToast((adapter && adapter.label || 'Nguồn hiện tại') + ' chưa hỗ trợ tạo playlist trực tiếp trong ShinaYuu Music');
-    return;
-  }
-  if (!ensureLoggedInForAction(provider)) return;
+  if (!collectTargetSong) { showToast('Hãy chọn một bài hát trước'); return; }
   var input = document.getElementById('collect-new-name');
   var name = input ? input.value.trim() : '';
   if (!name) { showToast('Hãy nhập tên playlist'); return; }
   try {
-    var r = await apiJson(adapter.playlistCreateUrl, {
+    var r = await apiJson('/api/app/playlist/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: name })
     });
-    if (r && (r.error || r.success === false)) throw new Error(r.error || r.message || 'PLAYLIST_CREATE_FAILED');
+    if (!r || r.error || r.success === false || !r.playlist || !r.playlist.id) throw new Error(r && (r.error || r.message) || 'APP_PLAYLIST_CREATE_FAILED');
     if (input) input.value = '';
-    showToast('Đã tạo playlist');
     await refreshUserPlaylists(true);
-    renderCollectModal();
-    var created = r && r.playlist;
-    var pid = created && created.id;
-    if (pid && collectTargetSong) addCollectTargetToPlaylist(pid);
+    await addCollectTargetToPlaylist(r.playlist.id, 'app');
   } catch (err) {
-    showToast('Tạo playlist thất bại');
+    showToast(err && err.message ? ('Tạo playlist thất bại: ' + err.message) : 'Tạo playlist thất bại');
   }
 }
+
 function collectResultMessage(r) {
   if (!r) return 'Thêm vào playlist thất bại';
   var msg = r.error || r.message || r.msg || '';
@@ -1400,12 +1332,15 @@ function collectResultMessage(r) {
   if (/exist|trùng lặp|đã tồn tại|already/i.test(String(msg))) return 'Bài hát đã có trong playlist';
   return msg ? ('Thêm vào playlist thất bại: ' + msg) : 'Thêm vào playlist thất bại';
 }
-function playlistTracksPageUrl(adapter, pid, offset, limit) {
-  var url = adapter.playlistTracksUrl + '?id=' + encodeURIComponent(pid);
+function playlistTracksPageUrl(adapter, pid, offset, limit, providerOverride) {
+  var provider = providerOverride || songAccountProvider(collectTargetSong || {});
+  var endpoint = provider === 'app' ? '/api/app/playlist/tracks' : adapter.playlistTracksUrl;
+  var url = endpoint + '?id=' + encodeURIComponent(pid);
   if (limit) url += '&limit=' + encodeURIComponent(String(limit));
   if (offset) url += '&offset=' + encodeURIComponent(String(offset));
   return url;
 }
+
 function playlistContainsAccountSong(tracks, song, provider) {
   var expected = songAccountIdentityValues(song, provider);
   if (!expected.length) return false;
@@ -1415,88 +1350,70 @@ function playlistContainsAccountSong(tracks, song, provider) {
     return songAccountIdentityValues(track, provider).some(function (id) { return !!expectedSet[id]; });
   });
 }
-async function verifySongInPlaylist(pid, song) {
-  var provider = songAccountProvider(song);
-  var adapter = songAccountAdapter(provider);
-  if (!pid || !adapter || !adapter.playlistTracksUrl || !songAccountId(song, provider)) return false;
-  var pageLimit = provider === 'spotify' ? 50 : 200;
+async function verifySongInPlaylist(pid, song, playlistProvider) {
+  var provider = playlistProvider || songAccountProvider(song);
+  var adapter = songAccountAdapter(song);
+  if (!pid || !song || !songAccountId(song, songAccountProvider(song))) return false;
+  if (provider !== 'app' && (!adapter || !adapter.playlistTracksUrl)) return false;
+  var pageLimit = provider === 'spotify' ? 50 : (provider === 'app' ? 200 : 200);
   for (var attempt = 0; attempt < 3; attempt++) {
-    if (attempt) {
-      await new Promise(function (resolve) { setTimeout(resolve, attempt === 1 ? 360 : 820); });
-    }
+    if (attempt) await new Promise(function (resolve) { setTimeout(resolve, attempt === 1 ? 360 : 820); });
     try {
-      var detail = await apiJson(playlistTracksPageUrl(adapter, pid, 0, pageLimit));
+      var detail = await apiJson(playlistTracksPageUrl(adapter, pid, 0, pageLimit, provider));
       var tracks = (detail && detail.tracks) || [];
-      if (playlistContainsAccountSong(tracks, song, provider)) return true;
+      if (playlistContainsAccountSong(tracks, song, songAccountProvider(song))) return true;
       var total = Math.max(0, Number(detail && (detail.total || (detail.playlist && detail.playlist.trackCount))) || 0);
       var lastOffset = total > pageLimit ? Math.max(0, total - pageLimit) : 0;
       if (lastOffset) {
-        var lastPage = await apiJson(playlistTracksPageUrl(adapter, pid, lastOffset, pageLimit));
-        if (playlistContainsAccountSong((lastPage && lastPage.tracks) || [], song, provider)) return true;
+        var lastPage = await apiJson(playlistTracksPageUrl(adapter, pid, lastOffset, pageLimit, provider));
+        if (playlistContainsAccountSong((lastPage && lastPage.tracks) || [], song, songAccountProvider(song))) return true;
       }
-    } catch (e) {
-      console.warn(provider + ' collect verify failed:', e);
-    }
+    } catch (e) { console.warn(provider + ' collect verify failed:', e); }
   }
   return false;
 }
-async function addCollectTargetToPlaylist(pid, targetProvider) {
+async function addCollectTargetToPlaylist(pid, playlistProvider) {
   if (collectBusy || !collectTargetSong || !pid) return;
   var targetSong = collectTargetSong;
-  var provider = targetProvider || songAccountProvider(targetSong);
-  if (provider === 'shinayuu') {
-    collectBusy = true;
-    setCollectBusyPid(pid, true, 'shinayuu');
-    try {
-      var added = await addTrackToBuiltInPlaylist(pid, targetSong, { silentSuccess: true });
-      if (!added) throw new Error('BUILT_IN_PLAYLIST_ADD_FAILED');
-      showToast(added === 'duplicate' ? 'Bài hát đã có trong playlist ShinaYuu' : 'Đã thêm vào playlist ShinaYuu');
-      closeCollectModal();
-      await refreshUserPlaylists(true);
-    } catch (err) {
-      showToast('Thêm vào playlist ShinaYuu thất bại');
-    } finally {
-      collectBusy = false;
-      setCollectBusyPid(pid, false, 'shinayuu');
-      updateLikeButtons();
-    }
+  var sourceProvider = songAccountProvider(targetSong);
+  var provider = playlistProvider || sourceProvider;
+  var adapter = songAccountAdapter(sourceProvider);
+  if (provider !== 'app' && (!adapter || !adapter.collect || !adapter.playlistAddUrl)) {
+    showToast(songAccountUnsupportedMessage(sourceProvider, 'collect'));
     return;
   }
-  var adapter = songAccountAdapter(provider);
-  if (!adapter || !adapter.collect || !adapter.playlistAddUrl) {
-    showToast(songAccountUnsupportedMessage(provider, 'collect'));
-    return;
-  }
-  if (!ensureLoggedInForAction(provider)) return;
+  if (provider !== 'app' && !ensureLoggedInForAction(sourceProvider)) return;
   collectBusy = true;
-  setCollectBusyPid(pid, true, provider);
+  setCollectBusyPid(pid, true);
   updateLikeButtons();
   showToast('Đang thêm vào playlist...');
   try {
-    var songId = songAccountId(targetSong, provider);
-    if (!songId) throw new Error('Bài hiện tại thiếu ' + adapter.label + 'mã bài hát');
-    var r = await apiJson(adapter.playlistAddUrl, {
+    var songId = songAccountId(targetSong, sourceProvider);
+    if (!songId) throw new Error('Bài hiện tại thiếu mã bài hát');
+    var endpoint = provider === 'app' ? '/api/app/playlist/add-song' : adapter.playlistAddUrl;
+    var r = await apiJson(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pid: pid, id: songId, song: targetSong })
     });
-    if (!r || r.error || r.success === false) throw new Error(collectResultMessage(r));
-    showToast('Đã thêm vào playlist');
+    if (!r || r.error || r.success === false) throw new Error(provider === 'app' && r && r.alreadyExists ? 'Bài hát đã có trong playlist' : collectResultMessage(r));
+    showToast(r.alreadyExists ? 'Bài hát đã có trong playlist' : 'Đã thêm vào playlist');
     closeCollectModal();
-    refreshUserPlaylists(true);
+    await refreshUserPlaylists(true);
     setTimeout(function () {
-      verifySongInPlaylist(pid, targetSong).then(function (ok) {
+      verifySongInPlaylist(pid, targetSong, provider).then(function (ok) {
         if (!ok) console.warn(provider + ' collect submitted but verify did not find song yet:', pid, songId);
       });
-    }, 900);
+    }, 350);
   } catch (err) {
     showToast(err && err.message ? err.message : 'Thêm vào playlist thất bại');
   } finally {
     collectBusy = false;
-    setCollectBusyPid(pid, false, provider);
+    setCollectBusyPid(pid, false);
     updateLikeButtons();
   }
 }
+
 function cloneSong(song) { return hydrateCustomCover(Object.assign({}, song)); }
 function avatarSrc(url) {
   if (!url) return '';

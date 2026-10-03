@@ -1,5 +1,4 @@
 'use strict';
-const CURRENT_VERSION = require('../package.json').version;
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -11,7 +10,7 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
 test('official GitHub update source is embedded in package metadata', () => {
   const pkg = JSON.parse(read('package.json'));
-  assert.equal(pkg.version, CURRENT_VERSION);
+  assert.equal(pkg.version, '2.1.7');
   assert.deepEqual(pkg.repository, {
     type: 'git',
     url: 'https://github.com/xkihuh/Mineradio-ShinaYuu-Ver.git',

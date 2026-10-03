@@ -1,6 +1,4 @@
 'use strict';
-const CURRENT_VERSION = require('../package.json').version;
-const CURRENT_BUILD_VERSION = `${CURRENT_VERSION}.0`;
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -103,8 +101,8 @@ test('lyrics clock combines provider time, global delay and per-track correction
 
 test('release identity is consistently bumped to 2.1.5', () => {
   const pkg = JSON.parse(read('package.json'));
-  assert.equal(pkg.version, CURRENT_VERSION);
-  assert.equal(pkg.displayVersion, CURRENT_VERSION);
-  assert.equal(pkg.shinayuu.displayVersion, CURRENT_VERSION);
-  assert.equal(pkg.build.buildVersion, CURRENT_BUILD_VERSION);
+  assert.equal(pkg.version, '2.1.7');
+  assert.equal(pkg.displayVersion, '2.1.7');
+  assert.equal(pkg.shinayuu.displayVersion, '2.1.7');
+  assert.equal(pkg.build.buildVersion, '2.1.7.0');
 });

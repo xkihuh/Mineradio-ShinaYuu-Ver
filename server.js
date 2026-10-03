@@ -53,23 +53,15 @@ const fs   = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const tls = require('tls');
-const { spawn } = require('child_process');
-const ffmpegPath = require('ffmpeg-static');
 const { once } = require('events');
 const { fileURLToPath } = require('url');
 const { analyzePodcastDjStream, analyzePodcastDjIntro } = require('./dj-analyzer');
 const { appendCuefieldFeedback, readCuefieldFeedbackStats } = require('./desktop/cuefield/feedback-log');
 const { planCuefieldTransitionFromCache } = require('./desktop/cuefield/shinayuu-transition-planner');
-const { createAiCore } = require('./desktop/ai-core');
-const aiCore = createAiCore({ providers: {
-  youtubeMusicSearch: (...args) => musicProviders.youtubeMusicSearch(...args),
-  soundcloudSearch: (...args) => musicProviders.soundcloudSearch(...args),
-  spotifySearch: (...args) => musicProviders.spotifySearch(...args),
-  lyricsFor: (...args) => musicProviders.lyricsFor(...args),
-} });
 const musicProviders = require('./music-providers');
 const { getLocalLibrary } = require('./local-library');
 const localLibrary = getLocalLibrary();
+const appPlaylists = require('./app-playlists');
 
 const PORT = process.env.PORT || 43821;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -86,7 +78,7 @@ const APP_VERSION = process.env.SHINAYUU_VERSION || process.env.MINERADIO_VERSIO
 const UPDATE_CONFIG = readUpdateConfig(APP_PACKAGE);
 const PATCH_MAX_BYTES = 12 * 1024 * 1024;
 const PATCH_ALLOWED_ROOTS = new Set(['public', 'desktop', 'build']);
-const PATCH_ALLOWED_FILES = new Set(['server.js', 'music-providers.js', 'soundcloud-api.js', 'local-library.js', 'youtube-caption-provider.js', 'youtube-forced-aligner.js', 'dj-analyzer.js', 'package.json', 'package-lock.json']);
+const PATCH_ALLOWED_FILES = new Set(['server.js', 'app-playlists.js', 'music-providers.js', 'local-library.js', 'youtube-caption-provider.js', 'youtube-forced-aligner.js', 'dj-analyzer.js', 'package.json', 'package-lock.json']);
 const UPDATE_FALLBACK_NOTES = [
   '电影镜头节奏更松',
   '音源失败自动换源',
@@ -936,10 +928,12 @@ async function fetchLatestUpdateInfo() {
     const asset = pickReleaseAsset(data.assets);
     const patch = pickPatchAsset(data.assets, APP_VERSION, latestVersion);
     const notes = extractReleaseNotes(data.body).length ? extractReleaseNotes(data.body) : UPDATE_FALLBACK_NOTES;
+    const versionComparison = compareVersions(latestVersion, APP_VERSION);
     return {
       configured: true,
       preview: false,
-      updateAvailable: compareVersions(latestVersion, APP_VERSION) > 0,
+      updateAvailable: versionComparison > 0,
+      remoteOlderThanCurrent: versionComparison < 0,
       currentVersion: APP_VERSION,
       latestVersion,
       release: {
@@ -3496,6 +3490,13 @@ function modernProviderError(res, error, fallbackStatus = 500) {
   sendJSON(res, {
     ok: false,
     error: error && error.message || String(error || 'UNKNOWN_ERROR'),
+    status,
+    ...(error && error.provider ? { provider: error.provider } : {}),
+    ...(error && error.code ? { code: error.code } : {}),
+    ...(error && error.reauthRequired ? { reauthRequired: true } : {}),
+    ...(error && error.requiredScopes ? { requiredScopes: error.requiredScopes } : {}),
+    ...(error && error.optionalScopes ? { optionalScopes: error.optionalScopes } : {}),
+    ...(error && error.grantedScopes ? { grantedScopes: error.grantedScopes } : {}),
     ...(error && error.diagnostics ? { diagnostics: error.diagnostics } : {}),
   }, status);
 }
@@ -3504,47 +3505,98 @@ async function handleModernMusicRoute(req, res, url, pn) {
   const baseUrl = requestBaseUrl(req);
 
 
-
-  // ShinaYuu AI v0.1: isolated assistant layer. It never sits on playback critical paths.
-  if (pn === '/api/ai/status' && req.method === 'GET') {
-    try { sendJSON(res, aiCore.status()); }
-    catch (error) { modernProviderError(res, error, 500); }
-    return true;
-  }
-
-  if (pn === '/api/ai/discover' && req.method === 'GET') {
+  // ---------- ShinaYuu local playlists ----------
+  // These routes are intentionally handled in this active server dispatcher.
+  // modern-music-routes.js is kept as a source module, but server.js is the
+  // request handler actually used by the packaged application.
+  if (pn === '/api/app/playlists' && req.method === 'GET') {
     try {
-      const query = url.searchParams.get('q') || url.searchParams.get('query') || '';
-      const limit = Number(url.searchParams.get('limit') || 18);
-      sendJSON(res, { ok: true, ...(await aiCore.discover(query, { limit })) });
-    } catch (error) { modernProviderError(res, error, 502); }
+      sendJSON(res, { ok: true, provider: 'app', loggedIn: true, playlists: await appPlaylists.list() });
+    } catch (error) { modernProviderError(res, error); }
     return true;
   }
 
-  if (pn === '/api/ai/lyrics-verify' && req.method === 'POST') {
+  if (pn === '/api/app/playlist/tracks' && req.method === 'GET') {
     try {
-      const body = await readRequestBody(req);
-      sendJSON(res, { ok: true, ...(await aiCore.verifyLyrics(body.context || {})) });
-    } catch (error) { modernProviderError(res, error, 502); }
+      const id = url.searchParams.get('id') || url.searchParams.get('pid') || '';
+      const limit = Math.max(1, Math.min(500, Number(url.searchParams.get('limit') || 100) || 100));
+      const offset = Math.max(0, Number(url.searchParams.get('offset') || 0) || 0);
+      sendJSON(res, { ok: true, provider: 'app', ...(await appPlaylists.get(id, limit, offset)) });
+    } catch (error) { modernProviderError(res, error); }
     return true;
   }
 
-  if (pn === '/api/ai/memory-event' && req.method === 'POST') {
+  if (pn === '/api/app/playlist/create' && req.method === 'POST') {
     try {
       const body = await readRequestBody(req);
-      sendJSON(res, { ok: true, ...(aiCore.recordMemory(body || {})) });
-    } catch (error) { modernProviderError(res, error, Number(error && error.status) || 500); }
+      const name = String(body.name || body.title || '').trim();
+      const playlist = await appPlaylists.create(name);
+      sendJSON(res, { ok: true, success: true, provider: 'app', playlist });
+    } catch (error) { modernProviderError(res, error); }
     return true;
   }
 
-  if (pn === '/api/ai/chat' && req.method === 'POST') {
+
+  if (pn === '/api/app/playlist/remove-tracks' && req.method === 'POST') {
     try {
       const body = await readRequestBody(req);
-      const result = await aiCore.chat(body.message || '', body.context || {});
-      sendJSON(res, { ok: true, ...result });
-    } catch (error) {
-      modernProviderError(res, error, Number(error && error.status) || 502);
-    }
+      const pid = body.pid || body.playlistId || '';
+      const trackKeys = Array.isArray(body.trackKeys) ? body.trackKeys : (Array.isArray(body.keys) ? body.keys : []);
+      if (!pid) {
+        sendJSON(res, { ok: false, success: false, error: 'Missing app playlist id' }, 400);
+        return true;
+      }
+      const result = await appPlaylists.removeTracks(pid, trackKeys);
+      sendJSON(res, { ok: true, success: true, provider: 'app', playlistId: pid, ...result });
+    } catch (error) { modernProviderError(res, error); }
+    return true;
+  }
+
+  if (pn === '/api/app/playlist/delete' && req.method === 'POST') {
+    try {
+      const body = await readRequestBody(req);
+      const pid = body.pid || body.playlistId || '';
+      if (!pid) {
+        sendJSON(res, { ok: false, success: false, error: 'Missing app playlist id' }, 400);
+        return true;
+      }
+      const result = await appPlaylists.removePlaylist(pid);
+      sendJSON(res, { ok: true, success: true, provider: 'app', playlistId: pid, ...result });
+    } catch (error) { modernProviderError(res, error); }
+    return true;
+  }
+
+  if (pn === '/api/app/playlist/add-song' && req.method === 'POST') {
+    try {
+      const body = await readRequestBody(req);
+      const pid = body.pid || body.playlistId || '';
+      const song = body.song || body;
+      if (!pid) {
+        sendJSON(res, { ok: false, success: false, error: 'Missing app playlist id' }, 400);
+        return true;
+      }
+      const result = await appPlaylists.addSong(pid, song);
+      sendJSON(res, { ok: true, success: true, provider: 'app', playlistId: pid, ...result });
+    } catch (error) { modernProviderError(res, error); }
+    return true;
+  }
+
+  if (pn === '/api/app/liked/check' && req.method === 'GET') {
+    try {
+      const keys = String(url.searchParams.get('keys') || '').split(',').map((value) => decodeURIComponent(value || '')).filter(Boolean).slice(0, 200);
+      sendJSON(res, { ok: true, provider: 'app', liked: await appPlaylists.checkLiked(keys) });
+    } catch (error) { modernProviderError(res, error); }
+    return true;
+  }
+
+  if (pn === '/api/app/liked/toggle' && req.method === 'POST') {
+    try {
+      const body = await readRequestBody(req);
+      const song = body.song || body;
+      const like = body.like !== false;
+      const result = await appPlaylists.setLiked(song, like);
+      sendJSON(res, { ok: true, success: true, provider: 'app', ...result });
+    } catch (error) { modernProviderError(res, error); }
     return true;
   }
 
@@ -4110,39 +4162,6 @@ async function handleModernMusicRoute(req, res, url, pn) {
     return true;
   }
 
-  if (pn === '/api/soundcloud/status') {
-    try { sendJSON(res, musicProviders.soundcloudStatus()); }
-    catch (error) { modernProviderError(res, error); }
-    return true;
-  }
-
-  if (pn === '/api/soundcloud/search') {
-    try {
-      const keywords = url.searchParams.get('keywords') || '';
-      const limit = Math.max(1, Math.min(50, parseInt(url.searchParams.get('limit') || '30', 10) || 30));
-      const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0);
-      const songs = keywords ? await musicProviders.soundcloudSearch(keywords, limit, offset) : [];
-      sendJSON(res, { provider: 'soundcloud', sourceType: 'music', songs, result: songs, total: songs.length, nextOffset: offset + songs.length, hasMore: songs.length >= limit });
-    } catch (error) {
-      console.error('[SoundCloudSearch]', error);
-      sendJSON(res, { provider: 'soundcloud', error: error.message, songs: [], result: [] }, Number(error.status) || 500);
-    }
-    return true;
-  }
-
-  if (pn === '/api/soundcloud/song/url') {
-    try {
-      const trackUrl = url.searchParams.get('url') || url.searchParams.get('id') || '';
-      const quality = url.searchParams.get('quality') || 'standard';
-      const data = await musicProviders.resolveSoundCloudPlayback(trackUrl, quality);
-      sendJSON(res, { ...data, source: 'soundcloud', mediaKind: 'audio' });
-    } catch (error) {
-      console.error('[SoundCloudPlayback]', error);
-      sendJSON(res, { provider: 'soundcloud', playbackProvider: 'soundcloud', url: null, playable: false, reason: 'soundcloud_playback_unavailable', message: error.message || 'SoundCloud playback is unavailable.' }, Number(error.status) || 500);
-    }
-    return true;
-  }
-
   if (pn === '/api/spotify/track/visual') {
     try {
       const id = url.searchParams.get('id') || '';
@@ -4198,12 +4217,11 @@ async function handleModernMusicRoute(req, res, url, pn) {
     return true;
   }
 
-  if (pn === '/api/lyric' || pn === '/api/spotify/lyric' || pn === '/api/qq/lyric' || pn === '/api/youtube-music/lyric' || pn === '/api/youtube-video/lyric' || pn === '/api/soundcloud/lyric') {
+  if (pn === '/api/lyric' || pn === '/api/spotify/lyric' || pn === '/api/qq/lyric' || pn === '/api/youtube-music/lyric' || pn === '/api/youtube-video/lyric') {
     try {
       const youtube = pn.includes('/qq/') || pn.includes('/youtube-music/') || pn.includes('/youtube-video/');
-      const soundcloud = pn === '/api/soundcloud/lyric';
       const id = youtube ? (url.searchParams.get('mid') || url.searchParams.get('id') || '') : (url.searchParams.get('id') || '');
-      const hostState = youtube || soundcloud ? null : publicSpotifyHostState();
+      const hostState = youtube ? null : publicSpotifyHostState();
       const requestedDuration = Math.max(0, Number(url.searchParams.get('duration') || 0));
       const requestedDurationMs = requestedDuration > 10000 ? requestedDuration : requestedDuration * 1000;
       const hostDurationMatches = !requestedDurationMs || !hostState || !hostState.durationMs
@@ -4212,7 +4230,7 @@ async function handleModernMusicRoute(req, res, url, pn) {
       const currentTrackId = rendererCurrentTrackId || (hostState && hostState.alive && hostDurationMatches
         ? hostState.currentTrackId
         : '');
-      const data = await musicProviders.lyricsFor(id, soundcloud ? 'soundcloud' : (youtube ? 'youtube' : 'spotify'), {
+      const data = await musicProviders.lyricsFor(id, youtube ? 'youtube' : 'spotify', {
         track: url.searchParams.get('track') || '',
         artist: url.searchParams.get('artist') || '',
         album: url.searchParams.get('album') || '',
@@ -4235,10 +4253,11 @@ async function handleModernMusicRoute(req, res, url, pn) {
     try {
       const status = await musicProviders.spotifyLoginStatus(baseUrl);
       if (!status.loggedIn) { sendJSON(res, { loggedIn: false, provider: 'spotify', playlists: [] }); return true; }
-      const page = await musicProviders.spotifyUserPlaylistsPage(
-        Math.max(1, Math.min(50, parseInt(url.searchParams.get('limit') || '50', 10) || 50)),
-        Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0),
-      );
+      const limit = Math.max(1, Math.min(50, parseInt(url.searchParams.get('limit') || '50', 10) || 50));
+      const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0);
+      const page = typeof musicProviders.spotifyUserPlaylistsPage === 'function'
+        ? await musicProviders.spotifyUserPlaylistsPage(limit, offset)
+        : { playlists: await musicProviders.spotifyUserPlaylists(limit, offset), total: 0, offset, nextOffset: offset, hasMore: false };
       sendJSON(res, { loggedIn: true, provider: 'spotify', userId: status.userId, ...page });
     } catch (error) { modernProviderError(res, error); }
     return true;
@@ -4248,29 +4267,20 @@ async function handleModernMusicRoute(req, res, url, pn) {
     try {
       const status = await musicProviders.youtubeLoginStatus(baseUrl);
       if (!status.loggedIn) { sendJSON(res, { loggedIn: false, provider: 'youtube', configured: status.configured, playlists: [] }); return true; }
-      const limit = parseInt(url.searchParams.get('limit') || '200', 10) || 200;
-      let playlists = await musicProviders.youtubeAccountPlaylists(limit);
-      let fallbackUsed = false;
-      if (!playlists.length && typeof musicProviders.youtubeDevicePlaylists === 'function') {
-        try {
-          const fallback = await musicProviders.youtubeDevicePlaylists(limit);
-          if (Array.isArray(fallback) && fallback.length) {
-            playlists = fallback;
-            fallbackUsed = true;
-          }
-        } catch (fallbackError) {
-          console.warn('[YouTubePlaylistSync] device/cookie fallback failed:', fallbackError.message || fallbackError);
-        }
-      }
+      const playlists = await musicProviders.youtubeAccountPlaylists(parseInt(url.searchParams.get('limit') || '200', 10) || 200);
       const diagnostics = typeof musicProviders.youtubePlaylistSyncDiagnostics === 'function' ? musicProviders.youtubePlaylistSyncDiagnostics() : null;
-      sendJSON(res, { loggedIn: true, provider: 'youtube', userId: status.userId, nickname: status.nickname, avatar: status.avatar, playlists, total: playlists.length, nextOffset: playlists.length, hasMore: false, fallbackUsed, diagnostics });
+      sendJSON(res, { loggedIn: true, provider: 'youtube', userId: status.userId, nickname: status.nickname, avatar: status.avatar, playlists, diagnostics });
     } catch (error) { modernProviderError(res, error); }
     return true;
   }
 
   if (pn === '/api/playlist/tracks' || pn === '/api/spotify/playlist/tracks') {
-    try { sendJSON(res, await musicProviders.spotifyPlaylistTracks(url.searchParams.get('id') || '')); }
-    catch (error) { modernProviderError(res, error); }
+    try {
+      const id = url.searchParams.get('id') || '';
+      const limit = Math.max(1, Math.min(100, parseInt(url.searchParams.get('limit') || '100', 10) || 100));
+      const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0);
+      sendJSON(res, await musicProviders.spotifyPlaylistTracks(id, limit, offset));
+    } catch (error) { modernProviderError(res, error); }
     return true;
   }
 
@@ -4286,7 +4296,7 @@ async function handleModernMusicRoute(req, res, url, pn) {
     return true;
   }
 
-  if (pn === '/api/song/like/check') {
+  if (pn === '/api/song/like/check' || pn === '/api/spotify/song/like/check') {
     try {
       const ids = String(url.searchParams.get('ids') || '').split(',').filter(Boolean).slice(0, 50);
       const checks = await musicProviders.spotifyLikedCheck(ids);
@@ -4297,31 +4307,34 @@ async function handleModernMusicRoute(req, res, url, pn) {
     return true;
   }
 
-  if (pn === '/api/song/like') {
+  if (pn === '/api/song/like' || pn === '/api/spotify/song/like') {
     try {
-      const id = url.searchParams.get('id') || '';
-      const like = String(url.searchParams.get('like') || 'true') !== 'false';
+      const body = req.method === 'POST' ? await readRequestBody(req) : {};
+      const id = body.id || body.trackId || url.searchParams.get('id') || '';
+      const like = String(body.like != null ? body.like : (url.searchParams.get('like') || 'true')) !== 'false';
+      if (!id) { sendJSON(res, { error: 'Missing Spotify track id' }, 400); return true; }
       await musicProviders.spotifySetLiked(id, like);
       sendJSON(res, { loggedIn: true, success: true, id, liked: like });
     } catch (error) { modernProviderError(res, error); }
     return true;
   }
 
-  if (pn === '/api/playlist/create') {
+  if (pn === '/api/playlist/create' || pn === '/api/spotify/playlist/create') {
     try {
       const body = req.method === 'POST' ? await readRequestBody(req) : {};
       const name = body.name || url.searchParams.get('name') || '';
       const playlist = await musicProviders.spotifyCreatePlaylist(name);
-      sendJSON(res, { loggedIn: true, success: true, playlist, id: playlist.id });
+      sendJSON(res, { loggedIn: true, success: true, playlist: { ...playlist, provider: 'spotify', source: 'spotify', ownedByCurrentUser: true, subscribed: false, virtual: false, writable: true }, id: playlist.id });
     } catch (error) { modernProviderError(res, error); }
     return true;
   }
 
-  if (pn === '/api/playlist/add-song') {
+  if (pn === '/api/playlist/add-song' || pn === '/api/spotify/playlist/add-song') {
     try {
       const body = await readRequestBody(req);
       const pid = body.pid || body.playlistId || url.searchParams.get('pid') || '';
       const id = body.id || body.trackId || url.searchParams.get('id') || '';
+      if (!pid || !id) { sendJSON(res, { error: 'Missing playlist id or Spotify track id' }, 400); return true; }
       await musicProviders.spotifyAddSongToPlaylist(pid, id);
       sendJSON(res, { loggedIn: true, success: true, pid, id });
     } catch (error) { modernProviderError(res, error); }
@@ -4574,21 +4587,6 @@ const server = http.createServer(async (req, res) => {
     } catch (err) {
       console.error('[DiscoverHome]', err);
       sendJSON(res, { error: err.message, loggedIn: false, dailySongs: [], playlists: [], podcasts: [] }, 500);
-    }
-    return;
-  }
-
-  if (pn === '/api/weather/current') {
-    try {
-      const lat = url.searchParams.get('lat');
-      const lon = url.searchParams.get('lon');
-      const timezone = url.searchParams.get('timezone') || '';
-      const city = url.searchParams.get('city') || '';
-      if (lat == null || lon == null) throw Object.assign(new Error('WEATHER_COORDINATES_REQUIRED'), { status: 400 });
-      sendJSON(res, { ok: true, weather: await fetchOpenMeteoWeather({ lat, lon, timezone, city }) });
-    } catch (err) {
-      console.error('[WeatherCurrent]', err);
-      sendJSON(res, { ok: false, error: err.message, weather: null }, Number(err && err.status) || 502);
     }
     return;
   }
@@ -5387,77 +5385,6 @@ const server = http.createServer(async (req, res) => {
       while (true) { const c = await reader.read(); if (c.done) break; res.write(c.value); }
       res.end();
     } catch (err) { console.error('[Cover]', err); res.writeHead(500); res.end(); }
-    return;
-  }
-
-  // ---------- SoundCloud -> ShinaYuu playback proxy ----------
-  // SoundCloud's current public API serves AAC HLS playlists. Desktop Chromium
-  // does not provide dependable native HLS playback, so the alpha provider
-  // transcodes the HLS source to a browser-safe MP3 byte stream. This is kept
-  // behind a provider-specific route so future native HLS playback can replace
-  // it without touching playback-core state.
-  if (pn === '/api/soundcloud/media') {
-    let child = null;
-    try {
-      const trackUrl = String(url.searchParams.get('url') || url.searchParams.get('id') || '').trim();
-      const quality = String(url.searchParams.get('quality') || 'standard').trim();
-      const seekStart = Math.max(0, Number(url.searchParams.get('start') || 0) || 0);
-      if (!trackUrl) { res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Missing SoundCloud track URL'); return; }
-      const streamUrl = await musicProviders.resolveSoundCloudPlayback(trackUrl, quality);
-      const upstream = String(streamUrl && streamUrl.upstreamUrl || '').trim();
-      if (!upstream) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('SoundCloud stream unavailable'); return; }
-      const isSeekRequest = seekStart > 0.01;
-      const seekArgs = isSeekRequest ? ['-ss', seekStart.toFixed(3)] : [];
-      // Normal playback keeps the existing MP3-compatible stream.  For seek
-      // requests, avoid re-encoding the SoundCloud AAC upstream: remux it into
-      // a fragmented MP4 stream instead.  This removes encoder startup and
-      // gives Chromium a much faster path from target segment -> audible data.
-      const outputArgs = isSeekRequest
-        ? [
-            '-vn', '-map', '0:a:0',
-            '-c:a', 'copy',
-            '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
-            '-avoid_negative_ts', 'make_zero',
-            '-f', 'mp4', 'pipe:1'
-          ]
-        : [
-            '-vn', '-map', '0:a:0',
-            '-c:a', 'libmp3lame', '-b:a', '160k', '-ar', '48000', '-ac', '2',
-            '-f', 'mp3', 'pipe:1'
-          ];
-      child = spawn(ffmpegPath, [
-        '-hide_banner', '-loglevel', 'error',
-        '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '2',
-        '-fflags', 'nobuffer', '-flags', 'low_delay',
-        '-probesize', '32k', '-analyzeduration', '0', '-seek_timestamp', '1',
-        ...seekArgs,
-        '-i', upstream,
-        ...outputArgs
-      ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-      res.writeHead(200, {
-        'Content-Type': isSeekRequest ? 'audio/mp4' : 'audio/mpeg',
-        'Cache-Control': 'no-store',
-        'Access-Control-Allow-Origin': '*',
-        'Cross-Origin-Resource-Policy': 'cross-origin',
-        'Accept-Ranges': 'none',
-        'X-ShinaYuu-Seek-Offset': String(seekStart),
-        'X-ShinaYuu-Provider': 'soundcloud',
-        'X-ShinaYuu-Attribution': 'SoundCloud',
-      });
-      child.stdout.pipe(res);
-      child.stderr.on('data', (buf) => console.warn('[SoundCloudFFmpeg]', String(buf).trim().slice(0, 500)));
-      const stop = () => { try { if (child && !child.killed) child.kill(); } catch (_) {} };
-      req.on('aborted', stop);
-      req.on('close', stop);
-      res.on('close', stop);
-      child.on('error', (error) => { console.error('[SoundCloudFFmpeg]', error.message); try { if (!res.headersSent) res.writeHead(500); res.end(); } catch (_) {} });
-      child.on('close', (code) => { if (!res.writableEnded) res.end(); if (code && code !== 255) console.warn('[SoundCloudFFmpeg] exited', code); });
-    } catch (error) {
-      console.error('[SoundCloudMedia]', error);
-      try { if (child && !child.killed) child.kill(); } catch (_) {}
-      if (!res.headersSent) res.writeHead(Number(error.status) || 500, { 'Content-Type': 'text/plain; charset=utf-8' });
-      if (!res.writableEnded) res.end(error.message || 'SoundCloud media unavailable');
-    }
     return;
   }
 

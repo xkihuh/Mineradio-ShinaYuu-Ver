@@ -75,7 +75,7 @@ function currentResumeSeconds(fallback) {
 function canRefreshCurrentPlaybackUrlForResume(song) {
   if (!song || song.type === 'local' || song.source === 'local' || song.localUrl) return false;
   var provider = normalizePlaybackProvider(songProviderKey(song));
-  return provider === 'youtube' || provider === 'spotify' || provider === 'soundcloud';
+  return provider === 'youtube' || provider === 'spotify';
 }
 
 function playbackResumeProvider(song) {

@@ -52,43 +52,10 @@ var albumGaplessTailFreqData = null;
 var shinayuuPlaybackDescriptorCache = new Map();
 var shinayuuPlaybackDescriptorInflight = new Map();
 var SHINAYUU_YOUTUBE_DESCRIPTOR_TTL_MS = 8 * 60 * 1000;
-
-function restartSingleRepeatMedia(media, token, index, reason) {
-  if (playMode !== 'single' || !media || token !== trackSwitchToken || index !== currentIdx || audio !== media) return false;
-  try { media.loop = true; } catch (_) {}
-  setTimeout(function () {
-    if (token !== trackSwitchToken || index !== currentIdx || audio !== media || playMode !== 'single') return;
-    try { media.currentTime = 0; } catch (_) {}
-    try {
-      var playPromise = media.play && media.play();
-      playing = true;
-      if (typeof setPlayIcon === 'function') setPlayIcon(true);
-      if (typeof updatePlaybackProgressUi === 'function') updatePlaybackProgressUi();
-      if (playPromise && typeof playPromise.catch === 'function') {
-        playPromise.catch(function () {
-          if (token !== trackSwitchToken || index !== currentIdx || audio !== media || playMode !== 'single') return;
-          playQueueAt(index, { autoRepeat: true, preserveHomeState: true, suppressPlayFailureNotice: true });
-        });
-      }
-    } catch (_) {
-      if (token === trackSwitchToken && index === currentIdx && audio === media && playMode === 'single') playQueueAt(index, { autoRepeat: true, preserveHomeState: true, suppressPlayFailureNotice: true });
-    }
-  }, 0);
-  return true;
-}
-
 var SHINAYUU_SPOTIFY_DESCRIPTOR_TTL_MS = 2 * 60 * 1000;
 
 function shinayuuDescriptorHasPlayback(data) {
-  return !!(data && (data.url || data.spotifyUri || data.uri || data.playbackUri));
-}
-
-// A provider descriptor may expose a short-lived proxy URL/token in addition to
-// the upstream media URL. The proxy carries the exact yt-dlp headers and refresh
-// path, so HTML playback must prefer it instead of rebuilding /api/audio?url=.
-function playbackMediaUrlFromDescriptor(data) {
-  data = data || {};
-  return String(data.proxyUrl || data.url || '').trim();
+  return !!(data && (data.url || data.proxyUrl || data.spotifyUri || data.uri || data.playbackUri));
 }
 
 function shinayuuPlaybackDescriptorKey(song, quality) {
@@ -97,7 +64,7 @@ function shinayuuPlaybackDescriptorKey(song, quality) {
   var provider = normalizePlaybackProvider(sourceProvider);
   var id = provider === 'spotify'
     ? (song.spotifyId || song.id || song.providerSongId || '')
-    : (provider === 'soundcloud' ? (song.externalUrl || song.soundcloudPermalink || song.soundcloudUrl || song.soundcloudId || song.id || song.providerSongId || '') : (song.youtubeId || song.id || song.mid || song.songmid || ''));
+    : (song.youtubeId || song.id || song.mid || song.songmid || '');
   var sourceType = sourceProvider === 'youtube-video' ? 'video' : 'music';
   return [provider, sourceType, String(id), String(quality || '')].join('|');
 }
@@ -111,15 +78,13 @@ async function resolvePlaybackDescriptor(song, quality, options) {
   var key = shinayuuPlaybackDescriptorKey(song, requestedQuality);
   var now = Date.now();
   var cached = shinayuuPlaybackDescriptorCache.get(key);
-  var ttl = provider === 'spotify' ? SHINAYUU_SPOTIFY_DESCRIPTOR_TTL_MS : (provider === 'soundcloud' ? 90 * 1000 : SHINAYUU_YOUTUBE_DESCRIPTOR_TTL_MS);
+  var ttl = provider === 'spotify' ? SHINAYUU_SPOTIFY_DESCRIPTOR_TTL_MS : SHINAYUU_YOUTUBE_DESCRIPTOR_TTL_MS;
   if (!options.refresh && cached && now - cached.at < ttl && cached.data && shinayuuDescriptorHasPlayback(cached.data)) return cached.data;
   if (!options.refresh && shinayuuPlaybackDescriptorInflight.has(key)) return shinayuuPlaybackDescriptorInflight.get(key);
   var qualityParam = '&quality=' + encodeURIComponent(requestedQuality);
   var promise;
   if (provider === 'spotify') {
     promise = apiJson('/api/spotify/song/url?id=' + encodeURIComponent(song.spotifyId || song.id || song.providerSongId || '') + qualityParam, { timeoutMs: options.prefetch ? 7000 : 9000 });
-  } else if (provider === 'soundcloud') {
-    promise = apiJson('/api/soundcloud/song/url?id=' + encodeURIComponent(song.externalUrl || song.soundcloudPermalink || song.soundcloudUrl || song.soundcloudId || song.id || song.providerSongId || '') + qualityParam, { timeoutMs: options.prefetch ? 9000 : 12000 });
   } else {
     promise = apiJson(youtubePlaybackUrlRoute(song) + '?id=' + encodeURIComponent(song.youtubeId || song.id || song.mid || song.songmid || '') + qualityParam + '&sourceType=' + encodeURIComponent(sourceProvider === 'youtube-video' ? 'video' : 'music'), { timeoutMs: options.prefetch ? 11000 : 15000 });
   }
@@ -139,7 +104,7 @@ function invalidatePlaybackDescriptorForSong(song) {
   var sourceProvider = songProviderKey(song);
   var id = provider === 'spotify'
     ? (song.spotifyId || song.id || song.providerSongId || '')
-    : (provider === 'soundcloud' ? (song.externalUrl || song.soundcloudPermalink || song.soundcloudUrl || song.soundcloudId || song.id || song.providerSongId || '') : (song.youtubeId || song.id || song.mid || song.songmid || ''));
+    : (song.youtubeId || song.id || song.mid || song.songmid || '');
   var sourceType = sourceProvider === 'youtube-video' ? 'video' : 'music';
   var prefix = [provider, sourceType, String(id), ''].join('|');
   Array.from(shinayuuPlaybackDescriptorCache.keys()).forEach(function (key) {
@@ -574,9 +539,6 @@ async function resolveAlbumGaplessPlaybackData(song) {
   if (playbackProvider === 'spotify') {
     return apiJson('/api/spotify/song/url?id=' + encodeURIComponent(song.spotifyId || song.id || song.providerSongId || '') + qualityParam, { timeoutMs: 9000 });
   }
-  if (playbackProvider === 'soundcloud') {
-    return apiJson('/api/soundcloud/song/url?id=' + encodeURIComponent(song.externalUrl || song.soundcloudPermalink || song.soundcloudUrl || song.soundcloudId || song.id || song.providerSongId || '') + qualityParam, { timeoutMs: 12000 });
-  }
   return apiJson(youtubePlaybackUrlRoute(song) + '?id=' + encodeURIComponent(song.youtubeId || song.id || song.mid || song.songmid || '') + qualityParam + '&sourceType=' + encodeURIComponent(sourceProvider === 'youtube-video' ? 'video' : 'music'), { timeoutMs: 15000 });
 }
 
@@ -736,13 +698,13 @@ async function scheduleAlbumGaplessPreloadForCurrent(token, reason) {
   try {
     var resolvedSong = nextSong;
     var data = await resolveAlbumGaplessPlaybackData(nextSong);
-    if ((!data || !data.url) && typeof searchAlternatePlatformSong === 'function') {
+    if ((!data || (!data.url && !data.proxyUrl)) && typeof searchAlternatePlatformSong === 'function') {
       var alternate = await searchAlternatePlatformSong(nextSong);
       if (alternate) {
         alternate.__albumGaplessKey = albumGaplessState.albumKey;
         alternate.__albumTrackIndex = nextSong && nextSong.__albumTrackIndex;
         var alternateData = await resolveAlbumGaplessPlaybackData(alternate);
-        if (alternateData && alternateData.url) {
+        if (alternateData && (alternateData.url || alternateData.proxyUrl)) {
           resolvedSong = alternate;
           data = alternateData;
         }
@@ -755,8 +717,8 @@ async function scheduleAlbumGaplessPreloadForCurrent(token, reason) {
       || queueItemKey(playQueue[nextIdx]) !== nextKey
       || !albumGaplessQueueCanAdvance(currentIdx)
     ) return false;
-    if (!data || !data.url) return false;
-    var proxyAudioUrl = playbackMediaUrlFromDescriptor(data);
+    if (!data || (!data.url && !data.proxyUrl)) return false;
+    var proxyAudioUrl = data.proxyUrl || '/api/audio?url=' + encodeURIComponent(data.url);
     var media = new Audio();
     media.crossOrigin = 'anonymous';
     media.preload = 'auto';
@@ -842,7 +804,7 @@ async function playLocalQueueSong(song, idx, token, firstVisualPlay, opts, resum
     }
     finalizeListenSession(true);
     if (playAlbumGaplessNextOnEnded(token)) return;
-    if (playMode === 'single' && restartSingleRepeatMedia(this, token, currentIdx, 'online-ended')) return;
+    if (playMode === 'single') setTimeout(function () { playQueueAt(currentIdx, { autoRepeat: true, suppressPlayFailureNotice: true }); }, 0);
     else setTimeout(nextTrack, 0);
   };
   audio.onloadedmetadata = function () {
@@ -944,7 +906,6 @@ async function playQueueAt(idx, opts) {
   var albumGaplessAdoptedGain = 0;
   var playbackMedia = null;
   var previousSongForTransition = currentIdx >= 0 && currentIdx < playQueue.length ? playQueue[currentIdx] : null;
-  var previousPlaybackTransport = String(window.activePlaybackTransport || 'none');
   if (
     playMode === 'shuffle'
     && !opts.skipShuffleOrder
@@ -1212,7 +1173,7 @@ async function playQueueAt(idx, opts) {
       var data;
       if (albumGaplessHandoff) {
         data = opts.preloadedData;
-      } else if (opts.preResolvedPlaybackData && opts.preResolvedPlaybackData.url) {
+      } else if (opts.preResolvedPlaybackData && (opts.preResolvedPlaybackData.url || opts.preResolvedPlaybackData.proxyUrl)) {
         data = opts.preResolvedPlaybackData;
       } else {
         data = await resolvePlaybackDescriptor(song, requestedQuality, { refresh: !!opts.forceDescriptorRefresh });
@@ -1226,14 +1187,6 @@ async function playQueueAt(idx, opts) {
         return settleExpiredSourceFallbackPlayback(idx, token, opts);
       }
       if (data) {
-        if (playbackProvider === 'soundcloud' && Number(data.duration) > 0) {
-          var soundcloudDurationMs = Number(data.duration);
-          // Backend duration is milliseconds; keep the queue item's duration in
-          // the same unit when it is declared that way, otherwise normalize from
-          // seconds. This value is authoritative for the progress clock.
-          song.duration = soundcloudDurationMs > 1000 ? Math.round(soundcloudDurationMs) : Math.round(soundcloudDurationMs * 1000);
-          song.durationMs = song.duration;
-        }
         song.resolvedPlaybackProvider = playbackProvider;
         song.playbackLevel = data.level || song.playbackLevel || '';
         if (!data.sourceMatch) song.playbackSource = data.source || data.provider || song.playbackSource || '';
@@ -1293,13 +1246,7 @@ async function playQueueAt(idx, opts) {
         document.getElementById('trial-banner').classList.add('show');
       }
       markPlayPhase('audio-element');
-      var proxyAudioUrl = opts.preloadedProxyAudioUrl || playbackMediaUrlFromDescriptor(data);
-      if (!proxyAudioUrl) {
-        var fallbackResult = await tryAutoPlaybackFallback(song, data, idx, token, retryPlaybackOpts);
-        if (fallbackResult !== null) return fallbackResult === true;
-        handlePlaybackUnavailable(song, data);
-        return false;
-      }
+      var proxyAudioUrl = opts.preloadedProxyAudioUrl || data.proxyUrl || '/api/audio?url=' + encodeURIComponent(data.url);
       if (albumGaplessHandoff) {
         audioFadeSerial++;
         clearAudioFadeTimers();
@@ -1376,7 +1323,7 @@ async function playQueueAt(idx, opts) {
         }
         finalizeListenSession(true);
         if (playAlbumGaplessNextOnEnded(token)) return;
-        if (playMode === 'single' && restartSingleRepeatMedia(this, token, currentIdx, 'online-ended')) return;
+        if (playMode === 'single') setTimeout(function () { playQueueAt(currentIdx, { autoRepeat: true, suppressPlayFailureNotice: true }); }, 0);
         else setTimeout(nextTrack, 0);
       };
       scheduleAudioResumePosition(audio, opts.resumeAt != null ? opts.resumeAt : restoreResumeAt, token);
@@ -1464,18 +1411,11 @@ async function playQueueAt(idx, opts) {
       // This prevents a late provider-stop completion from clearing the new
       // HTML transport or leaving both providers fighting over playback state.
       var providerStopPromise = window.pendingExternalProviderStopPromise;
-      var crossProviderStop = previousPlaybackTransport !== 'none'
-        && previousPlaybackTransport !== 'html-audio'
-        && playbackProvider !== 'spotify';
       if (!albumGaplessHandoff && providerStopPromise && typeof providerStopPromise.then === 'function') {
-        // Same-provider HTML starts should not wait at all. Cross-provider starts
-        // keep only a short bounded drain window; the previous 1800ms budget was
-        // directly audible on Spotify -> YouTube switches.
-        var providerStopBudget = crossProviderStop ? 650 : 260;
         try {
           await Promise.race([
             providerStopPromise,
-            new Promise(function (resolve) { setTimeout(function () { resolve(false); }, providerStopBudget); })
+            new Promise(function (resolve) { setTimeout(function () { resolve(false); }, 1800); })
           ]);
         } catch (_) { }
         // Do not clear a stop that merely exceeded the HTML start budget. A later

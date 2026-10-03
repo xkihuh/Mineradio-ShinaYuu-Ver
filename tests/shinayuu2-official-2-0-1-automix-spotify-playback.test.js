@@ -1,6 +1,4 @@
 'use strict';
-const CURRENT_VERSION = require('../package.json').version;
-const CURRENT_BUILD_VERSION = `${CURRENT_VERSION}.0`;
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -10,9 +8,9 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
 test('2.1.5 version and update repository are configured', () => {
   const pkg = JSON.parse(read('package.json'));
-  assert.equal(pkg.version, CURRENT_VERSION);
-  assert.equal(pkg.build.buildVersion, CURRENT_BUILD_VERSION);
-  assert.equal(pkg.shinayuu.displayVersion, CURRENT_VERSION);
+  assert.equal(pkg.version, '2.1.7');
+  assert.equal(pkg.build.buildVersion, '2.1.7.0');
+  assert.equal(pkg.shinayuu.displayVersion, '2.1.7');
   assert.equal(pkg.shinayuu.update.owner, 'xkihuh');
   assert.equal(pkg.shinayuu.update.repo, 'Mineradio-ShinaYuu-Ver');
 });
@@ -38,16 +36,12 @@ test('progress handoff ghost is reused and text writes are isolated', () => {
 test('Spotify playback has SDK prewarm, resume, device recovery and YouTube fallback', () => {
   const src = read('public/spotify-direct-player.js');
   assert.match(src, /shinayuu-spotify-login-ready/);
-  assert.match(src, /state\.paused === true && !resumeAttempted/);
+  assert.match(src, /state && match\.matched && state\.paused === true/);
   assert.doesNotMatch(src, /function ensureSpotifyDeviceActivated\(/);
-  assert.doesNotMatch(src, /await postJson\('\/api\/spotify\/player\/transfer'/);
-  assert.match(src, /Web API play command already targets the freshly-created SDK device/);
-  assert.match(src, /eventName !== 'playback_error'/);
-  assert.match(src, /playback_error diagnostic track=/);
-  assert.doesNotMatch(src, /playback-error-reactivate-retry/);
-  assert.doesNotMatch(src, /device activation failed/);
+  assert.match(src, /if \(attempt >= 2\)[\s\S]*?\/api\/spotify\/player\/transfer/);
+  assert.match(src, /retry device activation failed/);
   assert.match(src, /captureSpotifyMediaActivation/);
   assert.doesNotMatch(src, /SDK reconnect failed/);
   assert.match(src, /function playSpotifyViaYouTubeFallback\(/);
-  assert.match(src, /never send \/play again/);
+  assert.match(src, /Never disconnect the SDK inside a user-initiated play attempt/);
 });

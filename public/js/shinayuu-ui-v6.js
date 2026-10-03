@@ -27,23 +27,24 @@
     if (!body) return;
     var width = Math.max(0, window.innerWidth || root.clientWidth || 0);
     var height = Math.max(0, window.innerHeight || root.clientHeight || 0);
-    var dpr = Math.max(1, Number(window.devicePixelRatio) || 1);
+    var metrics = window.shinayuuDisplayMetrics || null;
+    var layoutWidth = Math.max(width, Number(metrics && metrics.layoutWidth) || 0);
+    var layoutHeight = Math.max(height, Number(metrics && metrics.layoutHeight) || 0);
+    var balanced = !!(metrics && metrics.balanced === true);
     var fullscreen = detectFullscreen();
-    var hiDpi = dpr >= 1.15;
-    var denseWindow = !fullscreen && (hiDpi || width < 1360 || height < 820);
-    setClass('ui-ultrawide', width >= 1800);
-    setClass('ui-wide', width >= 1440);
-    setClass('ui-compact', width < 1280 && width >= 900);
-    setClass('ui-narrow', width < 900);
-    setClass('ui-short', height < 760);
-    setClass('ui-very-short', height < 640);
+    setClass('ui-dpi-balanced', balanced);
+    setClass('ui-ultrawide', layoutWidth >= 1800);
+    setClass('ui-wide', layoutWidth >= 1440);
+    setClass('ui-compact', layoutWidth < 1280 && layoutWidth >= 900);
+    setClass('ui-narrow', layoutWidth < 900);
+    setClass('ui-short', layoutHeight < 760);
+    setClass('ui-very-short', layoutHeight < 640);
     setClass('ui-windowed', !fullscreen);
     setClass('ui-fullscreen', fullscreen);
-    setClass('ui-hi-dpi', hiDpi);
-    setClass('ui-dense-window', denseWindow);
-    root.style.setProperty('--sy-device-pixel-ratio', dpr.toFixed(3));
     root.style.setProperty('--sy-viewport-width', width + 'px');
     root.style.setProperty('--sy-viewport-height', height + 'px');
+    root.style.setProperty('--sy-layout-width', layoutWidth + 'px');
+    root.style.setProperty('--sy-layout-height', layoutHeight + 'px');
   }
 
   function queueViewportUpdate() {
@@ -126,13 +127,13 @@
 
   function installGlobalHooks() {
     window.addEventListener('resize', queueViewportUpdate, { passive: true });
-    if (window.visualViewport) window.visualViewport.addEventListener('resize', queueViewportUpdate, { passive: true });
     window.addEventListener('orientationchange', queueViewportUpdate, { passive: true });
     document.addEventListener('fullscreenchange', queueViewportUpdate);
     document.addEventListener('webkitfullscreenchange', queueViewportUpdate);
     document.addEventListener('visibilitychange', function () {
       if (!document.hidden) queueViewportUpdate();
     });
+    window.addEventListener('shinayuu-display-metrics-change', queueViewportUpdate);
   }
 
   function boot() {

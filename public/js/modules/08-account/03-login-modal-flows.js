@@ -13,23 +13,13 @@ var providerConfigSnapshot = {
   spotifyRedirectUri: spotifyRedirectUri,
   youtubeClientId: '',
   youtubeConfigured: false,
-  youtubeRedirectUri: '',
-  soundcloudClientId: '',
-  soundcloudConfigured: true,
-  soundcloudClientSecretConfigured: false
+  youtubeRedirectUri: ''
 };
 var providerConfigOpen = false;
 
-function normalizeLoginProviderKey(provider) {
-  provider = String(provider || '').toLowerCase();
-  if (provider === 'spotify') return 'spotify';
-  if (provider === 'soundcloud') return 'soundcloud';
-  return 'youtube';
-}
+function normalizeLoginProviderKey(provider) { return provider === 'spotify' ? 'spotify' : 'youtube'; }
 function loginProviderSupportsCookieMode() { return false; }
 function loginProviderOfficialModeText(provider) {
-  provider = normalizeLoginProviderKey(provider);
-  if (provider === 'soundcloud') return { title: 'Web Search', sub: localizeUiMessage('Tìm kiếm SoundCloud công khai; ShinaYuu tự resolve đúng URL track khi phát.') };
   return provider === 'spotify'
     ? { title: 'OAuth', sub: localizeUiMessage('Mở trang ủy quyền Spotify trong trình duyệt mặc định.') }
     : { title: 'Google OAuth', sub: localizeUiMessage('Mở trang đăng nhập Google trong trình duyệt mặc định.') };
@@ -58,27 +48,19 @@ function startQrPoll() {}
 function stopQrPoll() {}
 
 function providerDisplayName(provider) {
-  provider = normalizeLoginProviderKey(provider);
-  if (provider === 'spotify') return 'Spotify';
-  if (provider === 'soundcloud') return 'SoundCloud';
-  return 'YouTube Music';
+  return normalizeLoginProviderKey(provider) === 'spotify' ? 'Spotify' : 'YouTube Music';
 }
 function providerStatusObject(provider) {
-  provider = normalizeLoginProviderKey(provider);
-  if (provider === 'spotify') return spotifyLoginStatus || {};
-  if (provider === 'soundcloud') return soundcloudLoginStatus || {};
-  return youtubeLoginStatus || {};
+  return normalizeLoginProviderKey(provider) === 'spotify' ? (spotifyLoginStatus || {}) : (youtubeLoginStatus || {});
 }
 function providerConfigured(provider) {
   provider = normalizeLoginProviderKey(provider);
   if (provider === 'spotify') return !!providerConfigSnapshot.spotifyConfigured;
-  if (provider === 'soundcloud') return !!providerConfigSnapshot.soundcloudConfigured;
   return !!providerConfigSnapshot.youtubeConfigured;
 }
 function providerConnectedText(provider, status) {
   provider = normalizeLoginProviderKey(provider);
   status = status || providerStatusObject(provider);
-  if (provider === 'soundcloud') return localizeUiMessage('Sẵn sàng · Không cần Client ID');
   if (status.loggedIn) {
     var nickname = status.nickname || status.displayName || providerDisplayName(provider);
     return localizeUiMessage('Đã kết nối') + (nickname ? ' · ' + nickname : '');
@@ -104,11 +86,6 @@ function youtubeLoginStatusText(info) {
   }
   return localizeUiMessage('Sẵn sàng đăng nhập Google để đồng bộ playlist YouTube Music.');
 }
-function soundcloudLoginStatusText(info) {
-  info = info || soundcloudLoginStatus || {};
-  return localizeUiMessage('SoundCloud đã sẵn sàng · không cần Client ID / Client Secret.');
-}
-
 
 async function loadProviderConfig(force) {
   if (!force && providerConfigSnapshot.__loaded) return providerConfigSnapshot;
@@ -133,14 +110,10 @@ function syncProviderConfigInputs() {
   var market = document.getElementById('spotify-market-input');
   var youtubeUri = document.getElementById('youtube-redirect-uri');
   var spotifyUri = document.getElementById('spotify-redirect-uri');
-  var soundcloudId = document.getElementById('soundcloud-client-id-input');
-  var soundcloudSecret = document.getElementById('soundcloud-client-secret-input');
   if (youtubeId && document.activeElement !== youtubeId) youtubeId.value = providerConfigSnapshot.youtubeClientId || '';
   // The secret is intentionally never returned by the backend.
   if (youtubeSecret && document.activeElement !== youtubeSecret && !youtubeSecret.value) youtubeSecret.value = '';
   if (spotifyId && document.activeElement !== spotifyId) spotifyId.value = providerConfigSnapshot.spotifyClientId || '';
-  if (soundcloudId && document.activeElement !== soundcloudId) soundcloudId.value = providerConfigSnapshot.soundcloudClientId || '';
-  if (soundcloudSecret && document.activeElement !== soundcloudSecret) soundcloudSecret.value = '';
   if (market && document.activeElement !== market) market.value = providerConfigSnapshot.spotifyMarket || 'VN';
   if (youtubeUri) youtubeUri.textContent = providerConfigSnapshot.youtubeRedirectUri || localizeUiMessage('Được tạo sau khi ứng dụng khởi động');
   if (spotifyUri) spotifyUri.textContent = providerConfigSnapshot.spotifyRedirectUri || spotifyRedirectUri;
@@ -171,9 +144,6 @@ async function saveProviderConfig(provider) {
       if (spotifyInput) spotifyInput.focus();
       return { ok: false, error: 'SPOTIFY_CLIENT_ID_REQUIRED' };
     }
-  } else if (provider === 'soundcloud') {
-    if (statusEl) { statusEl.className = 'ok'; statusEl.textContent = localizeUiMessage('SoundCloud không cần cấu hình Client ID / Client Secret.'); }
-    return { ok: true, provider: 'soundcloud' };
   } else {
     var youtubeInput = document.getElementById('youtube-client-id-input');
     var secretInput = document.getElementById('youtube-client-secret-input');
@@ -195,7 +165,7 @@ async function saveProviderConfig(provider) {
     providerConfigSnapshot = Object.assign({}, providerConfigSnapshot, info || {}, { __loaded: true });
     syncProviderConfigInputs();
     updateLoginProviderUi();
-    if (statusEl) { statusEl.className = 'ok'; statusEl.textContent = provider === 'soundcloud' ? localizeUiMessage('Đã lưu cấu hình SoundCloud. Nguồn đã sẵn sàng để kiểm tra.') : localizeUiMessage('Đã lưu cấu hình. Bạn có thể bắt đầu đăng nhập.'); }
+    if (statusEl) { statusEl.className = 'ok'; statusEl.textContent = localizeUiMessage('Đã lưu cấu hình. Bạn có thể bắt đầu đăng nhập.'); }
     return { ok: true, provider: provider };
   } catch (error) {
     if (statusEl) { statusEl.className = 'fail'; statusEl.textContent = localizeUiMessage('Không thể lưu cấu hình: ') + (error.message || error); }
@@ -224,31 +194,22 @@ function openSpotifyDeveloperDashboard() { window.open('https://developer.spotif
 function updateLoginProviderUi() {
   var provider = normalizeLoginProviderKey(loginProvider);
   var isSpotify = provider === 'spotify';
-  var isSoundCloud = provider === 'soundcloud';
   var youtubeCard = document.getElementById('login-provider-youtube');
   var spotifyCard = document.getElementById('login-provider-spotify');
-  var soundcloudCard = document.getElementById('login-provider-soundcloud');
   var youtubeStatus = providerConnectedText('youtube', youtubeLoginStatus);
   var spotifyStatus = providerConnectedText('spotify', spotifyLoginStatus);
-  var soundcloudStatusText = providerConnectedText('soundcloud', soundcloudLoginStatus);
   if (youtubeCard) {
-    youtubeCard.classList.toggle('active', !isSpotify && !isSoundCloud);
+    youtubeCard.classList.toggle('active', !isSpotify);
     youtubeCard.classList.toggle('connected', !!(youtubeLoginStatus && youtubeLoginStatus.loggedIn));
   }
   if (spotifyCard) {
     spotifyCard.classList.toggle('active', isSpotify);
     spotifyCard.classList.toggle('connected', !!(spotifyLoginStatus && spotifyLoginStatus.loggedIn));
   }
-  if (soundcloudCard) {
-    soundcloudCard.classList.toggle('active', isSoundCloud);
-    soundcloudCard.classList.toggle('connected', !!(soundcloudLoginStatus && soundcloudLoginStatus.configured && soundcloudLoginStatus.searchReady));
-  }
   var youtubeState = document.getElementById('login-provider-youtube-state');
   var spotifyState = document.getElementById('login-provider-spotify-state');
-  var soundcloudState = document.getElementById('login-provider-soundcloud-state');
   if (youtubeState) youtubeState.textContent = youtubeStatus;
   if (spotifyState) spotifyState.textContent = spotifyStatus;
-  if (soundcloudState) soundcloudState.textContent = soundcloudStatusText;
 
   var title = document.getElementById('login-modal-title');
   var desc = document.getElementById('login-modal-desc');
@@ -257,38 +218,32 @@ function updateLoginProviderUi() {
   var startButton = document.getElementById('refresh-qr-btn');
   var logoutButton = document.getElementById('provider-logout-btn');
   var currentStatus = providerStatusObject(provider);
-  if (title) title.textContent = isSoundCloud ? localizeUiMessage('Cấu hình SoundCloud') : (isSpotify ? localizeUiMessage('Kết nối Spotify') : localizeUiMessage('Kết nối YouTube Music'));
-  if (desc) desc.textContent = isSoundCloud
-    ? localizeUiMessage('SoundCloud dùng Client ID + Client Secret để tìm kiếm và phát các track công khai. Không cần đăng nhập tài khoản SoundCloud.')
-    : (isSpotify
-      ? localizeUiMessage('Đăng nhập Spotify bằng OAuth chính thức để đồng bộ playlist, Liked Songs và phát trực tiếp bằng tài khoản Premium.')
-      : localizeUiMessage('YouTube Music có thể tìm và phát công khai. Đăng nhập Google chỉ cần thiết để đồng bộ playlist cá nhân.'));
+  if (title) title.textContent = isSpotify ? localizeUiMessage('Kết nối Spotify') : localizeUiMessage('Kết nối YouTube Music');
+  if (desc) desc.textContent = isSpotify
+    ? localizeUiMessage('Đăng nhập Spotify bằng OAuth chính thức để đồng bộ playlist, Liked Songs và phát trực tiếp bằng tài khoản Premium.')
+    : localizeUiMessage('YouTube Music có thể tìm và phát công khai. Đăng nhập Google chỉ cần thiết để đồng bộ playlist cá nhân.');
   if (statusEl && !/^(loading|ok|fail)$/.test(statusEl.className || '')) {
-    statusEl.textContent = isSoundCloud ? soundcloudLoginStatusText(soundcloudLoginStatus) : (isSpotify ? spotifyLoginStatusText(spotifyLoginStatus) : youtubeLoginStatusText(youtubeLoginStatus));
+    statusEl.textContent = isSpotify ? spotifyLoginStatusText(spotifyLoginStatus) : youtubeLoginStatusText(youtubeLoginStatus);
   }
   if (badge) {
-    var ready = isSoundCloud ? !!(currentStatus.configured && currentStatus.searchReady) : !!currentStatus.loggedIn;
-    badge.className = 'provider-status-badge' + (ready ? ' connected' : (providerConfigured(provider) ? ' ready' : ' needs-config'));
-    badge.textContent = ready ? localizeUiMessage(isSoundCloud ? 'Sẵn sàng' : 'Đã kết nối') : (providerConfigured(provider) ? localizeUiMessage('Sẵn sàng') : localizeUiMessage('Cần cấu hình'));
+    badge.className = 'provider-status-badge' + (currentStatus.loggedIn ? ' connected' : (providerConfigured(provider) ? ' ready' : ' needs-config'));
+    badge.textContent = currentStatus.loggedIn ? localizeUiMessage('Đã kết nối') : (providerConfigured(provider) ? localizeUiMessage('Sẵn sàng') : localizeUiMessage('Cần cấu hình'));
   }
   if (startButton) {
-    startButton.textContent = isSoundCloud
-      ? (currentStatus.configured ? localizeUiMessage('Kiểm tra SoundCloud') : localizeUiMessage('Cấu hình SoundCloud'))
-      : (currentStatus.loggedIn ? localizeUiMessage('Đăng nhập lại') : (isSpotify ? localizeUiMessage('Kết nối Spotify') : localizeUiMessage('Kết nối YouTube Music')));
+    startButton.textContent = currentStatus.loggedIn
+      ? localizeUiMessage('Đăng nhập lại')
+      : (isSpotify ? localizeUiMessage('Kết nối Spotify') : localizeUiMessage('Kết nối YouTube Music'));
   }
-  if (logoutButton) logoutButton.disabled = isSoundCloud || !currentStatus.loggedIn;
+  if (logoutButton) logoutButton.disabled = !currentStatus.loggedIn;
 
   var youtubeGroup = document.getElementById('youtube-config-group');
   var spotifyGroup = document.getElementById('spotify-config-group');
-  var soundcloudGroup = document.getElementById('soundcloud-config-group');
-  if (youtubeGroup) youtubeGroup.hidden = isSpotify || isSoundCloud;
+  if (youtubeGroup) youtubeGroup.hidden = isSpotify;
   if (spotifyGroup) spotifyGroup.hidden = !isSpotify;
-  if (soundcloudGroup) soundcloudGroup.hidden = !isSoundCloud;
   var graph = document.getElementById('provider-login-source-grid');
   if (graph) graph.setAttribute('data-provider', provider);
   syncProviderConfigInputs();
 }
-
 function updateLoginNodeGraphUi() { updateLoginProviderUi(); }
 
 async function showLoginModal(opts) {
@@ -297,7 +252,7 @@ async function showLoginModal(opts) {
   openGsapModal(document.getElementById('login-modal'));
   var statusEl = document.getElementById('qr-status');
   if (statusEl) { statusEl.className = 'loading'; statusEl.textContent = localizeUiMessage('Đang kiểm tra trạng thái các nguồn nhạc…'); }
-  await Promise.allSettled([loadProviderConfig(true), refreshYouTubeLoginStatus(), refreshSpotifyLoginStatus(), refreshSoundCloudLoginStatus()]);
+  await Promise.allSettled([loadProviderConfig(true), refreshYouTubeLoginStatus(), refreshSpotifyLoginStatus()]);
   if (statusEl) statusEl.className = '';
   updateLoginProviderUi();
 }
@@ -308,9 +263,9 @@ function setLoginProvider(provider, silent) {
   var statusEl = document.getElementById('qr-status');
   if (statusEl) statusEl.className = '';
   updateLoginProviderUi();
-  if (!silent && statusEl) statusEl.textContent = loginProvider === 'soundcloud'
-    ? soundcloudLoginStatusText(soundcloudLoginStatus)
-    : (loginProvider === 'spotify' ? spotifyLoginStatusText(spotifyLoginStatus) : youtubeLoginStatusText(youtubeLoginStatus));
+  if (!silent && statusEl) statusEl.textContent = loginProvider === 'spotify'
+    ? spotifyLoginStatusText(spotifyLoginStatus)
+    : youtubeLoginStatusText(youtubeLoginStatus);
   return loginProvider;
 }
 
@@ -333,32 +288,6 @@ async function beginProviderLogin(provider) {
   await loadProviderConfig(false);
   var statusEl = document.getElementById('qr-status');
   var button = document.getElementById('refresh-qr-btn');
-  if (provider === 'soundcloud') {
-    if (!providerConfigured(provider)) {
-      toggleProviderConfigPanel(true);
-      updateLoginProviderUi();
-      if (statusEl) { statusEl.className = 'fail'; statusEl.textContent = localizeUiMessage('Hãy nhập và lưu SoundCloud Client ID + Client Secret trước khi kiểm tra.'); }
-      var scInput = document.getElementById('soundcloud-client-id-input');
-      if (scInput) scInput.focus();
-      return { ok: false, provider: provider, error: 'SOUNDCLOUD_CLIENT_CREDENTIALS_REQUIRED' };
-    }
-    if (button) button.disabled = true;
-    try {
-      if (statusEl) { statusEl.className = 'loading'; statusEl.textContent = localizeUiMessage('Đang kiểm tra kết nối SoundCloud…'); }
-      var scResult = await apiJson('/api/soundcloud/status?t=' + Date.now(), { timeoutMs: 12000 });
-      soundcloudLoginStatus = normalizeSoundCloudLoginStatus(scResult);
-      if (!soundcloudLoginStatus.searchReady) throw new Error(scResult && (scResult.message || scResult.error) || 'SOUNDCLOUD_NOT_READY');
-      if (statusEl) { statusEl.className = 'ok'; statusEl.textContent = localizeUiMessage('SoundCloud API đã sẵn sàng.'); }
-      updateLoginProviderUi();
-      return { ok: true, provider: provider };
-    } catch (error) {
-      if (statusEl) { statusEl.className = 'fail'; statusEl.textContent = localizeUiMessage('Không thể kết nối SoundCloud: ') + (error.message || error); }
-      updateLoginProviderUi();
-      return { ok: false, provider: provider, error: error.message || 'SOUNDCLOUD_STATUS_FAILED' };
-    } finally {
-      if (button) button.disabled = false;
-    }
-  }
   if (!providerConfigured(provider)) {
     toggleProviderConfigPanel(true);
     updateLoginProviderUi();
@@ -439,15 +368,9 @@ async function refreshSelectedProviderStatus() {
   if (statusEl) { statusEl.className = 'loading'; statusEl.textContent = localizeUiMessage('Đang làm mới trạng thái đăng nhập…'); }
   try {
     await loadProviderConfig(true);
-    if (loginProvider === 'soundcloud') await refreshSoundCloudLoginStatus();
-    else if (loginProvider === 'spotify') await refreshSpotifyLoginStatus();
+    if (loginProvider === 'spotify') await refreshSpotifyLoginStatus();
     else await refreshYouTubeLoginStatus({ force: true });
-    if (statusEl) {
-      var refreshStatus = providerStatusObject(loginProvider);
-      var refreshReady = loginProvider === 'soundcloud' ? !!(refreshStatus.configured && refreshStatus.searchReady) : !!refreshStatus.loggedIn;
-      statusEl.className = refreshReady ? 'ok' : '';
-      statusEl.textContent = loginProvider === 'soundcloud' ? soundcloudLoginStatusText(soundcloudLoginStatus) : (loginProvider === 'spotify' ? spotifyLoginStatusText(spotifyLoginStatus) : youtubeLoginStatusText(youtubeLoginStatus));
-    }
+    if (statusEl) { statusEl.className = providerStatusObject(loginProvider).loggedIn ? 'ok' : ''; statusEl.textContent = loginProvider === 'spotify' ? spotifyLoginStatusText(spotifyLoginStatus) : youtubeLoginStatusText(youtubeLoginStatus); }
     updateLoginProviderUi();
     renderUserBtn();
     return { ok: true };
@@ -463,10 +386,6 @@ async function logoutSelectedLoginProvider() {
   var provider = normalizeLoginProviderKey(loginProvider);
   var statusEl = document.getElementById('qr-status');
   try {
-    if (provider === 'soundcloud') {
-      if (statusEl) { statusEl.className = ''; statusEl.textContent = localizeUiMessage('SoundCloud là nguồn API công khai; hãy sửa Client ID/Secret trong phần cấu hình.'); }
-      return { ok: false, provider: provider, error: 'SOUNDCLOUD_NOT_ACCOUNT_LOGIN' };
-    }
     var bridge = window.desktopWindow;
     if (provider === 'spotify') {
       if (bridge && typeof bridge.clearSpotifyMusicLogin === 'function') await bridge.clearSpotifyMusicLogin();

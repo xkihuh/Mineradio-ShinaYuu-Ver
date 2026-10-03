@@ -1,5 +1,4 @@
 'use strict';
-const CURRENT_VERSION = require('../package.json').version;
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -27,8 +26,7 @@ test('YouTube playback isolates public and authenticated Innertube clients and b
   assert.match(providers, /getYouTubeAuthenticatedPlaybackClient/);
   assert.match(providers, /youtubei\.js-public/);
   assert.match(providers, /youtubei\.js-authenticated/);
-  assert.doesNotMatch(providers, /public:android_vr/);
-  assert.match(providers, /public:default-no-android-vr/);
+  assert.match(providers, /public:android_vr/);
   assert.match(providers, /public:ios/);
   assert.match(providers, /public:tv/);
   assert.match(providers, /--no-cookies/);
@@ -58,7 +56,7 @@ test('inactive Spotify host no longer suppresses fallback lyrics and active requ
 
 test('Windows build identity uses the exact ShinaYuu Music 1.1.7.4 artwork and installer resources', () => {
   const pkg = JSON.parse(read('package.json'));
-  assert.equal(pkg.version, CURRENT_VERSION);
+  assert.equal(pkg.version, '2.1.7');
   assert.equal(pkg.productName, 'ShinaYuu Music');
   assert.equal(pkg.build.win.icon, 'build/icon.ico');
   assert.equal(pkg.build.nsis.installerIcon, 'build/icon.ico');

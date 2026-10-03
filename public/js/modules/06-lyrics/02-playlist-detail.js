@@ -1,4 +1,4 @@
-var playlistPanelDetailState = { key: '', loading: false, loadingMore: false, playlist: null, tracks: [], token: 0, total: 0, nextOffset: 0, hasMore: false, scrollTop: 0, controller: null, warmTimer: 0, renderLimit: PLAYLIST_DETAIL_INITIAL_RENDER, error: '', message: '' };
+var playlistPanelDetailState = { key: '', loading: false, loadingMore: false, playlist: null, tracks: [], token: 0, total: 0, nextOffset: 0, hasMore: false, scrollTop: 0, controller: null, warmTimer: 0, renderLimit: PLAYLIST_DETAIL_INITIAL_RENDER, error: '', message: '', selectMode: false, selectedKeys: Object.create(null) };
 function queueVirtualSpacerHtml(height) {
   height = Math.max(0, Math.round(Number(height) || 0));
   return height ? '<div class="queue-virtual-spacer" aria-hidden="true" style="height:' + height + 'px"></div>' : '';
@@ -120,20 +120,16 @@ function bindMiniQueueLazyRender() {
   }, { passive: true });
 }
 function normalizePlaylistProvider(provider) {
-  provider = String(provider || '').toLowerCase();
-  if (provider === 'shinayuu' || provider === 'mineradio') return 'shinayuu';
-  if (provider === 'spotify') return 'spotify';
-  return 'youtube';
+  var key = String(provider || '').toLowerCase();
+  return key === 'spotify' ? 'spotify' : (key === 'app' || key === 'local' || key === 'shinayuu' ? 'app' : 'youtube');
 }
 function playlistProviderLabel(provider) {
   provider = normalizePlaylistProvider(provider);
-  if (provider === 'shinayuu') return 'SY';
-  return provider === 'spotify' ? 'SP' : 'YT';
+  return provider === 'spotify' ? 'SP' : (provider === 'app' ? 'SY' : 'YT');
 }
 function playlistProviderName(provider) {
   provider = normalizePlaylistProvider(provider);
-  if (provider === 'shinayuu') return 'ShinaYuu';
-  return provider === 'spotify' ? 'Spotify' : 'YouTube Music';
+  return provider === 'spotify' ? 'Spotify' : (provider === 'app' ? 'ShinaYuu Music' : 'YouTube Music');
 }
 function playlistPanelKey(provider, id) {
   provider = normalizePlaylistProvider(provider);
@@ -145,7 +141,7 @@ function playlistPanelProviderId(provider, id) {
 }
 function playlistCardPriority(pl) {
   if (!pl) return 10;
-  if (pl.virtual || String(pl.id || '') === 'spotify-liked' || Number(pl.specialType || 0) === 5) return 0;
+  if (pl.virtual || String(pl.id || '') === 'spotify-liked' || String(pl.id || '') === 'app-liked' || Number(pl.specialType || 0) === 5 || normalizePlaylistProvider(pl.provider) === 'app') return 0;
   return 1;
 }
 function prioritizePlaylistGroupItems(items) {
@@ -161,12 +157,145 @@ function playlistPanelNoticeHtml(text, isError) {
   if (!text) text = 'Playlist chưa có bài hát có thể phát';
   return '<div style="text-align:center;padding:14px 10px;color:' + (isError ? 'rgba(255,180,160,.82)' : 'rgba(255,255,255,.30)') + ';font-size:11.5px;line-height:1.55">' + escHtml(text) + '</div>';
 }
+
+function playlistDetailTrackSelectionKey(song) {
+  try {
+    if (typeof queueItemKey === 'function') return String(queueItemKey(song) || '');
+  } catch (_) {}
+  var provider = normalizePlaylistProvider(song && (song.provider || song.source));
+  var id = song && (song.spotifyId || song.providerSongId || song.id || song.videoId || song.mid || song.songmid) || '';
+  return provider + ':' + String(id);
+}
+function playlistDetailIsSelected(song) {
+  var key = playlistDetailTrackSelectionKey(song);
+  return !!(key && playlistPanelDetailState.selectedKeys && playlistPanelDetailState.selectedKeys[key]);
+}
+function playlistDetailSelectedCount() {
+  var selected = playlistPanelDetailState.selectedKeys || {};
+  return Object.keys(selected).filter(function (key) { return !!selected[key]; }).length;
+}
+function playlistDetailSetSelected(song, selected) {
+  var key = playlistDetailTrackSelectionKey(song);
+  if (!key) return false;
+  if (!playlistPanelDetailState.selectedKeys) playlistPanelDetailState.selectedKeys = Object.create(null);
+  if (selected) playlistPanelDetailState.selectedKeys[key] = true;
+  else delete playlistPanelDetailState.selectedKeys[key];
+  return true;
+}
+function playlistDetailClearSelection() {
+  playlistPanelDetailState.selectedKeys = Object.create(null);
+}
+function playlistDetailSelectedAllLoaded() {
+  var tracks = playlistPanelDetailState.tracks || [];
+  if (!tracks.length) return false;
+  return tracks.every(playlistDetailIsSelected);
+}
+async function deleteCurrentAppPlaylist() {
+  var st = playlistPanelDetailState;
+  if (!st || !st.key || !st.playlist) return false;
+  var parts = st.key.split(':');
+  var provider = normalizePlaylistProvider(parts[0]);
+  var pid = parts.slice(1).join(':');
+  if (provider !== 'app' || pid === 'app-liked' || st.playlist.systemPlaylist) return false;
+  if (!window.confirm('Xóa playlist "' + String(st.playlist.name || 'Playlist') + '" khỏi ShinaYuu Music?')) return false;
+  try {
+    var r = await apiJson('/api/app/playlist/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pid: pid }) });
+    if (!r || r.error || r.success === false) throw new Error(r && (r.message || r.error) || 'APP_PLAYLIST_DELETE_FAILED');
+    cancelPlaylistPanelDetailRequest();
+    playlistPanelDetailState = { key: '', loading: false, loadingMore: false, playlist: null, tracks: [], token: playlistPanelDetailState.token + 1, total: 0, nextOffset: 0, hasMore: false, scrollTop: 0, controller: null, warmTimer: 0, renderLimit: PLAYLIST_DETAIL_INITIAL_RENDER, error: '', message: '', selectMode: false, selectedKeys: Object.create(null) };
+    await refreshUserPlaylists(true);
+    renderPlaylistPanelDetailState();
+    showToast('Đã xóa playlist khỏi ShinaYuu Music');
+    return true;
+  } catch (error) {
+    showToast('Xóa playlist thất bại: ' + String(error && error.message || error));
+    return false;
+  }
+}
+
+async function deleteCurrentAppPlaylistCard(pid, name) {
+  pid = String(pid || '');
+  if (!pid || pid === 'app-liked') return false;
+  if (!window.confirm('Xóa playlist "' + String(name || 'Playlist') + '" khỏi ShinaYuu Music?')) return false;
+  try {
+    var r = await apiJson('/api/app/playlist/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pid: pid }) });
+    if (!r || r.error || r.success === false) throw new Error(r && (r.message || r.error) || 'APP_PLAYLIST_DELETE_FAILED');
+    if (playlistPanelDetailState.key === playlistPanelKey('app', pid)) {
+      cancelPlaylistPanelDetailRequest();
+      playlistPanelDetailState = { key: '', loading: false, loadingMore: false, playlist: null, tracks: [], token: playlistPanelDetailState.token + 1, total: 0, nextOffset: 0, hasMore: false, scrollTop: 0, controller: null, warmTimer: 0, renderLimit: PLAYLIST_DETAIL_INITIAL_RENDER, error: '', message: '', selectMode: false, selectedKeys: Object.create(null), reauthRequired: false };
+    }
+    await refreshUserPlaylists(true);
+    renderPlaylistPanelDetailState();
+    showToast('Đã xóa playlist khỏi ShinaYuu Music');
+    return true;
+  } catch (error) {
+    showToast('Xóa playlist thất bại: ' + String(error && error.message || error));
+    return false;
+  }
+}
+
+function enterPlaylistDetailDeleteMode() {
+  var st = playlistPanelDetailState;
+  if (!st || !st.key || normalizePlaylistProvider(st.playlist && st.playlist.provider) !== 'app') return false;
+  playlistDetailClearSelection();
+  st.selectMode = true;
+  renderPlaylistPanelDetailState();
+  return true;
+}
+function exitPlaylistDetailDeleteMode() {
+  var st = playlistPanelDetailState;
+  if (!st) return false;
+  st.selectMode = false;
+  playlistDetailClearSelection();
+  renderPlaylistPanelDetailState();
+  return true;
+}
+async function deleteSelectedAppPlaylistTracks() {
+  var st = playlistPanelDetailState;
+  if (!st || !st.key || normalizePlaylistProvider(st.playlist && st.playlist.provider) !== 'app') return false;
+  var parts = st.key.split(':');
+  var pid = parts.slice(1).join(':');
+  var keys = Object.keys(st.selectedKeys || {}).filter(function (key) { return !!st.selectedKeys[key]; });
+  if (!keys.length) { showToast('Hãy chọn ít nhất một bài hát'); return false; }
+  if (!window.confirm('Xóa ' + keys.length + ' bài khỏi playlist?')) return false;
+  try {
+    var r = await apiJson('/api/app/playlist/remove-tracks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pid: pid, trackKeys: keys }) });
+    if (!r || r.error || r.success === false) throw new Error(r && (r.message || r.error) || 'APP_PLAYLIST_TRACK_DELETE_FAILED');
+    var removedSet = Object.create(null); keys.forEach(function (key) { removedSet[key] = true; });
+    st.tracks = (st.tracks || []).filter(function (song) { return !removedSet[playlistDetailTrackSelectionKey(song)]; });
+    st.total = Math.max(0, Number(r.total) || st.tracks.length);
+    st.nextOffset = st.tracks.length;
+    st.hasMore = !!(st.total > st.tracks.length);
+    st.selectMode = false;
+    playlistDetailClearSelection();
+    if (st.playlist) st.playlist.trackCount = st.total;
+    await refreshUserPlaylists(true);
+    st.playlist = userPlaylists.find(function (pl) { return playlistPanelKey(normalizePlaylistProvider(pl.provider), pl.id) === st.key; }) || st.playlist;
+    renderPlaylistPanelDetailState();
+    showToast((Number(r.removed) || keys.length) + ' bài đã được xóa');
+    return true;
+  } catch (error) {
+    showToast('Xóa bài thất bại: ' + String(error && error.message || error));
+    return false;
+  }
+}
+function togglePlaylistDetailTrackSelection(index, selected) {
+  var song = playlistPanelDetailState.tracks && playlistPanelDetailState.tracks[index];
+  if (!song) return false;
+  playlistDetailSetSelected(song, selected);
+  renderPlaylistPanelDetailState();
+  return true;
+}
+
 function playlistPanelDetailRowsHtml(options) {
   options = options || {};
   var st = playlistPanelDetailState;
   var tracks = st.tracks || [];
   if (st.loading && !tracks.length) {
     return '<div class="pl-detail-row pl-detail-loading-row"><span class="queue-hydration-spinner spinning"></span><div style="flex:1;min-width:0"><div class="pl-detail-row-title">Đang tải các bài đầu tiên</div><div class="pl-detail-row-artist">Có thể duyệt và phát ngay sau khi tải xong</div></div></div>';
+  }
+  if (!tracks.length && st.reauthRequired) {
+    return '<div class="pl-detail-access-required"><div class="pl-detail-access-copy"><strong>Spotify cần cấp lại quyền đọc playlist</strong><small>Hãy kết nối lại Spotify để cấp quyền playlist-read-private rồi mở lại playlist này.</small></div><button class="fx-mini-btn ghost" type="button" data-pl-spotify-reauth="1">Đăng nhập lại Spotify</button></div>';
   }
   if (!tracks.length) return playlistPanelNoticeHtml(st.message || st.error || '', !!st.error);
   var viewport = Math.max(280, Number(options.viewport) || Math.min(620, Math.round((window.innerHeight || 800) * 0.72)));
@@ -181,8 +310,11 @@ function playlistPanelDetailRowsHtml(options) {
     var i = start + localIndex;
     var thumb = songCoverSrc(song, 60);
     var imgTag = thumb ? '<img src="' + escHtml(thumb) + '" alt="" loading="lazy" decoding="async" onerror="this.style.opacity=0.2">' : '<div style="width:34px;height:34px;border-radius:7px;background:rgba(255,255,255,.06);flex:0 0 auto"></div>';
-    return '<div class="pl-detail-row" data-pl-detail-row="' + i + '">' +
-      imgTag +
+    var selectMode = !!st.selectMode;
+    var checkbox = selectMode ? '<label class="pl-detail-select" title="Chọn bài"><input type="checkbox" data-pl-detail-select="' + i + '" ' + (playlistDetailIsSelected(song) ? 'checked' : '') + '><span></span></label>' : '';
+    var clickAttr = ' data-pl-detail-row="' + i + '"';
+    return '<div class="pl-detail-row' + (selectMode && playlistDetailIsSelected(song) ? ' selected' : '') + '"' + clickAttr + '>' +
+      checkbox + imgTag +
       '<div style="flex:1;min-width:0"><div class="pl-detail-row-title">' + escHtml(song.name || '') + '</div>' +
       '<button type="button" class="pl-detail-row-artist" data-pl-detail-artist="' + i + '">' + escHtml(song.artist || 'Nghệ sĩ chưa rõ') + '</button></div>' +
       '</div>';
@@ -265,7 +397,7 @@ function playlistTracksEndpoint(provider, id, params) {
       query += '&' + encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
     });
   }
-  if (provider === 'shinayuu') return '';
+  if (provider === 'app') return '/api/app/playlist/tracks?' + query;
   return provider === 'spotify' ? '/api/spotify/playlist/tracks?' + query : '/api/youtube-music/playlist/tracks?' + query;
 }
 function playlistPanelDetailHtml(pl, provider, detailWindow) {
@@ -282,10 +414,17 @@ function playlistPanelDetailHtml(pl, provider, detailWindow) {
   var collectionButton = canUncollect
     ? '<button class="fx-mini-btn ghost pl-detail-top-btn" type="button" data-pl-detail-collection="0">Bỏ lưu</button>'
     : '';
+  var isApp = provider === 'app';
+  var isLiked = String(pl && pl.id || '') === 'app-liked' || !!pl.systemPlaylist;
+  var selectMode = !!playlistPanelDetailState.selectMode;
+  var selectedCount = playlistDetailSelectedCount();
+  var manageButton = isApp && !selectMode ? '<button class="fx-mini-btn ghost pl-detail-top-btn" type="button" data-pl-detail-delete-mode="1">Xóa bài</button>' : '';
+  var selectedActions = isApp && selectMode ? '<button class="fx-mini-btn ghost pl-detail-top-btn" type="button" data-pl-detail-select-all="1">' + (playlistDetailSelectedAllLoaded() ? 'Bỏ chọn' : 'Chọn tất cả') + '</button><button class="fx-mini-btn danger pl-detail-top-btn" type="button" data-pl-detail-delete-selected="1"' + (selectedCount ? '' : ' disabled') + '>Xóa ' + selectedCount + ' bài</button><button class="fx-mini-btn ghost pl-detail-top-btn" type="button" data-pl-detail-delete-cancel="1">Hủy</button>' : '';
+  var deletePlaylistButton = isApp && !isLiked && !selectMode ? '<button class="fx-mini-btn danger pl-detail-top-btn" type="button" data-pl-detail-delete-playlist="1">Xóa playlist</button>' : '';
   return '<div class="pl-inline-detail" data-pl-detail="' + escHtml(key) + '" style="height:' + playlistPanelDetailShellHeight() + 'px">' +
     '<div class="pl-detail-sticky">' +
     '<div class="pl-detail-head">' + img + '<div style="flex:1;min-width:0"><div class="pl-detail-title">' + escHtml(pl.name || 'Chi tiết playlist') + '</div><div class="pl-detail-sub">' + escHtml((expectedTotal || tracks.length || 0) + ' bài · ' + (pl.creator || playlistProviderName(provider))) + '</div></div><div class="pl-detail-count">' + (loading && !tracks.length ? 'Đang tải' : (tracks.length + (expectedTotal > tracks.length ? '/' + expectedTotal : ''))) + '</div></div>' +
-    '<div class="pl-detail-actions"><button class="pl-detail-play" type="button" data-pl-detail-play="' + escHtml(key) + '"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Phát playlist</button>' + collectionButton + '<button class="fx-mini-btn ghost pl-detail-top-btn" type="button" data-pl-detail-top="1">Về đầu danh sách</button></div>' +
+    '<div class="pl-detail-actions"><button class="pl-detail-play" type="button" data-pl-detail-play="' + escHtml(key) + '"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Phát playlist</button>' + collectionButton + manageButton + selectedActions + deletePlaylistButton + '<button class="fx-mini-btn ghost pl-detail-top-btn" type="button" data-pl-detail-top="1">Về đầu danh sách</button></div>' +
     '</div>' +
     '<div class="pl-detail-list" data-pl-detail-scroll="' + escHtml(key) + '">' + rows + '</div>' +
     '</div>';
@@ -361,34 +500,6 @@ async function loadMorePlaylistPanelDetailTracks(reason) {
   var pid = parts.slice(1).join(':');
   var offset = reason === 'initial' ? 0 : Math.max(0, Number(st.nextOffset) || st.tracks.length);
   var token = st.token;
-  if (provider === 'shinayuu' && typeof builtInPlaylistTracksPage === 'function') {
-    try {
-      var localResult = await builtInPlaylistTracksPage(pid, { limit: PLAYLIST_DETAIL_BATCH_SIZE, offset: offset });
-      if (playlistPanelDetailState.token !== token || playlistPanelDetailState.key !== st.key) return false;
-      var localTracks = (localResult && localResult.tracks) || [];
-      var localMapped = localTracks.map(cloneSong);
-      var localAdded = appendPlaylistPanelDetailTracks(st.tracks, localMapped);
-      st.total = Math.max(st.total || 0, Number(localResult && localResult.total) || 0, st.tracks.length);
-      st.nextOffset = Math.max(offset + localTracks.length, Number(localResult && localResult.nextOffset) || 0);
-      st.hasMore = !!(localResult && localResult.hasMore);
-      st.loading = false;
-      st.loadingMore = false;
-      st.error = localResult && localResult.error || '';
-      st.message = localResult && (localResult.message || '') || '';
-      if (localResult && localResult.playlist) st.playlist = Object.assign({}, st.playlist || {}, localResult.playlist);
-      if (reason === 'initial') { renderPlaylistPanelDetailState(); scrollPlaylistPanelDetailIntoView(st.key); }
-      else renderPlaylistPanelDetailRows();
-      return localAdded > 0;
-    } catch (localError) {
-      st.loading = false;
-      st.loadingMore = false;
-      st.hasMore = false;
-      st.error = 'BUILT_IN_PLAYLIST_PAGE_FAILED';
-      st.message = 'Không tải được playlist ShinaYuu.';
-      if (reason === 'initial') renderPlaylistPanelDetailState(); else renderPlaylistPanelDetailRows();
-      return false;
-    }
-  }
   var controller = window.AbortController ? new AbortController() : null;
   var timer = controller ? setTimeout(function () { controller.abort(); }, 12000) : 0;
   st.controller = controller;
@@ -398,7 +509,12 @@ async function loadMorePlaylistPanelDetailTracks(reason) {
     var r = await apiJson(playlistTracksEndpoint(provider, pid, { limit: PLAYLIST_DETAIL_BATCH_SIZE, offset: offset }), controller ? { signal: controller.signal } : { timeoutMs: 12000 });
     if (playlistPanelDetailState.token !== token || playlistPanelDetailState.key !== st.key) return false;
     var rawTracks = r && r.tracks || [];
-    if (r && r.error && !rawTracks.length) throw new Error(r.message || r.error);
+    if (r && r.error && !rawTracks.length) {
+      var structured = new Error(r.message || r.error);
+      structured.data = r;
+      structured.status = Number(r.status || 0) || 0;
+      throw structured;
+    }
     var mapped = rawTracks.map(cloneSong);
     var added = appendPlaylistPanelDetailTracks(st.tracks, mapped);
     var responseTotal = Number(r && (r.total || (r.playlist && r.playlist.trackCount))) || 0;
@@ -410,7 +526,12 @@ async function loadMorePlaylistPanelDetailTracks(reason) {
     st.loadingMore = false;
     st.error = (r && r.error) || '';
     st.message = (r && (r.message || r.warning)) || '';
+    st.reauthRequired = !!(r && r.reauthRequired) || !!(r && r.playlist && r.playlist.requiresReauthorization);
     if (r && r.playlist) st.playlist = Object.assign({}, st.playlist || {}, r.playlist);
+    if (!mapped.length && r && r.playlist && r.playlist.itemAccess === 'restricted') {
+      st.message = r.warning || 'Spotify không cho phép đọc các bài của playlist mà bạn chỉ theo dõi; chỉ playlist bạn sở hữu hoặc cộng tác mới có thể hiển thị bài hát.';
+      st.hasMore = false;
+    }
     if (reason === 'initial') {
       renderPlaylistPanelDetailState();
       scrollPlaylistPanelDetailIntoView(st.key);
@@ -430,8 +551,13 @@ async function loadMorePlaylistPanelDetailTracks(reason) {
     st.loading = false;
     st.loadingMore = false;
     st.hasMore = false;
+    var errorData = e && e.data || {};
+    var isSpotifyAuth = provider === 'spotify' && (errorData.reauthRequired === true || Number(e && e.status) === 401 || Number(e && e.status) === 403);
+    st.reauthRequired = isSpotifyAuth && (errorData.reauthRequired !== false);
     st.error = 'PLAYLIST_DETAIL_PAGE_FAILED';
-    st.message = st.tracks.length ? 'Tải các bài tiếp theo thất bại; tiếp tục cuộn để thử lại' : 'Tải chi tiết playlist thất bại. Hãy thử lại sau.';
+    st.message = st.reauthRequired
+      ? 'Spotify cần cấp lại quyền đọc playlist. Hãy đăng nhập lại Spotify rồi mở lại playlist này.'
+      : (st.tracks.length ? 'Tải các bài tiếp theo thất bại; tiếp tục cuộn để thử lại' : 'Tải chi tiết playlist thất bại. Hãy thử lại sau.');
     if (reason === 'initial') renderPlaylistPanelDetailState();
     else renderPlaylistPanelDetailRows();
     return false;
@@ -453,12 +579,13 @@ async function openPlaylistPanelDetail(provider, pid, title) {
     playlistPanelDetailState.renderLimit = PLAYLIST_DETAIL_INITIAL_RENDER;
     playlistPanelDetailState.error = '';
     playlistPanelDetailState.message = '';
+    playlistPanelDetailState.reauthRequired = false;
     renderPlaylistPanelDetailState();
     return;
   }
   cancelPlaylistPanelDetailRequest();
   var token = ++playlistPanelDetailState.token;
-  playlistPanelDetailState = { key: key, loading: true, loadingMore: false, playlist: pl, tracks: [], token: token, total: Number(pl.trackCount) || 0, nextOffset: 0, hasMore: true, scrollTop: 0, controller: null, warmTimer: 0, renderLimit: PLAYLIST_DETAIL_INITIAL_RENDER, error: '', message: '' };
+  playlistPanelDetailState = { key: key, loading: true, loadingMore: false, playlist: pl, tracks: [], token: token, total: Number(pl.trackCount) || 0, nextOffset: 0, hasMore: true, scrollTop: 0, controller: null, warmTimer: 0, renderLimit: PLAYLIST_DETAIL_INITIAL_RENDER, error: '', message: '', selectMode: false, selectedKeys: Object.create(null), reauthRequired: false };
   renderPlaylistPanelDetailState();
   scrollPlaylistPanelDetailIntoView(key);
   await loadMorePlaylistPanelDetailTracks('initial');
@@ -565,9 +692,9 @@ function playlistPanelBuildVirtualEntries() {
   if (playlistPanelVirtualCache.revision === playlistCatalogRevision &&
       playlistPanelVirtualCache.detailKey === playlistPanelDetailState.key &&
       playlistPanelVirtualCache.detailSig === detailSig) return playlistPanelVirtualCache;
-  var labels = { shinayuu: 'Playlist ShinaYuu', youtube: 'Playlist YouTube Music', spotify: 'Playlist Spotify' };
-  var order = ['shinayuu', 'youtube', 'spotify'];
-  var groups = { shinayuu: [], youtube: [], spotify: [] };
+  var labels = { app: 'Playlist ShinaYuu', youtube: 'Playlist YouTube Music', spotify: 'Playlist Spotify' };
+  var order = ['app', 'youtube', 'spotify'];
+  var groups = { app: [], youtube: [], spotify: [] };
   userPlaylists.forEach(function (pl, sourceIndex) {
     var key = playlistPanelGroupKey(pl);
     if (!groups[key]) groups[key] = [];
@@ -616,6 +743,7 @@ function playlistPanelOffsetIndex(offsets, value) {
 function playlistCatalogFooterHtml() {
   var state = playlistCatalogSyncState || {};
   var providerStates = state.providers || {};
+  var spotifyState = providerStates.spotify || {};
   var totals = Object.keys(providerStates).reduce(function (acc, key) {
     var item = providerStates[key] || {};
     acc.loaded += Number(item.loaded) || 0;
@@ -623,11 +751,18 @@ function playlistCatalogFooterHtml() {
     if (item.hasMore || item.loading) acc.pending = true;
     return acc;
   }, { loaded: 0, total: 0, pending: !!state.loading });
-  if (!totals.pending && !state.error) return '';
+  var authNotice = '';
+  if (spotifyState.reauthRequired) {
+    authNotice = '<div class="playlist-catalog-auth-needed">' +
+      '<div><strong>Spotify cần đăng nhập lại</strong><span>Quyền đọc playlist hiện tại chưa đủ hoặc phiên cấp quyền cũ không còn phù hợp. Hãy kết nối lại Spotify để tải đầy đủ bài hát.</span></div>' +
+      '<button class="fx-mini-btn ghost" type="button" data-pl-spotify-catalog-reauth="1">Kết nối lại Spotify</button>' +
+      '</div>';
+  }
+  if (!totals.pending && !state.error) return authNotice;
   var label = state.error
     ? ('Một số playlist tải thất bại · Đã hiển thị ' + userPlaylists.length + ' playlist')
     : ('Đang tải playlist trong nền · ' + totals.loaded + (totals.total ? '/' + totals.total : ''));
-  return '<div class="playlist-catalog-status"><span class="queue-hydration-spinner spinning"></span><span>' + label + '</span></div>';
+  return authNotice + '<div class="playlist-catalog-status"><span class="queue-hydration-spinner spinning"></span><span>' + label + '</span></div>';
 }
 function schedulePlaylistPanelVirtualRender() {
   if (playlistPanelVirtualCache.raf) return;
@@ -672,7 +807,7 @@ function renderUserPlaylistsList(opts) {
   if (!userPlaylists.length) {
     $pl.innerHTML = playlistCatalogSyncState && playlistCatalogSyncState.loading
       ? miniQueueSkeleton() + playlistCatalogFooterHtml()
-      : '<div style="text-align:center;padding:24px 0;color:rgba(255,255,255,.32);font-size:11.5px">Không tìm thấy playlist</div>';
+      : playlistCatalogFooterHtml() + '<div style="text-align:center;padding:24px 0;color:rgba(255,255,255,.32);font-size:11.5px">Không tìm thấy playlist</div>';
     return;
   }
   var panel = document.getElementById('playlist-panel');
@@ -685,9 +820,13 @@ function renderUserPlaylistsList(opts) {
     var key = playlistPanelKey(provider, pl.id);
     var isExpanded = playlistPanelDetailState.key === key;
     var expanded = isExpanded ? ' expanded' : '';
+    var appDelete = provider === 'app' && String(pl.id || '') !== 'app-liked' && !pl.systemPlaylist
+      ? '<div class="pl-card-app-actions"><button type="button" class="pl-card-delete fx-mini-btn ghost" data-pl-card-delete="1" aria-label="Xóa playlist" title="Xóa playlist"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h8m-7 0v12m6-12v12M5 6h14M9 6V4h6v2m-8 0 1 14h6l1-14"/></svg></button></div>'
+      : '';
     return '<div class="pl-card' + expanded + '" aria-expanded="' + (isExpanded ? 'true' : 'false') + '" data-playlist-provider="' + provider + '" data-playlist-id="' + escHtml(String(pl.id || '')) + '" data-playlist-title="' + escHtml(pl.name || '') + '" data-playlist-index="' + sourceIndex + '">' +
       imgTag +
       '<div style="flex:1;min-width:0"><div class="pl-name">' + escHtml(pl.name) + '<span class="tag-source ' + provider + '" style="margin-left:6px;vertical-align:1px">' + providerLabel + '</span></div><div class="pl-sub">' + pl.trackCount + ' bài · ' + escHtml(pl.creator || '') + '</div></div>' +
+      appDelete +
       '</div>';
   }
   var cache = playlistPanelBuildVirtualEntries();
@@ -720,6 +859,13 @@ function renderUserPlaylistsList(opts) {
   if (opts.animate && seq === playlistRenderSeq) animateVisiblePanelList($pl, '.pl-card', document.getElementById('playlist-panel'));
 }
 document.getElementById('pl-list').addEventListener('click', function (e) {
+  var cardDelete = e.target && e.target.closest ? e.target.closest('[data-pl-card-delete]') : null;
+  if (cardDelete) {
+    e.preventDefault(); e.stopPropagation();
+    var deleteCard = cardDelete.closest('.pl-card[data-playlist-provider="app"]');
+    if (deleteCard) deleteCurrentAppPlaylistCard(deleteCard.getAttribute('data-playlist-id') || '', deleteCard.getAttribute('data-playlist-title') || '');
+    return;
+  }
   var loadMore = e.target && e.target.closest ? e.target.closest('[data-pl-load-more]') : null;
   if (loadMore) {
     e.preventDefault();
@@ -734,6 +880,38 @@ document.getElementById('pl-list').addEventListener('click', function (e) {
     growPlaylistPanelDetailRenderLimit();
     return;
   }
+
+  var deleteMode = e.target && e.target.closest ? e.target.closest('[data-pl-detail-delete-mode]') : null;
+  if (deleteMode) { e.preventDefault(); e.stopPropagation(); enterPlaylistDetailDeleteMode(); return; }
+  var deleteCancel = e.target && e.target.closest ? e.target.closest('[data-pl-detail-delete-cancel]') : null;
+  if (deleteCancel) { e.preventDefault(); e.stopPropagation(); exitPlaylistDetailDeleteMode(); return; }
+  var deleteSelected = e.target && e.target.closest ? e.target.closest('[data-pl-detail-delete-selected]') : null;
+  if (deleteSelected) { e.preventDefault(); e.stopPropagation(); deleteSelectedAppPlaylistTracks(); return; }
+  var selectAll = e.target && e.target.closest ? e.target.closest('[data-pl-detail-select-all]') : null;
+  if (selectAll) {
+    e.preventDefault(); e.stopPropagation();
+    var selectAllOn = !playlistDetailSelectedAllLoaded();
+    (playlistPanelDetailState.tracks || []).forEach(function (song) { playlistDetailSetSelected(song, selectAllOn); });
+    renderPlaylistPanelDetailState();
+    return;
+  }
+  var selectBox = e.target && e.target.closest ? e.target.closest('[data-pl-detail-select]') : null;
+  if (selectBox) {
+    e.preventDefault(); e.stopPropagation();
+    togglePlaylistDetailTrackSelection(Number(selectBox.getAttribute('data-pl-detail-select')), !!selectBox.checked);
+    return;
+  }
+  var deletePlaylist = e.target && e.target.closest ? e.target.closest('[data-pl-detail-delete-playlist]') : null;
+  if (deletePlaylist) { e.preventDefault(); e.stopPropagation(); deleteCurrentAppPlaylist(); return; }
+
+  var spotifyReauth = e.target && e.target.closest ? e.target.closest('[data-pl-spotify-reauth]') : null;
+  if (spotifyReauth) {
+    e.preventDefault(); e.stopPropagation();
+    if (typeof showLoginModal === 'function') showLoginModal({ provider: 'spotify' });
+    else if (typeof openLoginModal === 'function') openLoginModal('spotify');
+    return;
+  }
+
   var detailTop = e.target && e.target.closest ? e.target.closest('[data-pl-detail-top]') : null;
   if (detailTop) {
     e.preventDefault();
@@ -766,7 +944,12 @@ document.getElementById('pl-list').addEventListener('click', function (e) {
   if (row) {
     e.preventDefault();
     e.stopPropagation();
-    playPlaylistPanelDetailTrack(Number(row.getAttribute('data-pl-detail-row')));
+    var rowIndex = Number(row.getAttribute('data-pl-detail-row'));
+    if (playlistPanelDetailState.selectMode) {
+      togglePlaylistDetailTrackSelection(rowIndex, !playlistDetailIsSelected(playlistPanelDetailState.tracks[rowIndex]));
+    } else {
+      playPlaylistPanelDetailTrack(rowIndex);
+    }
     return;
   }
   var card = e.target && e.target.closest ? e.target.closest('.pl-card') : null;

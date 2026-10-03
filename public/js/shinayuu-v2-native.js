@@ -18,7 +18,7 @@
       localHint: 'Theo dõi thư mục nhạc hoặc nhập ZIP / RAR / 7Z. Thư viện được giữ lại sau khi mở lại ứng dụng.',
       mediaLibrary: 'Thư viện nền đa phương tiện', chooseMedia: 'Chọn thư mục ảnh / video', changeFolder: 'Đổi thư mục', all: 'Tất cả', images: 'Ảnh', videos: 'Video', noMedia: 'Chưa có ảnh hoặc video.', apply: 'Áp dụng',
       mvBackground: 'MV của bài đang phát', mvHint: 'Dùng video YouTube đúng của bài hiện tại làm nền, không thay đổi bố cục giao diện hoặc lyrics.', on: 'Bật', off: 'Tắt', full: 'Fill', fit: 'Fit', original: 'Gốc',
-      discord: 'Discord Rich Presence', discordId: 'Discord Application ID', configure: 'Lưu cấu hình', reconnect: 'Kết nối lại', portal: 'Mở Discord Developer Portal', discordHero: 'Hiển thị bài hát, trạng thái phát và câu lyrics đang xuất hiện trên Stage.', discordFieldsHint: 'Discord Developer Portal', discordImageHint: 'Asset dự phòng cho Rich Presence', discordAutoReconnect: 'Tự kết nối lại khi Discord mở.', discordStageMirror: 'Mirror đúng câu đang hiện trên Stage.', discordCoverHint: 'Ưu tiên ảnh bìa bài hát.',
+      discord: 'Discord Rich Presence', discordId: 'Discord Application ID', configure: 'Lưu cấu hình', reconnect: 'Kết nối lại', portal: 'Mở Discord Developer Portal',
       update: 'Cập nhật ShinaYuu Music', checkUpdate: 'Kiểm tra cập nhật', currentVersion: 'Phiên bản hiện tại', latestVersion: 'Phiên bản mới nhất', upToDate: 'Bạn đang dùng phiên bản mới nhất.',
       updateAvailable: 'Đã có phiên bản mới', updateNow: 'Cập nhật ngay', later: 'Để sau', quickPatch: 'Bản vá nhanh', fullInstaller: 'Bộ cài đầy đủ', updateWithPatch: 'Cập nhật bằng bản vá', downloadFullInstaller: 'Tải bộ cài đầy đủ', chooseUpdateMethod: 'Chọn bản vá nhanh hoặc tải bộ cài đầy đủ để cài đặt.', downloadingUpdate: 'Đang tải bản cập nhật', applyingPatch: 'Đang áp dụng bản vá', preparingInstall: 'Đã tải xong bộ cài', restartNow: 'Khởi động lại ngay', installNow: 'Cài đặt ngay', retry: 'Thử lại', fallbackInstaller: 'Dùng bộ cài đầy đủ', updateReady: 'Bản cập nhật đã sẵn sàng', updateFailed: 'Cập nhật không thành công', releaseNotes: 'Nội dung cập nhật', updateSizeUnknown: 'Không rõ dung lượng', updateChecking: 'Đang kiểm tra phiên bản mới…', updateProgress: 'Tiến trình cập nhật', patchPreferred: 'Ứng dụng sẽ ưu tiên tải bản vá nhỏ và tự chuyển sang bộ cài đầy đủ khi cần.', installerWillClose: 'Bộ cài sẽ mở và ShinaYuu Music sẽ đóng để hoàn tất cập nhật.', restartToFinish: 'Khởi động lại ShinaYuu Music để sử dụng phiên bản mới.',
       close: 'Đóng', search: 'Tìm trong thư viện…', loading: 'Đang tải…', failed: 'Không thể hoàn tất thao tác.', remove: 'Gỡ', play: 'Phát',
@@ -30,7 +30,7 @@
       localHint: 'Watch music folders or import ZIP / RAR / 7Z archives. The library persists after restart.',
       mediaLibrary: 'Background media library', chooseMedia: 'Choose image / video folder', changeFolder: 'Change folder', all: 'All', images: 'Images', videos: 'Videos', noMedia: 'No images or videos found.', apply: 'Apply',
       mvBackground: 'Now-playing MV background', mvHint: 'Use the exact YouTube video for the current track as the background without changing the UI or lyrics layout.', on: 'On', off: 'Off', full: 'Fill', fit: 'Fit', original: 'Original',
-      discord: 'Discord Rich Presence', discordId: 'Discord Application ID', configure: 'Save configuration', reconnect: 'Reconnect', portal: 'Open Discord Developer Portal', discordHero: 'Show the current track, playback state and the lyric line visible on Stage.', discordFieldsHint: 'Discord Developer Portal', discordImageHint: 'Fallback Rich Presence asset', discordAutoReconnect: 'Reconnect automatically when Discord opens.', discordStageMirror: 'Mirror the line currently visible on Stage.', discordCoverHint: 'Prefer track cover art.',
+      discord: 'Discord Rich Presence', discordId: 'Discord Application ID', configure: 'Save configuration', reconnect: 'Reconnect', portal: 'Open Discord Developer Portal',
       update: 'ShinaYuu Music updates', checkUpdate: 'Check for updates', currentVersion: 'Current version', latestVersion: 'Latest version', upToDate: 'You are using the latest version.',
       updateAvailable: 'A new version is available', updateNow: 'Update now', later: 'Later', quickPatch: 'Quick patch', fullInstaller: 'Full installer', updateWithPatch: 'Update with patch', downloadFullInstaller: 'Download full installer', chooseUpdateMethod: 'Choose the quick patch or download the full installer.', downloadingUpdate: 'Downloading update', applyingPatch: 'Applying patch', preparingInstall: 'Installer downloaded', restartNow: 'Restart now', installNow: 'Install now', retry: 'Try again', fallbackInstaller: 'Use full installer', updateReady: 'The update is ready', updateFailed: 'Update failed', releaseNotes: 'What is new', updateSizeUnknown: 'Unknown size', updateChecking: 'Checking for a new version…', updateProgress: 'Update progress', patchPreferred: 'The app will prefer the smaller patch and fall back to the full installer when needed.', installerWillClose: 'The installer will open and ShinaYuu Music will close to finish the update.', restartToFinish: 'Restart ShinaYuu Music to use the new version.',
       close: 'Close', search: 'Search the library…', loading: 'Loading…', failed: 'The operation could not be completed.', remove: 'Remove', play: 'Play',
@@ -123,21 +123,27 @@
       '.shinayuu-empty{display:grid;place-items:center;min-height:180px;padding:24px;text-align:center;color:rgba(255,255,255,.5);font:600 12px/1.6 Inter,sans-serif}',
       '.shinayuu-config-form{display:grid;gap:10px;max-width:620px}.shinayuu-config-form label{font:600 11px/1.3 Inter,sans-serif;color:rgba(255,255,255,.7)}.shinayuu-config-form input{height:40px;padding:0 12px;border:1px solid rgba(255,255,255,.13);border-radius:11px;background:rgba(0,0,0,.24);color:#fff;outline:none}',
       '#shinayuu-native-modal[data-kind="discord"]{background:radial-gradient(circle at 50% 18%,rgba(101,79,197,.19),rgba(0,0,0,.68) 48%);backdrop-filter:blur(18px) saturate(1.18)}',
-      '#shinayuu-native-modal[data-kind="discord"] .shinayuu-native-dialog{width:min(680px,94vw);height:auto;max-height:min(720px,90vh);margin:auto;border-color:rgba(196,185,255,.24);background:linear-gradient(145deg,rgba(31,26,53,.88),rgba(10,12,22,.82));box-shadow:0 34px 110px rgba(0,0,0,.62),inset 0 1px 0 rgba(255,255,255,.1);backdrop-filter:blur(28px) saturate(1.34)}',
+      '#shinayuu-native-modal[data-kind="discord"] .shinayuu-native-dialog{width:min(680px,94vw);height:auto;max-height:min(760px,90vh);border-color:rgba(196,185,255,.24);background:linear-gradient(145deg,rgba(31,26,53,.88),rgba(10,12,22,.82));box-shadow:0 34px 110px rgba(0,0,0,.62),inset 0 1px 0 rgba(255,255,255,.1);backdrop-filter:blur(28px) saturate(1.34)}',
       '#shinayuu-native-modal[data-kind="discord"] .shinayuu-native-toolbar{display:none}',
-      '#shinayuu-native-modal[data-kind="discord"] .shinayuu-native-head{display:none}',
-      '#shinayuu-native-modal[data-kind="discord"] .shinayuu-native-body{scrollbar-width:thin;scrollbar-color:rgba(146,215,255,.25) transparent}',
       '#shinayuu-native-modal[data-kind="discord"] .shinayuu-native-body{padding:18px;overflow:auto}',
       '.shinayuu-discord-liquid{display:grid;gap:13px}.shinayuu-discord-modal-hero{display:grid;grid-template-columns:58px minmax(0,1fr) auto;align-items:center;gap:13px;padding:15px;border:1px solid rgba(255,255,255,.11);border-radius:18px;background:linear-gradient(135deg,rgba(145,108,255,.13),rgba(81,210,255,.07));box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}',
       '.shinayuu-discord-modal-avatar{width:58px;height:58px;border-radius:17px;object-fit:cover;background:linear-gradient(145deg,#7866dc,#4daee7);box-shadow:0 12px 28px rgba(0,0,0,.25)}.shinayuu-discord-modal-avatar.fallback{display:grid;place-items:center;font:800 16px/1 Inter,sans-serif;color:#fff}',
       '.shinayuu-discord-modal-copy{min-width:0}.shinayuu-discord-kicker{display:block;margin-bottom:5px;font:750 8px/1 Inter,sans-serif;letter-spacing:.16em;color:rgba(176,202,255,.66)}.shinayuu-discord-modal-copy h3{margin:0;font:750 16px/1.2 Inter,sans-serif;color:#fff}.shinayuu-discord-modal-copy p{margin:5px 0 0;font:500 10px/1.45 Inter,sans-serif;color:rgba(255,255,255,.56)}',
       '.shinayuu-discord-status{padding:6px 9px;border:1px solid rgba(255,255,255,.1);border-radius:999px;background:rgba(255,255,255,.055);font:700 9px/1 Inter,sans-serif;color:rgba(255,255,255,.58)}.shinayuu-discord-status.online{border-color:rgba(86,237,174,.28);background:rgba(57,213,148,.11);color:#8ff3c5}',
       '.shinayuu-discord-preview{display:grid;grid-template-columns:42px minmax(0,1fr) auto;align-items:center;gap:10px;padding:11px 12px;border:1px solid rgba(255,255,255,.09);border-radius:15px;background:rgba(9,10,18,.38)}.shinayuu-discord-preview-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:linear-gradient(145deg,rgba(112,92,222,.9),rgba(71,170,226,.85));font:800 10px/1 Inter,sans-serif;color:#fff}.shinayuu-discord-preview strong,.shinayuu-discord-preview span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.shinayuu-discord-preview strong{font:700 11px/1.35 Inter,sans-serif;color:#fff}.shinayuu-discord-preview span{font:500 9.5px/1.35 Inter,sans-serif;color:rgba(255,255,255,.55)}.shinayuu-discord-preview small{font:600 8px/1 Inter,sans-serif;color:rgba(255,255,255,.35)}',
-      '.shinayuu-discord-lyric-preview{position:relative;display:grid;gap:5px;padding:12px 13px 12px 15px;overflow:hidden;border:1px solid rgba(135,218,255,.16);border-radius:15px;background:linear-gradient(135deg,rgba(75,198,255,.09),rgba(142,102,255,.08),rgba(255,255,255,.025));box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}.shinayuu-discord-lyric-preview:before{content:;position:absolute;left:0;top:11px;bottom:11px;width:3px;border-radius:999px;background:linear-gradient(180deg,#73e3ff,#a07cff)}.shinayuu-discord-lyric-preview span{font:800 7px/1 Inter,sans-serif;letter-spacing:.15em;color:rgba(139,221,255,.68)}.shinayuu-discord-lyric-preview strong{font:650 11px/1.45 Inter,sans-serif;color:#fff;word-break:break-word}.shinayuu-discord-lyric-preview small{font:500 8px/1.35 Inter,sans-serif;color:rgba(255,255,255,.38)}',
       '.shinayuu-discord-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}.shinayuu-discord-fields label{display:grid;gap:5px;padding:11px;border:1px solid rgba(255,255,255,.09);border-radius:14px;background:rgba(255,255,255,.035)}.shinayuu-discord-fields label>span{font:700 10px/1.2 Inter,sans-serif;color:rgba(255,255,255,.84)}.shinayuu-discord-fields label>small{min-height:26px;font:500 8.5px/1.4 Inter,sans-serif;color:rgba(255,255,255,.42)}.shinayuu-discord-fields input{height:38px;padding:0 11px;border:1px solid rgba(255,255,255,.11);border-radius:11px;background:rgba(2,4,10,.34);color:#fff;outline:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.045)}.shinayuu-discord-fields input:focus{border-color:rgba(120,213,255,.42);box-shadow:0 0 0 3px rgba(95,185,255,.08),inset 0 1px 0 rgba(255,255,255,.05)}',
-      '.shinayuu-discord-switches{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.shinayuu-discord-switches label{display:flex;align-items:flex-start;gap:9px;padding:11px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.03);cursor:pointer}.shinayuu-discord-switches input{margin-top:2px;accent-color:#8e7cff}.shinayuu-discord-switches strong,.shinayuu-discord-switches small{display:block}.shinayuu-discord-switches strong{font:650 9.5px/1.3 Inter,sans-serif;color:rgba(255,255,255,.8)}.shinayuu-discord-switches small{margin-top:3px;font:500 8px/1.4 Inter,sans-serif;color:rgba(255,255,255,.4)}',
+      '.shinayuu-discord-switches{display:grid;grid-template-columns:1fr 1fr;gap:10px}.shinayuu-discord-switches label{display:flex;align-items:flex-start;gap:9px;padding:11px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.03);cursor:pointer}.shinayuu-discord-switches input{margin-top:2px;accent-color:#8e7cff}.shinayuu-discord-switches strong,.shinayuu-discord-switches small{display:block}.shinayuu-discord-switches strong{font:650 9.5px/1.3 Inter,sans-serif;color:rgba(255,255,255,.8)}.shinayuu-discord-switches small{margin-top:3px;font:500 8px/1.4 Inter,sans-serif;color:rgba(255,255,255,.4)}',
       '.shinayuu-discord-diagnostic{padding:10px 11px;border:1px solid rgba(255,255,255,.075);border-radius:12px;background:rgba(0,0,0,.18);font:500 9px/1.45 Inter,sans-serif;color:rgba(255,255,255,.52)}.shinayuu-discord-actions{display:flex;justify-content:flex-end;gap:7px;flex-wrap:wrap}.shinayuu-discord-actions .primary{min-width:138px}',
       '@media(max-width:620px){.shinayuu-discord-modal-hero{grid-template-columns:48px minmax(0,1fr)}.shinayuu-discord-modal-avatar{width:48px;height:48px;border-radius:14px}.shinayuu-discord-status{grid-column:1/-1;justify-self:start}.shinayuu-discord-fields,.shinayuu-discord-switches{grid-template-columns:1fr}}',
+      '#shinayuu-discord-settings-panel{position:fixed;inset:0;z-index:12150;display:none;align-items:center;justify-content:center;padding:34px;background:rgba(3,5,12,.62);backdrop-filter:blur(18px) saturate(1.18);-webkit-backdrop-filter:blur(18px) saturate(1.18)}',
+      '#shinayuu-discord-settings-panel.show{display:flex}',
+      '.shinayuu-discord-panel-backdrop{position:absolute;inset:0}',
+      '.shinayuu-discord-panel-dialog{position:relative;width:min(760px,94vw);max-height:min(820px,90vh);display:flex;flex-direction:column;overflow:hidden;border:1px solid rgba(203,194,255,.24);border-radius:26px;background:linear-gradient(145deg,rgba(33,28,57,.91),rgba(8,10,19,.86));box-shadow:0 38px 130px rgba(0,0,0,.62),inset 0 1px 0 rgba(255,255,255,.12),0 0 70px rgba(105,96,255,.09);backdrop-filter:blur(34px) saturate(1.34);-webkit-backdrop-filter:blur(34px) saturate(1.34)}',
+      '.shinayuu-discord-panel-head{position:relative;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:18px 20px;border-bottom:1px solid rgba(255,255,255,.09);background:linear-gradient(135deg,rgba(145,108,255,.10),rgba(81,210,255,.035))}',
+      '.shinayuu-discord-panel-head>div{display:grid;gap:4px}.shinayuu-discord-panel-head span{font:800 7.5px/1 Inter,Segoe UI,sans-serif;letter-spacing:.17em;color:rgba(176,202,255,.64)}.shinayuu-discord-panel-head h2{margin:0;font:750 18px/1.2 Inter,Segoe UI,sans-serif;color:#fff}',
+      '.shinayuu-discord-panel-close{all:unset;display:grid;place-items:center;width:34px;height:34px;border:1px solid rgba(255,255,255,.10);border-radius:11px;background:rgba(255,255,255,.055);color:#fff;font:600 20px/1 Inter,Segoe UI,sans-serif;cursor:pointer}.shinayuu-discord-panel-close:hover{background:rgba(255,255,255,.095)}',
+      '.shinayuu-discord-panel-body{min-height:0;overflow:auto;padding:17px 19px 20px}.shinayuu-discord-panel-content{max-width:720px;margin:0 auto}',
+      '@media(max-width:680px){#shinayuu-discord-settings-panel{padding:10px}.shinayuu-discord-panel-dialog{width:100%;max-height:96vh;border-radius:20px}.shinayuu-discord-panel-head{padding:14px 15px}.shinayuu-discord-panel-body{padding:12px}.shinayuu-discord-panel-head h2{font-size:16px}}',
       '#shinayuu-native-modal[data-kind="update"]{padding:24px}',
       '#shinayuu-native-modal[data-kind="update"] .shinayuu-native-dialog{width:min(520px,calc(100vw - 48px));height:auto;max-height:min(430px,calc(100vh - 48px));margin:auto;border-radius:18px}',
       '#shinayuu-native-modal[data-kind="update"] .shinayuu-native-head{padding:13px 15px}',
@@ -159,20 +165,7 @@
       '.shinayuu-update-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}.shinayuu-update-actions .shinayuu-native-button{min-width:104px}.shinayuu-update-actions .primary{min-width:136px}',
       '#fx-update-now-btn{width:100%;min-height:39px;margin-top:7px;border:1px solid rgba(102,222,255,.28);border-radius:11px;background:linear-gradient(135deg,rgba(65,198,255,.15),rgba(143,94,255,.13));color:#fff;font:750 10.5px/1 Inter,sans-serif;cursor:pointer}#fx-update-now-btn[hidden],#shinayuu-native-update-now[hidden]{display:none!important}',
       '@media(max-width:900px){.shinayuu-native-dialog{width:96vw;height:88vh}.shinayuu-native-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}}',
-,
-      '#shinayuu-native-modal[data-kind="discord"] .shinayuu-native-body{padding:14px!important;background:linear-gradient(180deg,rgba(20,25,45,.16),rgba(4,7,14,.1))!important}',
-      '.sy-dc-root{position:relative;display:grid;gap:12px;padding:2px;color:#fff;font-family:Inter,Segoe UI,sans-serif;overflow:hidden;min-width:0;box-sizing:border-box}.sy-dc-root *{box-sizing:border-box}.sy-dc-root img{display:block;max-width:none}',
-      '.sy-dc-glow{position:absolute;pointer-events:none;border-radius:999px;filter:blur(30px);opacity:.42}.sy-dc-glow-a{width:220px;height:140px;right:-70px;top:-50px;background:radial-gradient(circle,rgba(116,92,255,.52),transparent 70%)}.sy-dc-glow-b{width:180px;height:130px;left:-80px;bottom:40px;background:radial-gradient(circle,rgba(74,210,255,.32),transparent 70%)}',
-      '.sy-dc-hero{position:relative;display:grid;grid-template-columns:58px minmax(0,1fr) auto;align-items:center;gap:13px;padding:15px;border:1px solid rgba(255,255,255,.13);border-radius:22px;background:linear-gradient(135deg,rgba(116,96,255,.18),rgba(63,207,255,.08) 55%,rgba(255,255,255,.035));box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 18px 40px rgba(0,0,0,.22);backdrop-filter:blur(26px) saturate(1.35)}',
-      '.sy-dc-avatar{display:block!important;width:58px!important;height:58px!important;max-width:58px!important;max-height:58px!important;min-width:58px!important;min-height:58px!important;border-radius:17px;object-fit:cover;background:linear-gradient(145deg,#7360de,#49b8e8);box-shadow:0 10px 30px rgba(0,0,0,.32),0 0 0 1px rgba(255,255,255,.12)}.sy-dc-avatar.fallback{display:grid;place-items:center;font:850 15px/1 Inter,sans-serif;color:#fff}',
-      '.sy-dc-hero-copy{min-width:0}.sy-dc-kicker{display:block;margin-bottom:4px;font:800 7px/1 Inter,sans-serif;letter-spacing:.18em;color:rgba(171,212,255,.65)}.sy-dc-hero-copy h3{margin:0;font:750 16px/1.2 Inter,sans-serif;color:#fff}.sy-dc-hero-copy p{margin:5px 0 0;font:500 9.5px/1.45 Inter,sans-serif;color:rgba(255,255,255,.56)}',
-      '.sy-dc-status{display:inline-flex;align-items:center;gap:6px;padding:7px 9px;border:1px solid rgba(255,255,255,.11);border-radius:999px;background:rgba(7,11,22,.34);font:750 8px/1 Inter,sans-serif;color:rgba(255,255,255,.56);white-space:nowrap}.sy-dc-status i{display:block;width:6px;height:6px;border-radius:50%;background:#788195;box-shadow:0 0 0 3px rgba(120,129,149,.11)}.sy-dc-status.online{color:#9ff5cb;border-color:rgba(72,236,166,.24);background:rgba(60,220,155,.08)}.sy-dc-status.online i{background:#56e9aa;box-shadow:0 0 0 3px rgba(86,233,170,.13)}.sy-dc-status.connecting{color:#a9ddff}.sy-dc-status.connecting i{background:#68cfff;box-shadow:0 0 0 3px rgba(104,207,255,.13)}',
-      '.sy-dc-live{display:grid;grid-template-columns:44px minmax(0,1fr) auto;align-items:center;gap:10px;padding:10px 11px;border:1px solid rgba(255,255,255,.09);border-radius:16px;background:rgba(255,255,255,.035);box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}.sy-dc-live-icon{width:44px;height:44px;border-radius:13px;overflow:hidden;background:linear-gradient(145deg,#6f5cdc,#46b9eb);box-shadow:0 8px 22px rgba(0,0,0,.2)}.sy-dc-live-icon img{display:block!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;min-width:0!important;min-height:0!important;object-fit:cover!important}.sy-dc-live-copy{min-width:0;display:grid;gap:2px}.sy-dc-live-copy>span{font:800 6.5px/1 Inter,sans-serif;letter-spacing:.15em;color:rgba(145,220,255,.6)}.sy-dc-live-copy strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:700 11px/1.3 Inter,sans-serif;color:#fff}.sy-dc-live-copy span+strong{}.sy-dc-live-copy small{display:block;font:500 8.5px/1.35 Inter,sans-serif;color:rgba(255,255,255,.45)}.sy-dc-live>em{font:800 7px/1 Inter,sans-serif;letter-spacing:.12em;font-style:normal;color:#98e7ff}',
-      '.sy-dc-lyrics{position:relative;display:grid;gap:6px;padding:12px 13px 12px 16px;border:1px solid rgba(109,221,255,.17);border-radius:16px;background:linear-gradient(135deg,rgba(71,207,255,.09),rgba(130,92,255,.08),rgba(255,255,255,.025));box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}.sy-dc-lyrics:before{content:"";position:absolute;left:0;top:11px;bottom:11px;width:3px;border-radius:999px;background:linear-gradient(180deg,#72e7ff,#9d7cff)}.sy-dc-lyrics>div{display:flex;justify-content:space-between;gap:10px;align-items:center}.sy-dc-lyrics>div span{font:800 6.5px/1 Inter,sans-serif;letter-spacing:.16em;color:rgba(146,223,255,.68)}.sy-dc-lyrics>div small{font:500 7px/1 Inter,sans-serif;color:rgba(255,255,255,.32)}.sy-dc-lyrics strong{font:650 11px/1.48 Inter,sans-serif;color:#fff;word-break:break-word}',
-      '.sy-dc-fields{display:grid;grid-template-columns:1fr 1fr;gap:9px}.sy-dc-fields label{display:grid;gap:5px;padding:11px;border:1px solid rgba(255,255,255,.085);border-radius:15px;background:linear-gradient(145deg,rgba(255,255,255,.05),rgba(255,255,255,.018));box-shadow:inset 0 1px 0 rgba(255,255,255,.045)}.sy-dc-fields label>span{font:800 7px/1 Inter,sans-serif;letter-spacing:.11em;color:rgba(192,216,255,.7)}.sy-dc-fields label>small{font:500 7.5px/1.35 Inter,sans-serif;color:rgba(255,255,255,.35)}.sy-dc-fields input{height:38px;padding:0 11px;border:1px solid rgba(155,191,255,.16);border-radius:11px;background:rgba(2,6,14,.54);color:#fff;outline:none;font:650 9px/38px Inter,sans-serif}.sy-dc-fields input:focus{border-color:rgba(99,218,255,.46);box-shadow:0 0 0 3px rgba(80,193,255,.08),inset 0 1px 0 rgba(255,255,255,.05)}',
-      '.sy-dc-feature-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.sy-dc-feature{display:grid;grid-template-columns:31px minmax(0,1fr);align-items:center;gap:8px;min-width:0;padding:10px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.018));color:#fff;text-align:left;cursor:pointer;transition:.18s ease}.sy-dc-feature:hover{transform:translateY(-1px);border-color:rgba(120,209,255,.25);background:linear-gradient(145deg,rgba(112,202,255,.08),rgba(141,102,255,.06))}.sy-dc-feature-switch{position:relative;width:31px;height:18px;border:1px solid rgba(255,255,255,.11);border-radius:999px;background:rgba(5,9,18,.7)}.sy-dc-feature-switch i{position:absolute;left:3px;top:3px;width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.62);transition:left .18s ease,background .18s ease}.sy-dc-feature.on{border-color:rgba(104,209,255,.2);background:linear-gradient(145deg,rgba(70,201,255,.1),rgba(129,93,255,.07))}.sy-dc-feature.on .sy-dc-feature-switch{background:linear-gradient(90deg,rgba(61,194,255,.48),rgba(128,93,255,.52))}.sy-dc-feature.on .sy-dc-feature-switch i{left:17px;background:#fff}.sy-dc-feature b,.sy-dc-feature small{display:block;min-width:0}.sy-dc-feature b{font:700 8.5px/1.2 Inter,sans-serif;color:#fff}.sy-dc-feature small{margin-top:3px;font:500 7px/1.3 Inter,sans-serif;color:rgba(255,255,255,.38)}',
-      '.sy-dc-diagnostic{padding:9px 11px;border:1px solid rgba(255,255,255,.07);border-radius:12px;background:rgba(0,0,0,.16);font:500 8px/1.4 Inter,sans-serif;color:rgba(255,255,255,.42)}.sy-dc-actions{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:7px}.sy-dc-actions .shinayuu-native-button{height:38px;border-radius:12px}.sy-dc-actions .sy-dc-primary{background:linear-gradient(135deg,rgba(66,203,255,.2),rgba(131,95,255,.18));border-color:rgba(111,215,255,.28);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 8px 22px rgba(0,0,0,.18)}',
-      '@media(max-width:620px){.sy-dc-hero{grid-template-columns:48px minmax(0,1fr)}.sy-dc-avatar{width:48px;height:48px;border-radius:14px}.sy-dc-status{grid-column:1/-1;justify-self:start}.sy-dc-fields,.sy-dc-feature-grid,.sy-dc-actions{grid-template-columns:1fr}.sy-dc-feature{grid-template-columns:31px minmax(0,1fr)}}'
+      '@media(max-width:680px){#shinayuu-native-modal{padding:48px 8px 8px}.shinayuu-native-dialog{width:100%;height:94vh;border-radius:18px}.shinayuu-native-row{grid-template-columns:38px minmax(0,1fr)}.shinayuu-native-row-actions{grid-column:1/-1;justify-content:flex-start}.shinayuu-native-toolbar{padding:10px}.shinayuu-native-body{padding:10px}.shinayuu-native-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}'
     ].join('\n');
     document.head.appendChild(style);
   }
@@ -421,12 +414,11 @@
     try { video.load(); } catch (_) {}
   }
   function descriptorCacheKey(id) { return [id, state.mv.quality].join('|'); }
-  async function fetchMvDescriptor(videoId, refresh, compatibility, qualityOverride) {
-    var quality = String(qualityOverride || state.mv.quality || 'fhd');
-    var key = [videoId, quality].join('|') + (compatibility ? '|compat' : '');
+  async function fetchMvDescriptor(videoId, refresh, compatibility) {
+    var key = descriptorCacheKey(videoId) + (compatibility ? '|compat' : '');
     var cached = state.mv.descriptorCache[key];
     if (!refresh && cached && Date.now() - cached.at < 8 * 60 * 1000) return cached.value;
-    var url = '/api/youtube-video/song/video?id=' + encodeURIComponent(videoId) + '&quality=' + encodeURIComponent(quality) + (refresh ? '&refresh=1' : '') + (compatibility ? '&compat=1' : '');
+    var url = '/api/youtube-video/song/video?id=' + encodeURIComponent(videoId) + '&quality=' + encodeURIComponent(state.mv.quality) + (refresh ? '&refresh=1' : '') + (compatibility ? '&compat=1' : '');
     var response = await fetch(url);
     var data = await response.json();
     if (!response.ok || !data || !(data.proxyUrl || data.url)) throw new Error(data && (data.message || data.error) || 'MV_UNAVAILABLE');
@@ -437,40 +429,6 @@
     var provider = currentProvider(song);
     if (provider !== 'youtube' && provider !== 'youtube-video') return '';
     return String(song.youtubeId || song.videoId || song.id || song.mid || '').trim();
-  }
-  function mvStartupQuality() {
-    // MV is decorative background, not the primary media path. Start with a
-    // fast 1080p-class descriptor so high-quality background video cannot hold
-    // the audio/lyrics critical path. The requested quality is restored later.
-    return state.mv.quality === 'fhd' ? 'fhd' : 'fhd';
-  }
-  async function upgradeMvVideoQuality(video, videoId, token, targetQuality) {
-    targetQuality = String(targetQuality || 'fhd');
-    if (targetQuality === 'fhd' || !video || token !== state.mv.requestToken || !state.mv.enabled) return;
-    try {
-      var desired = await fetchMvDescriptor(videoId, false, false, targetQuality);
-      if (token !== state.mv.requestToken || !state.mv.enabled || !desired || !(desired.proxyUrl || desired.url)) return;
-      var currentTime = Number(video.currentTime || 0);
-      var wasPlaying = !video.paused && !video.ended;
-      var nextUrl = desired.proxyUrl || desired.url;
-      if (String(video.currentSrc || video.src || '') === String(nextUrl)) return;
-      video.src = nextUrl;
-      video.load();
-      await new Promise(function(resolve, reject) {
-        var timer = setTimeout(function(){ cleanup(); reject(new Error('MV_UPGRADE_TIMEOUT')); }, 7000);
-        function cleanup(){ clearTimeout(timer); video.removeEventListener('loadedmetadata', ok); video.removeEventListener('error', fail); }
-        function ok(){ cleanup(); resolve(); }
-        function fail(){ cleanup(); reject(new Error('MV_UPGRADE_FAILED')); }
-        video.addEventListener('loadedmetadata', ok, {once:true});
-        video.addEventListener('error', fail, {once:true});
-      });
-      if (token !== state.mv.requestToken || !state.mv.enabled) return;
-      try { if (isFinite(currentTime) && video.duration > 0) video.currentTime = Math.min(currentTime, Math.max(0, video.duration - 0.05)); } catch (_) {}
-      if (wasPlaying) video.play().catch(function(){});
-      console.info('[ShinaYuuMV] quality upgraded ' + targetQuality);
-    } catch (error) {
-      console.warn('[ShinaYuuMV] quality upgrade skipped:', error && (error.message || error));
-    }
   }
   async function updateMvForCurrentTrack(force) {
     if (!state.mv.enabled) return stopMvVideo();
@@ -485,8 +443,7 @@
     if (!video) return;
     document.body.classList.remove('shinayuu-mv-active');
     try {
-      var desiredQuality = state.mv.quality;
-      var descriptor = await fetchMvDescriptor(videoId, false, false, mvStartupQuality());
+      var descriptor = await fetchMvDescriptor(videoId, false, false);
       if (token !== state.mv.requestToken || !state.mv.enabled) return;
       video.src = descriptor.proxyUrl || descriptor.url;
       video.dataset.videoId = videoId;
@@ -503,11 +460,6 @@
       if (token !== state.mv.requestToken || !state.mv.enabled) return;
       document.body.classList.add('shinayuu-mv-active');
       syncMvPlayback(true);
-      if (desiredQuality !== 'fhd') {
-        setTimeout(function () {
-          upgradeMvVideoQuality(video, videoId, token, desiredQuality);
-        }, 1400);
-      }
     } catch (error) {
       console.warn('[ShinaYuuMV]', error);
       recoverMvVideo(false);
@@ -570,13 +522,40 @@
     return t('notConfigured');
   }
 
+  function ensureDiscordLiquidPanel() {
+    var panel = byId('shinayuu-discord-settings-panel');
+    if (panel) return panel;
+    panel = document.createElement('div');
+    panel.id = 'shinayuu-discord-settings-panel';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    panel.setAttribute('aria-labelledby', 'shinayuu-discord-panel-title');
+    panel.innerHTML = '<div class="shinayuu-discord-panel-backdrop" data-discord-panel-close="1"></div>' +
+      '<section class="shinayuu-discord-panel-dialog">' +
+        '<header class="shinayuu-discord-panel-head"><div><span>DISCORD RICH PRESENCE</span><h2 id="shinayuu-discord-panel-title">Thiết lập Discord</h2></div><button type="button" class="shinayuu-discord-panel-close" data-discord-panel-close="1" aria-label="Đóng">×</button></header>' +
+        '<div class="shinayuu-discord-panel-body" id="shinayuu-discord-panel-body"></div>' +
+      '</section>';
+    panel.addEventListener('click', function (event) {
+      var close = event.target && event.target.closest ? event.target.closest('[data-discord-panel-close]') : null;
+      if (close) closeDiscordLiquidPanel();
+    });
+    document.body.appendChild(panel);
+    return panel;
+  }
+  function closeDiscordLiquidPanel() {
+    var panel = byId('shinayuu-discord-settings-panel');
+    if (panel) panel.classList.remove('show');
+  }
   async function openDiscordSettings() {
+    // Use the proven ShinaYuu native Liquid Glass modal container. Keeping the
+    // Discord panel inside the same modal stack avoids stacking-context and
+    // transformed-root issues that can hide a standalone fixed overlay in the
+    // packaged Chromium renderer.
     var discordState = {};
     try {
       if (typeof bridge.getDiscordState === 'function') discordState = await bridge.getDiscordState();
     } catch (error) {
-      console.warn('[DiscordSettings] getDiscordState failed:', error);
-      discordState = { configured: false, connected: false, errorDetail: 'Không thể đọc trạng thái Discord hiện tại. Bạn vẫn có thể nhập cấu hình và kết nối lại.' };
+      console.warn('[DiscordSettingsPanel] state read failed:', error && error.message || error);
     }
     state.discord = discordState || {};
     var config = state.discord.config || {};
@@ -584,63 +563,58 @@
     var status = discordConnectionLabel(state.discord);
     var profileName = profile.displayName || profile.username || 'Discord';
     var avatar = profile.avatarUrl
-      ? '<img class="sy-dc-avatar" src="' + escapeHtml(profile.avatarUrl) + '" alt="">'
-      : '<div class="sy-dc-avatar fallback">DC</div>';
+      ? '<img class="shinayuu-discord-modal-avatar" src="' + escapeHtml(profile.avatarUrl) + '" alt="">'
+      : '<div class="shinayuu-discord-modal-avatar fallback">DC</div>';
     var activity = state.discord.activity || {};
     var nowPlaying = activity.title
       ? '<strong>' + escapeHtml(activity.title) + '</strong><span>' + escapeHtml(activity.artist || activity.source || 'ShinaYuu Music') + '</span>'
       : '<strong>ShinaYuu Music</strong><span>Visual Music Experience</span>';
-    var initialEnabled = config.enabled !== false;
-    var initialLyrics = config.showVisibleLyric !== false;
-    var initialCover = config.preferTrackCover !== false;
+    var diagnostic = state.discord.errorDetail || state.discord.error || (state.discord.connected
+      ? 'Discord Rich Presence đang hoạt động.'
+      : 'Nhập Application ID rồi nhấn Lưu và kết nối.');
     var body = '' +
-      '<div class="sy-dc-root">' +
-        '<div class="sy-dc-glow sy-dc-glow-a"></div><div class="sy-dc-glow sy-dc-glow-b"></div>' +
-        '<div class="sy-dc-hero">' +
-          avatar +
-          '<div class="sy-dc-hero-copy"><span class="sy-dc-kicker">DISCORD RICH PRESENCE</span><h3>' + escapeHtml(profileName) + '</h3><p>' + escapeHtml(t('discordHero')) + '</p></div>' +
-          '<span class="sy-dc-status ' + (state.discord.connected ? 'online' : state.discord.connecting ? 'connecting' : '') + '"><i></i>' + escapeHtml(status) + '</span>' +
+      '<div class="shinayuu-discord-liquid">' +
+        '<div class="shinayuu-discord-modal-hero">' + avatar +
+          '<div class="shinayuu-discord-modal-copy"><span class="shinayuu-discord-kicker">DISCORD RICH PRESENCE</span><h3>' + escapeHtml(profileName) + '</h3><p>Hiển thị bài đang phát, nguồn nhạc và tiến độ của ShinaYuu Music trên Discord.</p></div>' +
+          '<span class="shinayuu-discord-status ' + (state.discord.connected ? 'online' : '') + '">' + escapeHtml(status) + '</span>' +
         '</div>' +
-        '<div class="sy-dc-live">' +
-          '<div class="sy-dc-live-icon"><img src="assets/shinayuu-app-icon.png" alt=""></div>' +
-          '<div class="sy-dc-live-copy"><span>LIVE ACTIVITY</span>' + nowPlaying + '</div>' +
-          '<em>' + escapeHtml(activity.isPlaying ? 'PLAYING' : activity.title ? 'PAUSED' : 'READY') + '</em>' +
+        '<div class="shinayuu-discord-preview"><div class="shinayuu-discord-preview-icon"><img src="assets/shinayuu-app-icon.png" alt="ShinaYuu Music"></div><div>' + nowPlaying + '</div><small>Live preview</small></div>' +
+        '<div class="shinayuu-discord-fields">' +
+          '<label><span>' + escapeHtml(t('discordId')) + '</span><small>ID của ứng dụng trong Discord Developer Portal</small><input id="shinayuu-discord-app-id" inputmode="numeric" autocomplete="off" spellcheck="false" value="' + escapeHtml(config.applicationId || state.discord.applicationId || '') + '" placeholder="123456789012345678"></label>' +
+          '<label><span>Large Image Key</span><small>Asset dự phòng khi ảnh bìa trực tuyến không được Discord chấp nhận</small><input id="shinayuu-discord-image-key" autocomplete="off" spellcheck="false" value="' + escapeHtml(config.largeImageKey || 'shinayuu') + '" placeholder="shinayuu"></label>' +
         '</div>' +
-        '<div class="sy-dc-lyrics"><div><span>VISIBLE LYRICS</span><small>Stage source of truth</small></div><strong id="shinayuu-discord-live-lyric-modal">' + escapeHtml(activity.visibleLyric || discordVisibleLyricText() || 'Chưa có câu lyrics đang hiển thị') + '</strong></div>' +
-        '<div class="sy-dc-fields">' +
-          '<label><span>APPLICATION ID</span><small>' + escapeHtml(t('discordFieldsHint')) + '</small><input id="shinayuu-discord-app-id" inputmode="numeric" autocomplete="off" spellcheck="false" value="' + escapeHtml(config.applicationId || state.discord.applicationId || '') + '" placeholder="123456789012345678"></label>' +
-          '<label><span>LARGE IMAGE KEY</span><small>' + escapeHtml(t('discordImageHint')) + '</small><input id="shinayuu-discord-image-key" autocomplete="off" spellcheck="false" value="' + escapeHtml(config.largeImageKey || 'shinayuu') + '" placeholder="shinayuu"></label>' +
+        '<div class="shinayuu-discord-switches">' +
+          '<label><input id="shinayuu-discord-enabled" type="checkbox" ' + (config.enabled !== false ? 'checked' : '') + '><span><strong>Bật Discord Rich Presence</strong><small>Tự kết nối lại khi Discord được mở.</small></span></label>' +
+          '<label><input id="shinayuu-discord-cover" type="checkbox" ' + (config.preferTrackCover !== false ? 'checked' : '') + '><span><strong>Ưu tiên ảnh bìa bài hát</strong><small>Tự dùng asset ShinaYuu nếu Discord từ chối ảnh ngoài.</small></span></label>' +
         '</div>' +
-        '<div class="sy-dc-feature-grid">' +
-          '<button class="sy-dc-feature ' + (initialEnabled ? 'on' : '') + '" id="shinayuu-discord-enabled" data-on="' + (initialEnabled ? '1' : '0') + '" type="button"><span class="sy-dc-feature-switch"><i></i></span><span><b>Rich Presence</b><small>' + escapeHtml(t('discordAutoReconnect')) + '</small></span></button>' +
-          '<button class="sy-dc-feature ' + (initialLyrics ? 'on' : '') + '" id="shinayuu-discord-lyrics" data-on="' + (initialLyrics ? '1' : '0') + '" type="button"><span class="sy-dc-feature-switch"><i></i></span><span><b>Visible Lyrics</b><small>' + escapeHtml(t('discordStageMirror')) + '</small></span></button>' +
-          '<button class="sy-dc-feature compact ' + (initialCover ? 'on' : '') + '" id="shinayuu-discord-cover" data-on="' + (initialCover ? '1' : '0') + '" type="button"><span class="sy-dc-feature-switch"><i></i></span><span><b>Track Cover</b><small>' + escapeHtml(t('discordCoverHint')) + '</small></span></button>' +
-        '</div>' +
-        '<div class="sy-dc-diagnostic" id="shinayuu-discord-diagnostic">' + escapeHtml(state.discord.errorDetail || state.discord.error || (state.discord.connected ? 'Discord Rich Presence đang hoạt động.' : 'Nhập Application ID rồi nhấn Lưu và kết nối.')) + '</div>' +
-        '<div class="sy-dc-actions">' +
-          '<button class="shinayuu-native-button primary sy-dc-primary" id="shinayuu-discord-save" type="button">Lưu và kết nối</button>' +
-          '<button class="shinayuu-native-button" id="shinayuu-discord-reconnect" type="button">Kết nối lại</button>' +
-          '<button class="shinayuu-native-button" id="shinayuu-discord-portal" type="button">Developer Portal</button>' +
+        '<div class="shinayuu-discord-diagnostic">' + escapeHtml(diagnostic) + '</div>' +
+        '<div class="shinayuu-discord-actions">' +
+          '<button class="shinayuu-native-button primary" id="shinayuu-discord-save" type="button">Lưu và kết nối</button>' +
+          '<button class="shinayuu-native-button" id="shinayuu-discord-reconnect" type="button">' + escapeHtml(t('reconnect')) + '</button>' +
+          '<button class="shinayuu-native-button" id="shinayuu-discord-portal" type="button">' + escapeHtml(t('portal')) + '</button>' +
         '</div>' +
       '</div>';
     openModal(t('discord'), '', body, 'discord');
-    ['shinayuu-discord-enabled','shinayuu-discord-lyrics','shinayuu-discord-cover'].forEach(function (id) {
-      var el = byId(id); if (!el) return;
-      el.onclick = function () { var on = el.getAttribute('data-on') === '1' ? '0' : '1'; el.setAttribute('data-on', on); el.classList.toggle('on', on === '1'); };
-    });
-    byId('shinayuu-discord-save').onclick = async function () {
+    var appInput = byId('shinayuu-discord-app-id');
+    if (appInput) setTimeout(function () { try { appInput.focus(); appInput.select(); } catch (_) {} }, 40);
+    var save = byId('shinayuu-discord-save');
+    if (save) save.onclick = async function () {
       var id = String(byId('shinayuu-discord-app-id').value || '').replace(/\D/g, '');
       var imageKey = String(byId('shinayuu-discord-image-key').value || 'shinayuu').trim() || 'shinayuu';
-      var enabled = byId('shinayuu-discord-enabled').getAttribute('data-on') === '1';
-      var preferTrackCover = byId('shinayuu-discord-cover').getAttribute('data-on') === '1';
-      var showVisibleLyric = byId('shinayuu-discord-lyrics').getAttribute('data-on') === '1';
+      var enabled = !!byId('shinayuu-discord-enabled').checked;
+      var preferTrackCover = !!byId('shinayuu-discord-cover').checked;
       if (enabled && !/^\d{17,24}$/.test(id)) { toast('Application ID Discord không hợp lệ.'); return; }
-      if (typeof bridge.configureDiscord === 'function') state.discord = await bridge.configureDiscord({ enabled: enabled, applicationId: id, largeImageKey: imageKey, largeImageText: 'ShinaYuu Music', showTrack: true, preferTrackCover: preferTrackCover, showVisibleLyric: showVisibleLyric });
+      if (typeof bridge.configureDiscord === 'function') state.discord = await bridge.configureDiscord({ enabled: enabled, applicationId: id, largeImageKey: imageKey, largeImageText: 'ShinaYuu Music', showTrack: true, preferTrackCover: preferTrackCover });
       updateDiscordActivity(true);
       toast(t('saved')); closeModal(); refreshNativeStatusCards();
     };
-    byId('shinayuu-discord-reconnect').onclick = async function () { if (typeof bridge.reconnectDiscord === 'function') state.discord = await bridge.reconnectDiscord(); openDiscordSettings(); };
-    byId('shinayuu-discord-portal').onclick = function () { if (typeof bridge.openDiscordDeveloperPortal === 'function') bridge.openDiscordDeveloperPortal(); };
+    var reconnect = byId('shinayuu-discord-reconnect');
+    if (reconnect) reconnect.onclick = async function () {
+      try { if (typeof bridge.reconnectDiscord === 'function') state.discord = await bridge.reconnectDiscord(); } catch (error) { console.warn('[DiscordReconnect]', error); }
+      openDiscordSettings();
+    };
+    var portal = byId('shinayuu-discord-portal');
+    if (portal) portal.onclick = function () { if (typeof bridge.openDiscordDeveloperPortal === 'function') bridge.openDiscordDeveloperPortal(); };
   }
 
   function formatUpdateBytes(value) {
@@ -701,10 +675,20 @@
       if (nativeStatus) nativeStatus.textContent = t('updateAvailable') + ': ' + info.latestVersion;
       if (nativeNow) { nativeNow.hidden = false; nativeNow.textContent = t('updateNow'); }
     } else {
-      setFriendlyUpdateNote('idle', info.currentVersion);
+      var remoteOlder = !!(state.update.latest && state.update.latest.remoteOlderThanCurrent);
+      setFriendlyUpdateNote('idle', remoteOlder ? info.latestVersion : info.currentVersion);
       if (staticNow) staticNow.hidden = true;
       if (nativeNow) nativeNow.hidden = true;
-      if (nativeStatus && state.update.current) nativeStatus.textContent = t('currentVersion') + ': ' + String(state.update.current.version || '');
+      if (nativeStatus && state.update.current) {
+        nativeStatus.textContent = remoteOlder
+          ? ((window.appLanguage === 'en' ? 'Update source is older than installed version: ' : 'Nguồn cập nhật đang thấp hơn phiên bản đang cài: ') + String(info.latestVersion || '—'))
+          : (t('currentVersion') + ': ' + String(state.update.current.version || ''));
+      }
+      if (staticStatus) {
+        staticStatus.textContent = remoteOlder
+          ? ((window.appLanguage === 'en' ? 'Update source is older: ' : 'Nguồn cập nhật cũ hơn: ') + String(info.latestVersion || '—'))
+          : (t('currentVersion') + ': ' + String(info.currentVersion || ''));
+      }
     }
   }
   function updateNotesHtml(notes) {
@@ -867,7 +851,8 @@
       var currentVersion = current.version || current.displayVersion || '';
       var configured = !((current.update && current.update.configured === false) || latest.configured === false);
       var updateAvailable = configured && !!latest.updateAvailable;
-      var result = { ok: true, configured: configured, updateAvailable: updateAvailable, currentVersion: currentVersion, latestVersion: latestVersion, latest: latest };
+      var remoteOlderThanCurrent = configured && !!latest.remoteOlderThanCurrent;
+      var result = { ok: true, configured: configured, updateAvailable: updateAvailable, remoteOlderThanCurrent: remoteOlderThanCurrent, currentVersion: currentVersion, latestVersion: latestVersion, latest: latest };
       if (updateAvailable) {
         var promptKey = 'shinayuu-update-auto-prompted-v2';
         var prompted = '';
@@ -880,8 +865,14 @@
           renderUpdateAvailable(latest);
         }
       } else if (!automatic) {
-        var message = !configured ? t('updateNotConfigured') : t('upToDate');
-        var body = '<div class="shinayuu-update-shell"><div class="shinayuu-update-hero">' + updateAppLogoMarkup('success') + '<div class="shinayuu-update-copy"><strong>' + escapeHtml(message) + '</strong><span>' + escapeHtml(t('currentVersion') + ': ' + currentVersion) + '</span></div></div><div class="shinayuu-update-actions"><button class="shinayuu-native-button primary" id="shinayuu-update-close" type="button">' + escapeHtml(t('close')) + '</button></div></div>';
+        var remoteOlder = configured && !!latest.remoteOlderThanCurrent;
+        var message = !configured ? t('updateNotConfigured') : (remoteOlder
+          ? (window.appLanguage === 'en' ? 'The configured update source is older than this installation.' : 'Nguồn cập nhật hiện tại cũ hơn phiên bản đang cài.')
+          : t('upToDate'));
+        var versionLine = remoteOlder
+          ? ((window.appLanguage === 'en' ? 'Remote release: ' : 'Bản phát hành từ máy chủ: ') + String(latestVersion || '—') + ' · ' + (window.appLanguage === 'en' ? 'installed: ' : 'đang cài: ') + String(currentVersion || '—'))
+          : (t('currentVersion') + ': ' + currentVersion);
+        var body = '<div class="shinayuu-update-shell"><div class="shinayuu-update-hero">' + updateAppLogoMarkup('success') + '<div class="shinayuu-update-copy"><strong>' + escapeHtml(message) + '</strong><span>' + escapeHtml(versionLine) + '</span></div></div><div class="shinayuu-update-actions"><button class="shinayuu-native-button primary" id="shinayuu-update-close" type="button">' + escapeHtml(t('close')) + '</button></div></div>';
         openModal(t('update'), '', body, 'update');
         var close = byId('shinayuu-update-close'); if (close) close.onclick = closeModal;
       }
@@ -910,26 +901,9 @@
     }).catch(function () {});
   }
 
-  function bindDiscordLauncher() {
-    var button = byId('shinayuu-standalone-discord-open');
-    if (!button || button._shinayuuDiscordLauncherBound) return;
-    button._shinayuuDiscordLauncherBound = true;
-    button.type = 'button';
-    button.textContent = t('configure');
-    button.addEventListener('click', function (event) {
-      event.preventDefault();
-      event.stopPropagation();
-      Promise.resolve().then(function () { return openDiscordSettings(); }).catch(function (error) {
-        console.warn('[DiscordSettings] open failed:', error);
-        toast('Không thể mở giao diện kết nối Discord.');
-      });
-    });
-  }
-
   function injectNativeControls() {
-    if (byId('shinayuu-local-library-choice')) return;
     var uploadPanel = byId('upload-panel');
-    if (uploadPanel) {
+    if (uploadPanel && !byId('shinayuu-local-library-choice')) {
       var localChoice = document.createElement('button');
       localChoice.id = 'shinayuu-local-library-choice';
       localChoice.className = 'upload-choice';
@@ -949,66 +923,72 @@
       Array.prototype.forEach.call(mvRow.querySelectorAll('[data-shinayuu-mv-quality]'), function (button) { button.onclick = function () { setMvQuality(button.getAttribute('data-shinayuu-mv-quality')); }; });
       Array.prototype.forEach.call(mvRow.querySelectorAll('[data-shinayuu-mv-mode]'), function (button) { button.onclick = function () { setMvMode(button.getAttribute('data-shinayuu-mv-mode')); }; });
     }
-    var advancedBody = document.querySelector('#fx-advanced .fx-advanced-body');
-    if (advancedBody) {
+    var discordCard = byId('discord-advanced-card');
+    var discordNeedsNormalize = discordCard && discordCard.getAttribute('data-shinayuu-discord-card-v2') !== '1';
+    if (discordNeedsNormalize) {
+      // Older 2.1.x HTML could leave an inline Discord form here. Normalize the
+      // entire card at runtime, not merely append a button, so old controls can
+      // never remain as a second configuration surface.
+      discordCard.innerHTML = '' +
+        '<div class="sy-discord-settings-glow" aria-hidden="true"></div>' +
+        '<div class="sy-discord-settings-main">' +
+          '<div class="sy-discord-settings-icon" aria-hidden="true">⌁</div>' +
+          '<div class="sy-discord-settings-copy"><span>DISCORD RICH PRESENCE</span><strong id="discord-profile-name">Discord chưa kết nối</strong><small id="discord-profile-note">Thiết lập Rich Presence, ảnh bìa và trạng thái bài hát.</small><em id="discord-card-state">Chưa cấu hình</em></div>' +
+          '<span class="sy-discord-settings-status" id="discord-status-pill"><i></i><b id="discord-status-text">Ngoại tuyến</b></span>' +
+        '</div>' +
+        '<div class="sy-discord-settings-preview"><span>●</span><div><strong id="discord-now-title">ShinaYuu Music</strong><small id="discord-now-meta">Visual Music Experience</small></div><em id="discord-now-progress">Live</em></div>' +
+        '<button class="sy-discord-settings-open" id="discord-open-settings" type="button" aria-label="Mở thiết lập Discord">⚙ Thiết lập Discord</button>';
+      discordCard.setAttribute('data-shinayuu-discord-card-v2', '1');
+    }
+    if (advancedBody && !byId('shinayuu-native-settings-section')) {
       var section = document.createElement('div');
       section.id = 'shinayuu-native-settings-section';
       section.innerHTML = '<div class="fx-section-label" id="shinayuu-native-tools-label">' + escapeHtml(t('tools')) + '</div>' +
         '<div class="shinayuu-native-status-card"><h4 id="shinayuu-native-local-title">' + escapeHtml(t('localLibrary')) + '</h4><p id="shinayuu-native-local-status">' + escapeHtml(t('localCount', { n: 0 })) + '</p><div class="shinayuu-native-status-actions"><button class="fx-mini-btn ghost" id="shinayuu-native-local-open" type="button">' + escapeHtml(t('localLibrary')) + '</button><button class="fx-mini-btn ghost" id="shinayuu-native-local-add" type="button">' + escapeHtml(t('addLocal')) + '</button></div></div>' +
+        '<div class="shinayuu-native-status-card"><h4 id="shinayuu-native-discord-title">' + escapeHtml(t('discord')) + '</h4><p id="shinayuu-native-discord-status">' + escapeHtml(t('notConfigured')) + '</p><div class="shinayuu-native-status-actions"><button class="fx-mini-btn ghost" id="shinayuu-native-discord-open" type="button">' + escapeHtml(t('configure')) + '</button></div></div>' +
         '<div class="shinayuu-native-status-card"><h4 id="shinayuu-native-update-title">' + escapeHtml(t('update')) + '</h4><p id="shinayuu-native-update-status">' + escapeHtml(t('updateUnknown')) + '</p><div class="shinayuu-native-status-actions"><button class="fx-mini-btn ghost" id="shinayuu-native-update-check" type="button">' + escapeHtml(t('checkUpdate')) + '</button><button class="fx-mini-btn ghost" id="shinayuu-native-update-now" type="button" hidden>' + escapeHtml(t('updateNow')) + '</button></div></div>';
       advancedBody.appendChild(section);
       byId('shinayuu-native-local-open').onclick = openLocalLibrary;
       byId('shinayuu-native-local-add').onclick = addLocalSource;
+      byId('shinayuu-native-discord-open').onclick = openDiscordSettings;
       byId('shinayuu-native-update-check').onclick = checkUpdate;
       byId('shinayuu-native-update-now').onclick = openLatestUpdatePrompt;
     }
+    var discordOpenSettings = byId('discord-open-settings');
+    if (discordOpenSettings && discordOpenSettings.dataset.shinayuuDirectBound !== '1') {
+      discordOpenSettings.dataset.shinayuuDirectBound = '1';
+      discordOpenSettings.onclick = function (event) { event.preventDefault(); event.stopPropagation(); openDiscordSettings().catch(function (error) { console.warn('[DiscordSettingsPanel]', error); }); };
+    }
+    var discordCardFinal = byId('discord-advanced-card');
+    if (discordCardFinal && discordCardFinal.dataset.shinayuuDiscordBound !== '1') {
+      discordCardFinal.dataset.shinayuuDiscordBound = '1';
+      discordCardFinal.setAttribute('tabindex', '0');
+      discordCardFinal.addEventListener('click', function (event) { if (!event.target.closest('button,input,a')) openDiscordSettings(); });
+      discordCardFinal.addEventListener('keydown', function (event) { if ((event.key === 'Enter' || event.key === ' ') && !event.target.closest('button,input,a')) { event.preventDefault(); openDiscordSettings(); } });
+    }
     applyMvUi();
-    bindDiscordLauncher();
   }
 
   function refreshNativeText() {
     var mapping = {
       'shinayuu-mv-label': t('mvBackground'), 'shinayuu-mv-hint': t('mvHint'),
       'shinayuu-native-tools-label': t('tools'), 'shinayuu-native-local-title': t('localLibrary'),
-      'shinayuu-native-update-title': t('update'), 'shinayuu-standalone-discord-title': t('discord')
+      'shinayuu-native-discord-title': t('discord'), 'shinayuu-native-update-title': t('update')
     };
     Object.keys(mapping).forEach(function (id) { var el = byId(id); if (el) el.textContent = mapping[id]; });
     var localChoice = byId('shinayuu-local-library-choice');
     if (localChoice) localChoice.innerHTML = '<svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><path d="M9 16V10l7-1v6"></path><circle cx="7" cy="16" r="2"></circle><circle cx="14" cy="15" r="2"></circle></svg><span><strong>' + escapeHtml(t('localLibrary')) + '</strong><small>' + escapeHtml(t('localHint')) + '</small></span>';
     var ids = [
       ['shinayuu-native-local-open', 'localLibrary'], ['shinayuu-native-local-add', 'addLocal'],
-      ['shinayuu-standalone-discord-open', 'configure'], ['shinayuu-native-update-check', 'checkUpdate'], ['shinayuu-native-update-now', 'updateNow']
+      ['shinayuu-native-discord-open', 'configure'], ['shinayuu-native-update-check', 'checkUpdate'], ['shinayuu-native-update-now', 'updateNow']
     ];
     ids.forEach(function (pair) { var el = byId(pair[0]); if (el) el.textContent = t(pair[1]); });
-    var discordLauncher = byId('shinayuu-standalone-discord-open');
-    if (discordLauncher) discordLauncher.textContent = (state.discord && state.discord.connected) ? 'Cài đặt Discord' : ((state.discord && state.discord.configured) ? t('reconnect') : t('configure'));
-    bindDiscordLauncher();
     applyMvUi(); refreshNativeStatusCards(); setUpdateCardState();
   }
   function refreshNativeStatusCards() {
     var localStatus = byId('shinayuu-native-local-status'); if (localStatus) localStatus.textContent = t('localCount', { n: (state.local.tracks || []).length });
-    var discordCard = byId('shinayuu-discord-standalone-card');
-    var discordButton = byId('shinayuu-standalone-discord-open');
-    var discordStatus = byId('shinayuu-standalone-discord-status');
-    var discordConnected = !!(state.discord && state.discord.connected);
-    var discordConfigured = !!(state.discord && state.discord.configured);
-    if (discordCard) discordCard.classList.toggle('connected', discordConnected);
-    if (discordStatus) discordStatus.textContent = discordConnected ? t('connected') : (discordConfigured ? t('disconnected') : t('notConfigured'));
-    if (discordButton) discordButton.textContent = discordConnected ? 'Cài đặt Discord' : (discordConfigured ? t('reconnect') : t('configure'));
+    var discordStatus = byId('shinayuu-native-discord-status'); if (discordStatus) discordStatus.textContent = state.discord && state.discord.connected ? t('connected') : (state.discord && state.discord.configured ? t('disconnected') : t('notConfigured'));
   }
-  function discordVisibleLyricText() {
-    try {
-      var lines = Array.isArray(window.lyricsLines) ? window.lyricsLines : (typeof lyricsLines !== 'undefined' ? lyricsLines : []);
-      var stage = window.stageLyrics || (typeof stageLyrics !== 'undefined' ? stageLyrics : null);
-      var idx = stage && Number.isFinite(Number(stage.currentIdx)) ? Number(stage.currentIdx) : -1;
-      if (idx >= 0 && lines[idx]) {
-        var text = String(lines[idx].text || lines[idx].line || lines[idx].lyric || '').replace(/\s+/g, ' ').trim();
-        if (text) return text.slice(0, 128);
-      }
-    } catch (_) {}
-    return '';
-  }
-
   function discordPlaybackSnapshot(song) {
     song = song || currentSong();
     if (!song) return null;
@@ -1038,18 +1018,17 @@
       cover: cover,
       isPlaying: isPlaying,
       positionSec: Math.max(0, position),
-      durationSec: Math.max(0, duration),
-      visibleLyric: discordVisibleLyricText()
+      durationSec: Math.max(0, duration)
     };
   }
 
   var discordActivityLastSignature = '';
-  function updateDiscordActivity(immediate, providedPayload) {
+  function updateDiscordActivity(immediate) {
     if (typeof bridge.updateDiscordActivity !== 'function') return;
-    var payload = providedPayload || discordPlaybackSnapshot();
+    var payload = discordPlaybackSnapshot();
     if (!payload) return;
-    payload = Object.assign({}, payload, { immediate: !!immediate });
-    var signature = [payload.title, payload.artist, payload.source, payload.visibleLyric || '', payload.isPlaying ? 1 : 0, Math.round(payload.positionSec / 2), Math.round(payload.durationSec)].join('|');
+    payload.immediate = !!immediate;
+    var signature = [payload.title, payload.artist, payload.source, payload.isPlaying ? 1 : 0, Math.round(payload.positionSec / 2), Math.round(payload.durationSec)].join('|');
     if (!immediate && signature === discordActivityLastSignature) return;
     discordActivityLastSignature = signature;
     bridge.updateDiscordActivity(payload).catch(function () {});
@@ -1065,25 +1044,6 @@
     }
     window.addEventListener('shinayuu-spotify-track-started', function () { setTimeout(function () { updateDiscordActivity(true); }, 120); });
     document.addEventListener('shinayuu-playback-state', function () { updateDiscordActivity(true); });
-    document.addEventListener('shinayuu-lyrics-applied', function () { updateDiscordActivity(true); });
-    document.addEventListener('shinayuu-lyric-sync-profile', function () { updateDiscordActivity(true); });
-    // Stage is authoritative for Discord lyrics. This event fires only after the
-    // line has actually been committed to the visible Stage, so short lines do
-    // not depend on the coarse 1.2 s Discord polling loop.
-    document.addEventListener('shinayuu-stage-lyric-changed', function (event) {
-      var detail = event && event.detail || {};
-      var text = String(detail.text || '').replace(/\s+/g, ' ').trim();
-      if (!text) return;
-      var payload = discordPlaybackSnapshot();
-      if (!payload) return;
-      payload.visibleLyric = text.slice(0, 128);
-      payload.immediate = true;
-      updateDiscordActivity(true, payload);
-      var modalLyric = byId('shinayuu-discord-live-lyric-modal');
-      if (modalLyric) modalLyric.textContent = payload.visibleLyric;
-      var legacyLyric = byId('discord-live-lyric');
-      if (legacyLyric) legacyLyric.textContent = payload.visibleLyric;
-    });
   }
 
 
@@ -1091,8 +1051,19 @@
     return openMediaLibrary().catch(function (error) { console.warn(error); toast(t('failed')); });
   };
 
+  // Publish the Discord opener before boot. This makes the explicit HTML button
+  // independent from the rest of the native-controls initialization lifecycle.
+  window.openShinaYuuDiscordLiquidSettings = openDiscordSettings;
+  document.addEventListener('click', function (event) {
+    var button = event.target && event.target.closest ? event.target.closest('#discord-open-settings, #shinayuu-native-discord-open') : null;
+    if (!button) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    openDiscordSettings().catch(function (error) { console.warn('[DiscordSettingsPanel]', error); });
+  }, true);
+
   function boot() {
-    installStyle(); ensureModal(); ensureMvVideo(); loadMvState(); injectNativeControls(); bindDiscordLauncher();
+    installStyle(); ensureModal(); ensureMvVideo(); loadMvState(); injectNativeControls();
     setTimeout(function () { loadLocalLibrary(false).catch(function () {}); loadRememberedMedia().catch(function () {}); }, 1800);
     if (typeof bridge.getDiscordState === 'function') setTimeout(function () { bridge.getDiscordState().then(function (value) { state.discord = value || {}; refreshNativeStatusCards(); }).catch(function () {}); }, 2600);
     if (typeof bridge.onLocalMusicChanged === 'function') bridge.onLocalMusicChanged(function (value) { if (value && Array.isArray(value.tracks)) state.local = value; refreshNativeStatusCards(); });
@@ -1104,7 +1075,7 @@
     document.addEventListener('shinayuu-track-change', function () { updateMvForCurrentTrack(true); updateDiscordActivity(true); setTimeout(function () { updateDiscordActivity(true); }, 480); });
     setInterval(function () { updateMvForCurrentTrack(false); }, 700);
     setInterval(function () { syncMvPlayback(false); }, 950);
-    setInterval(function () { updateDiscordActivity(false); }, 1200);
+    setInterval(function () { updateDiscordActivity(false); }, 5000);
     setTimeout(scheduleAutomaticUpdateChecks, 1200);
     document.addEventListener('visibilitychange', function () {
       // Keep the video clock attached to playback in both directions. Chromium

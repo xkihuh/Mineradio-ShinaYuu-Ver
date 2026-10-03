@@ -149,3 +149,93 @@ body.sy-automix-cover-swap #thumb-cover{
     grid-column:1/-1!important;
   }
 }
+
+/* ShinaYuu 2.1.7 R5: runtime display/DPI awareness. We intentionally do not
+   zoom/transform the entire UI from Windows scale; Electron already renders
+   in DIP/CSS pixels. These rules use viewport/DIP dimensions so 100%, 125%,
+   150% and mixed-monitor setups keep the same visual proportions. */
+:root{
+  --sy-display-scale:1;
+  --sy-display-scale-percent:100%;
+  --sy-display-css-width:1280px;
+  --sy-display-css-height:720px;
+  --sy-display-pixel-width:1280px;
+  --sy-display-pixel-height:720px;
+}
+.fx-discord-inline-panel[hidden]{display:none!important}
+#discord-advanced-card{cursor:pointer}
+#discord-open-settings{appearance:none;border:1px solid rgba(255,255,255,.12);border-radius:999px;background:rgba(255,255,255,.055);color:rgba(255,255,255,.84);padding:7px 10px;font:700 7.5px/1 Inter,Segoe UI,sans-serif;cursor:pointer;flex:0 0 auto}
+#discord-open-settings:hover{border-color:rgba(125,213,255,.36);background:rgba(89,190,255,.10)}
+#discord-open-settings:focus-visible{outline:2px solid rgba(129,219,255,.48);outline-offset:2px}
+@media(max-width:1120px){
+  #desktop-window-shell .left-panel,
+  #desktop-window-shell .right-panel{min-width:0}
+  .fx-discord-card-v209{max-width:100%}
+}
+@media(max-width:900px){
+  #discord-advanced-card{padding:10px!important}
+  #discord-advanced-card .sy-discord-preview{grid-template-columns:34px minmax(0,1fr) auto!important}
+  #discord-open-settings{padding:6px 8px}
+}
+@media(max-width:680px){
+  #discord-open-settings{font-size:8px;padding:7px 9px}
+}
+
+
+/* ShinaYuu R7: Hi-DPI layout balance.
+   Electron already maps the window to DIP/CSS pixels. The runtime uses the
+   physical display + scale to keep the reference layout tier stable, while
+   these overrides prevent the player controls from switching to a two-row
+   stack solely because Windows DPI reduced the CSS viewport. */
+html[data-shinayuu-layout-profile="balanced"] body.desktop-shell.ui-compact #bottom-bar,
+html[data-shinayuu-layout-profile="balanced"] body.desktop-shell.ui-compact #bottom-bar.stage-mode,
+html[data-shinayuu-layout-profile="balanced"] body.desktop-shell.ui-compact.simple-mode #bottom-bar,
+html[data-shinayuu-layout-profile="balanced"] body.desktop-shell.ui-compact.diy-mode #bottom-bar,
+html[data-shinayuu-layout-profile="balanced"] body.desktop-shell.ui-compact.diy-mode #bottom-bar.stage-mode {
+  width: min(1180px, calc(100vw - 2 * var(--sy-edge))) !important;
+  padding-left: clamp(10px, 1.2vw, 18px) !important;
+  padding-right: clamp(10px, 1.2vw, 18px) !important;
+}
+
+html[data-shinayuu-layout-profile="balanced"] body.desktop-shell.ui-compact #controls,
+html[data-shinayuu-layout-profile="balanced"] body.desktop-shell.ui-compact.simple-mode #controls,
+html[data-shinayuu-layout-profile="balanced"] body.desktop-shell.ui-compact.diy-mode #controls {
+  grid-template-columns: minmax(0, 1fr) max-content minmax(0, 1fr) !important;
+  grid-template-areas: none !important;
+  column-gap: clamp(7px, 1vw, 12px) !important;
+  row-gap: 0 !important;
+  align-items: center !important;
+}
+
+html[data-shinayuu-layout-profile="balanced"] body.desktop-shell.ui-compact #controls .actions,
+html[data-shinayuu-layout-profile="balanced"] body.desktop-shell.ui-compact #controls .transport,
+html[data-shinayuu-layout-profile="balanced"] body.desktop-shell.ui-compact #controls .modes {
+  grid-area: auto !important;
+  min-width: 0 !important;
+}
+
+html[data-shinayuu-layout-profile="balanced"] body.desktop-shell.ui-compact #controls .actions {
+  overflow: hidden !important;
+}
+
+html[data-shinayuu-layout-profile="balanced"] body.desktop-shell.ui-compact #controls .modes {
+  justify-content: flex-end !important;
+  overflow: hidden !important;
+  gap: 7px !important;
+}
+
+html[data-shinayuu-layout-profile="balanced"] body.desktop-shell.ui-compact .control-track,
+html[data-shinayuu-layout-profile="balanced"] body.desktop-shell.ui-compact .control-meta {
+  min-width: 0 !important;
+  max-width: min(220px, 100%) !important;
+}
+
+html[data-shinayuu-layout-profile="balanced"] body.desktop-shell.ui-compact .control-cluster {
+  gap: 8px !important;
+}
+
+html, body, #desktop-window-shell,
+body.desktop-shell #desktop-window-shell {
+  min-width: 0 !important;
+  min-height: 0 !important;
+}

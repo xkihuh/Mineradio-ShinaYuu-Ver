@@ -1,5 +1,4 @@
 'use strict';
-const CURRENT_VERSION = require('../package.json').version;
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -12,7 +11,7 @@ const releaseScript = fs.readFileSync(path.join(root, 'tools', 'build-windows-re
 const guide = fs.readFileSync(path.join(root, 'docs', 'WINDOWS_BUILD_A_TO_Z.md'), 'utf8');
 
 test('2.1.5 exposes the official Windows release commands', () => {
-  assert.equal(pkg.version, CURRENT_VERSION);
+  assert.equal(pkg.version, '2.1.7');
   assert.equal(pkg.scripts['build:win'], 'npm run release:win');
   assert.equal(pkg.scripts['release:win'], 'node tools/build-windows-release.js');
   assert.equal(pkg.scripts['package:win:dir'], 'node tools/package-windows-dir.js');
