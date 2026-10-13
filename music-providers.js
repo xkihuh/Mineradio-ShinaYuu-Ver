@@ -1724,7 +1724,7 @@ function ytDlpBrowserCookieSources() {
   return output;
 }
 
-function ytDlpAuthStrategies(cookieBundle) {
+function ytDlpAuthStrategies(cookieBundle, purpose = 'audio') {
   const bundle = cookieBundle && typeof cookieBundle === 'object'
     ? cookieBundle
     : { header: String(cookieBundle || ''), cookies: [] };
@@ -1732,25 +1732,35 @@ function ytDlpAuthStrategies(cookieBundle) {
   const signedIn = youtubeCookieLooksSignedIn(bundle.header) || youtubeCookieRowsLookSignedIn(bundle.cookies);
   const cookieFile = signedIn ? writeYtDlpCookieFile(bundle.header, bundle.cookies) : '';
 
-  // Public music videos must not depend on a browser/account cookie. YouTube
-  // currently exposes different format sets to different Innertube clients,
-  // so try explicit no-cookie clients before falling back to account cookies.
-  // This also avoids a stale/rotated cookie turning every public track into a
-  // false YOUTUBE_AUTH_REQUIRED failure.
-  strategies.push(
-    // `android_vr` has regressed on some YouTube sessions and may return only
-    // format 18 or URLs that later 403. Prefer plain Android first; yt-dlp
-    // documents it as a practical workaround for current SABR/GVS issues.
-    { key: 'public:android', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=android'] },
-    { key: 'public:web_embedded_default', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=web_embedded,default'] },
-    { key: 'public:web_embedded', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=web_embedded'] },
-    { key: 'public:tv', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=tv'] },
-    { key: 'public:android_vr', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=android_vr'] },
-    { key: 'public:ios', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=ios'] },
-    { key: 'public:web_safari', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=web_safari'] },
-    { key: 'public:default', args: ['--no-cookies'] },
-  );
-  if (cookieFile) strategies.push({ key: 'app-cookie', args: ['--cookies', cookieFile] });
+  // Audio and MV must not share the same player-client order. The lightweight
+  // Android client can be useful for audio recovery but frequently exposes a
+  // reduced video-format set. For MV, query a high-resolution-capable client
+  // group first so yt-dlp can compare DASH formats across TV/iOS/Web Safari.
+  // The audio order below intentionally remains unchanged to protect playback.
+  if (String(purpose || '').toLowerCase() === 'video') {
+    strategies.push(
+      { key: 'video:public:tv_ios_web_safari', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=tv,ios,web_safari'] },
+      { key: 'video:public:default', args: ['--no-cookies'] },
+      { key: 'video:public:tv_web_safari', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=tv,web_safari'] },
+      { key: 'video:public:web_embedded_default', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=web_embedded,default'] },
+      { key: 'video:public:tv', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=tv'] },
+      { key: 'video:public:ios', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=ios'] },
+      { key: 'video:public:android', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=android'] },
+    );
+  } else {
+    // Public music audio keeps the proven Android-first recovery order.
+    strategies.push(
+      { key: 'public:android', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=android'] },
+      { key: 'public:web_embedded_default', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=web_embedded,default'] },
+      { key: 'public:web_embedded', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=web_embedded'] },
+      { key: 'public:tv', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=tv'] },
+      { key: 'public:android_vr', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=android_vr'] },
+      { key: 'public:ios', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=ios'] },
+      { key: 'public:web_safari', args: ['--no-cookies', '--extractor-args', 'youtube:player_client=web_safari'] },
+      { key: 'public:default', args: ['--no-cookies'] },
+    );
+  }
+  if (cookieFile) strategies.push({ key: `${String(purpose || 'audio').toLowerCase()}:app-cookie`, args: ['--cookies', cookieFile] });
   for (const browser of ytDlpBrowserCookieSources()) {
     strategies.push({ key: `browser:${browser}`, args: ['--cookies-from-browser', browser] });
   }
@@ -1760,13 +1770,15 @@ function ytDlpAuthStrategies(cookieBundle) {
   const unique = [];
   const used = new Set();
   for (const item of strategies.sort((a, b) => {
-    const aPublic = a.key.startsWith('public:');
-    const bPublic = b.key.startsWith('public:');
+    const aPublic = a.key.startsWith('public:') || a.key.startsWith('video:public:');
+    const bPublic = b.key.startsWith('public:') || b.key.startsWith('video:public:');
     if (aPublic !== bPublic) return aPublic ? -1 : 1;
     return a.key === preferred ? -1 : b.key === preferred ? 1 : 0;
   })) {
     const blockedUntil = Number(youtubeYtDlpAuthFailures.get(item.key) || 0);
-    if (blockedUntil > now && item.key !== 'public:default' && item.key !== 'app-cookie') continue;
+    const isDefaultFallback = item.key === 'public:default' || item.key === 'video:public:default';
+    const isCookieFallback = item.key === 'app-cookie' || item.key === 'audio:app-cookie' || item.key === 'video:app-cookie';
+    if (blockedUntil > now && !isDefaultFallback && !isCookieFallback) continue;
     if (!used.has(item.key)) { used.add(item.key); unique.push(item); }
   }
   return unique;
@@ -1780,7 +1792,10 @@ function insertYtDlpStrategyArgs(args, extra) {
 
 async function runYtDlpWithAuthRecovery(engine, args, options = {}) {
   const cookieBundle = await youtubeBrowserCookieBundle();
-  const strategies = ytDlpAuthStrategies(cookieBundle);
+  const purpose = String(options.purpose || 'audio').toLowerCase();
+  const runOptions = { ...options };
+  delete runOptions.purpose;
+  const strategies = ytDlpAuthStrategies(cookieBundle, purpose);
   const tried = [];
   let lastError = null;
   for (let index = 0; index < strategies.length; index += 1) {
@@ -1789,7 +1804,7 @@ async function runYtDlpWithAuthRecovery(engine, args, options = {}) {
     tried.push(strategy.key);
     try {
       const result = await runChild(engine.executable, insertYtDlpStrategyArgs(args, strategy.args), {
-        ...options,
+        ...runOptions,
         timeoutMs: strategy.key.startsWith('browser:')
           ? Math.min(Number(options.timeoutMs || 70000), 42000)
           : Number(options.timeoutMs || 70000),
@@ -2242,13 +2257,10 @@ function youtubeBackgroundVideoLimits(quality) {
   const mode = normalizeBackgroundVideoQuality(quality);
   return {
     mode,
-    // High requests 1440p so object-fit:cover has enough source pixels after
-    // cropping on a Full-HD desktop. Ultra may use 2160p on capable systems;
-    // Balanced remains 1080p and Eco remains 720p.
-    height: mode === 'eco' ? 720 : (mode === 'balanced' ? 1080 : (mode === 'ultra' ? 2160 : (mode === 'max' ? 4320 : 1440))),
-    // A large portion of YouTube's high-resolution catalog is available only
-    // as 50/60 fps video-only formats.
-    fps: mode === 'eco' ? 30 : 60,
+    // MAX is truly source-max: do not silently cap at 4320p or 60 fps.
+    // Fixed tiers remain useful for lower-bandwidth systems/displays.
+    height: mode === 'max' ? Infinity : (mode === 'eco' ? 720 : (mode === 'balanced' ? 1080 : (mode === 'ultra' ? 2160 : 1440))),
+    fps: mode === 'max' ? Infinity : (mode === 'eco' ? 30 : 60),
   };
 }
 
@@ -2256,6 +2268,28 @@ function youtubeBackgroundVideoFormat(quality, options = {}) {
   const { mode, height, fps } = youtubeBackgroundVideoLimits(quality);
   const compatibility = !!(options && options.compatibility);
   const minimumHeight = mode === 'eco' ? 720 : (mode === 'balanced' ? 1080 : (mode === 'ultra' ? 2160 : (mode === 'max' ? 2160 : 1440)));
+  // MAX must follow yt-dlp's bestvideo sorting through the highest available
+  // source format, including 8K and >60-fps uploads when present. A fixed
+  // height/fps ceiling here was the primary reason some MVs looked softer than
+  // their YouTube source despite selecting MAX in the UI.
+  if (mode === 'max') {
+    if (!compatibility) return [
+      'bestvideo[height>=2160]',
+      'bestvideo[height>=1440]',
+      'bestvideo',
+      'best[height>=2160]',
+      'best[height>=1440]',
+      'best',
+    ].join('/');
+    return [
+      'bestvideo[vcodec^=avc1][ext=mp4][height>=2160]',
+      'bestvideo[vcodec^=avc1][ext=mp4][height>=1440]',
+      'bestvideo[vcodec^=avc1][ext=mp4]',
+      'bestvideo[ext=mp4]',
+      'bestvideo',
+      'best',
+    ].join('/');
+  }
   // Ask for the requested tier first, then fall back one tier at a time only
   // when the upload genuinely does not contain that resolution. This prevents
   // yt-dlp from silently selecting a soft 360p/480p rendition while Full HD or
@@ -2375,6 +2409,8 @@ function youtubeCachedVideoDescriptor(info, videoId, quality, options = {}) {
     mediaKind: 'video',
     hasAudio: !!(selected.acodec && String(selected.acodec).toLowerCase() !== 'none'),
     formatId: String(selected.format_id || ''),
+    videoCodec: String(selected.vcodec || ''),
+    audioCodec: String(selected.acodec || ''),
     reusedPlaybackMetadata: true,
     compatibility,
   };
@@ -2394,6 +2430,8 @@ function ytDlpVideoArgs(videoId, quality = 'auto', options = {}) {
     '--extractor-retries', '2',
     '--fragment-retries', '2',
     '--format', youtubeBackgroundVideoFormat(quality, options),
+    '--format-sort', 'res,fps,hdr,vcodec,br',
+    '--format-sort-force',
   ];
   if (nodeRuntime) args.push('--js-runtimes', `node:${nodeRuntime}`);
   args.push(`https://www.youtube.com/watch?v=${encodeURIComponent(String(videoId || ''))}`);
@@ -2404,18 +2442,15 @@ async function youtubeVideoViaYtDlp(videoId, quality = 'auto', options = {}) {
   const refresh = !!(options && options.refresh);
   const cachedDescriptor = refresh ? null : cachedYouTubeVideoDescriptor(videoId, quality, options);
   if (cachedDescriptor) return playbackResultFromYouTubeDescriptor(cachedDescriptor, 'yt-dlp-video-cache');
-  if (!refresh) {
-    const reused = youtubeCachedVideoDescriptor(cachedYouTubeYtDlpInfo(videoId), videoId, quality, options);
-    if (reused) {
-      cacheYouTubeVideoDescriptor(videoId, quality, reused, options);
-      return playbackResultFromYouTubeDescriptor(reused, 'yt-dlp-playback-metadata');
-    }
-  }
+  // Do not reuse metadata cached by the audio resolver: its auth client is
+  // intentionally audio-first and may expose only a low-resolution subset of
+  // video formats. MV quality requires a fresh video-purpose extraction.
   const engine = await prepareYouTubeEngine();
   const nodeRuntime = findNodeRuntime();
   const result = await runYtDlpWithAuthRecovery(engine, ytDlpVideoArgs(videoId, quality, options), {
-    timeoutMs: 70000,
-    maxOutput: 18 * 1024 * 1024,
+    purpose: 'video',
+    timeoutMs: 80000,
+    maxOutput: 24 * 1024 * 1024,
     env: ytDlpRuntimeEnv(nodeRuntime),
   });
   let info;
@@ -2443,6 +2478,8 @@ async function youtubeVideoViaYtDlp(videoId, quality = 'auto', options = {}) {
     mediaKind: 'video',
     hasAudio: !!(selected.acodec && String(selected.acodec).toLowerCase() !== 'none'),
     formatId: String(selected.format_id || info.format_id || ''),
+    videoCodec: String(selected.vcodec || info.vcodec || ''),
+    audioCodec: String(selected.acodec || info.acodec || ''),
     compatibility: !!(options && options.compatibility),
     requestedQuality: normalizeBackgroundVideoQuality(quality),
   };
@@ -4998,7 +5035,7 @@ async function resolveYouTubePlayback(videoId, quality, options = {}) {
 async function youtubeVideoViaInnertube(videoId, quality = 'auto', options = {}) {
   const id = String(videoId || '').trim();
   const mode = normalizeBackgroundVideoQuality(quality);
-  const requestedQuality = mode === 'eco' ? '720p' : (mode === 'balanced' ? '1080p' : (mode === 'high' ? '1440p' : (mode === 'ultra' ? '2160p' : '4320p')));
+  const requestedQuality = mode === 'max' ? 'best' : (mode === 'eco' ? '720p' : (mode === 'balanced' ? '1080p' : (mode === 'high' ? '1440p' : '2160p')));
   const yt = await getYouTubeClient();
   const format = await yt.getStreamingData(id, { type: 'video', quality: requestedQuality, format: 'any' });
   const directUrl = String(format && format.url || '').trim();
@@ -5013,6 +5050,7 @@ async function youtubeVideoViaInnertube(videoId, quality = 'auto', options = {})
     availableMaxHeight: Number(format && format.height || 0),
     fps: Number(format && format.fps || 0),
     videoQuality: String(format && (format.quality_label || format.quality) || ''),
+    videoCodec: String(format && format.mime_type || ''),
     videoId: id,
     mediaKind: 'video',
     requestedQuality: mode,
@@ -5037,6 +5075,19 @@ async function resolveYouTubeVideoBackground(videoId, quality = 'auto', options 
   let ytDlpError = null;
   try {
     const stream = await youtubeVideoViaYtDlp(id, quality, options);
+    console.info('[YouTubeMVQuality]', JSON.stringify({
+      videoId: id,
+      engine: stream.engine || 'yt-dlp',
+      requested: mode,
+      selected: stream.videoQuality || stream.formatId || '',
+      formatId: stream.formatId || '',
+      width: Number(stream.width || 0),
+      height: Number(stream.height || 0),
+      availableMaxHeight: Number(stream.availableMaxHeight || 0),
+      fps: Number(stream.fps || 0),
+      videoCodec: stream.videoCodec || '',
+      compatibility: !!(options && options.compatibility),
+    }));
     return {
       ...stream,
       proxyUrl: stream.streamToken ? `/api/media?stream=${encodeURIComponent(stream.streamToken)}` : stream.proxyUrl,
@@ -5062,6 +5113,18 @@ async function resolveYouTubeVideoBackground(videoId, quality = 'auto', options 
 
   try {
     const stream = await youtubeVideoViaInnertube(id, quality, options);
+    console.info('[YouTubeMVQuality]', JSON.stringify({
+      videoId: id,
+      engine: stream.engine || 'youtubei.js-video-fast',
+      requested: mode,
+      selected: stream.videoQuality || '',
+      width: Number(stream.width || 0),
+      height: Number(stream.height || 0),
+      availableMaxHeight: Number(stream.availableMaxHeight || 0),
+      fps: Number(stream.fps || 0),
+      videoCodec: stream.videoCodec || '',
+      compatibility: !!(options && options.compatibility),
+    }));
     return {
       ...stream,
       proxyUrl: stream.streamToken ? `/api/media?stream=${encodeURIComponent(stream.streamToken)}` : stream.proxyUrl,
@@ -6496,6 +6559,7 @@ module.exports = {
     ytDlpAuthChallenge,
     ytDlpBrowserCookieFailure,
     ytDlpBrowserCookieSourceAvailable,
+    ytDlpAuthStrategies,
     youtubeDurationSeconds,
     youtubeThumbnail,
     youtubeBackgroundVideoLimits,

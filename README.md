@@ -1,6 +1,12 @@
-# ShinaYuu Music 2.2.0
+# ShinaYuu Music 2.2.1
 
 Bản ổn định hợp nhất phát triển trực tiếp từ ShinaYuu Music 2.1.7, giữ nguyên YouTube/Spotify playback và bổ sung các phần ổn định cho playlist, lyrics, Discord và DPI.
+
+## YouTube MV quality (2.2.1)
+
+- MV quality `MAX` requests the highest source formats available rather than capping selection at 4320p/60fps. Actual quality still depends on the formats YouTube exposes to the selected client and on the renderer/device decoding support.
+- MV resolution uses a dedicated yt-dlp video-client profile; metadata obtained by the audio resolver is not reused for MV format selection.
+- Diagnostics log the selected format, resolution, frame rate and codec without exposing signed stream URLs. YouTube audio resolver ordering is unchanged.
 
 ## Sửa chính
 
@@ -52,16 +58,39 @@ npm run release:win
 Installer dự kiến:
 
 ```text
-ShinaYuu-Music-2.1.7-Setup.exe
+ShinaYuu-Music-2.2.1-Setup.exe
 ```
 
 ## Phiên bản
 
 ```text
-Package version : 2.2.0
-Display version : 2.2.0
-Build version   : 2.2.0.0
+Package version : 2.2.1
+Display version : 2.2.1
+Build version   : 2.2.1.0
 ```
+
+## Windows release 2.2.1
+
+### Full installer
+
+```powershell
+npm run release:win:skip-tests
+```
+
+### Full installer + patch from the previous source
+
+```powershell
+npm run release:win:patch -- "D:\ShinaYuu\Release-Base\ShinaYuu-Music-2.1.7-SOURCE.zip"
+```
+
+The installer is written to `dist\ShinaYuu-Music-2.2.1-Setup.exe`. Patch files are written to `dist\updates\` and use the `2.1.7-to-2.2.1` naming pattern.
+
+### Patch only
+
+```powershell
+npm run patch -- "D:\ShinaYuu\Release-Base\ShinaYuu-Music-2.1.7-SOURCE.zip"
+```
+
 ## Acknowledgments
 
 Mineradio was originally designed and developed by XxHuberrr, and is now being maintained and localized for global users by x.kihuh. Special thanks to **emily**, who co-created early concepts for the visual foundation and inspired the optimization direction for the `emily` visual preset.
@@ -76,25 +105,3 @@ ShinaYuu Music is licensed under `GPL-3.0-only`. Redistribution of source or bin
 This project is licensed under the GPL-3.0 License. See the [LICENSE](./LICENSE) file for details.
 
 The ShinaYuu Logo, the name "ShinaYuu," the UI visual design, and original visual assets belong entirely to the original author. Third-party dependencies and services follow their respective open-source licenses and terms of service.
-
-## Windows release 2.2.0
-
-### Full installer
-
-```powershell
-npm run release:win:skip-tests
-```
-
-### Full installer + patch from the previous source
-
-```powershell
-npm run release:win:patch -- "D:\ShinaYuu\Release-Base\ShinaYuu-Music-2.1.7-SOURCE.zip"
-```
-
-The installer is written to `dist\ShinaYuu-Music-2.2.0-Setup.exe`. Patch files are written to `dist\updates\` and use the `2.1.7-to-2.2.0` naming pattern.
-
-### Patch only
-
-```powershell
-npm run patch -- "D:\ShinaYuu\Release-Base\ShinaYuu-Music-2.1.7-SOURCE.zip"
-```

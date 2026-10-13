@@ -1,8 +1,8 @@
 {
   "name": "shinayuu-music",
   "productName": "ShinaYuu Music",
-  "version": "2.2.0",
-  "description": "ShinaYuu Music 2.2.0: stability release; smooths the Spotify progress clock and restores full-frame 3D lyrics animation for SDK playback without changing the working Widevine pipeline.",
+  "version": "2.2.1",
+  "description": "ShinaYuu Music 2.2.1: improves YouTube MV source-quality selection and diagnostics while preserving the stable Spotify/Widevine, playlist, lyrics, Discord, and DPI paths.",
   "author": "ShinaYuu",
   "license": "GPL-3.0-only",
   "main": "desktop/main.js",
@@ -107,7 +107,7 @@
       "include": "build/installer.nsh",
       "artifactName": "ShinaYuu-Music-${version}-Setup.${ext}"
     },
-    "buildVersion": "2.2.0.0",
+    "buildVersion": "2.2.1.0",
     "electronDist": "node_modules/electron/dist",
     "publish": [
       {
@@ -140,8 +140,8 @@
     "rcedit": "^5.0.2"
   },
   "shinayuu": {
-    "displayVersion": "2.2.0",
-    "edition": "ShinaYuu Music 2.2.0 Stability Final",
+    "displayVersion": "2.2.1",
+    "edition": "ShinaYuu Music 2.2.1 Stability + YouTube MV Quality",
     "lineage": {
       "productCore": "ShinaYuu Music 1.1.8.7",
       "visualUiAndLyricsStage": "Mineradio 2.1.0 selective stability/layer ports on ShinaYuu 2.0.17",
@@ -188,12 +188,12 @@
       "checkIntervalMs": 21600000,
       "autoPrompt": true
     },
-    "buildVersion": "2.2.0.0"
+    "buildVersion": "2.2.1.0"
   },
   "engines": {
     "node": ">=22.0.0"
   },
-  "displayVersion": "2.2.0",
+  "displayVersion": "2.2.1",
   "repository": {
     "type": "git",
     "url": "https://github.com/xkihuh/Mineradio-ShinaYuu-Ver.git"

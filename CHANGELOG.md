@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.2.1 — YouTube MV Quality Update
+
+- Promotes the stable 2.2.0 source to release version 2.2.1.
+- Keeps the YouTube MV quality R1 changes: a dedicated video-oriented yt-dlp format lookup, uncapped MAX selection, format sorting, and safe resolution/FPS/codec diagnostics.
+- Leaves the working YouTube audio resolver order and Spotify/Widevine playback pipeline unchanged.
+- Keeps local ShinaYuu playlists, app-local liked music, Discord settings, lyrics-only ports, and display/DPI adaptation from the 2.2.0 stability line.
+- Synchronizes package/display/build identity to 2.2.1 / 2.2.1.0 and refreshes renderer cache-busting URLs.
+
 ## 2.2.0 — Stability Final
 
 - Finalized the 2.1.7-based stability line without replacing the working YouTube or Spotify playback engines.
@@ -9,6 +17,9 @@
 - Retained local ShinaYuu playlists and local liked-music behavior.
 - Release identity bumped to 2.2.0 / 2.2.0.0.
 - Release tooling supports a full NSIS installer and an optional 2.1.7 → 2.2.0 resource patch.
+- YouTube MV MAX now requests the highest source formats available from the selected YouTube client instead of applying a 4320p/60fps ceiling.
+- MV metadata resolution uses a video-oriented yt-dlp client profile and no longer reuses metadata gathered by the audio resolver, which can expose a reduced format list.
+- Added safe MV-quality diagnostics (selected format, actual dimensions, FPS and codec) without logging signed stream URLs; YouTube audio client order remains unchanged.
 
 # ShinaYuu Music 2.1.6
 

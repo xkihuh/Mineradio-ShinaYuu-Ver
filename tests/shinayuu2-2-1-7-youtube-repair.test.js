@@ -8,10 +8,10 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('2.1.7 keeps the original yt-dlp bundle pin and uses yt-dlp as YouTube audio authority', () => {
+test('2.2.1 keeps the pinned yt-dlp bundle and uses yt-dlp as YouTube audio authority', () => {
   const pkg = JSON.parse(read('package.json'));
   const providers = read('music-providers.js');
-  assert.equal(pkg.version, '2.1.7');
+  assert.equal(pkg.version, '2.2.1');
   assert.match(providers, /const YTDLP_VERSION = '2026\.07\.04';/);
   assert.doesNotMatch(providers, /2026\.08\.19/);
   assert.match(providers, /let ytDlpError = null;[\s\S]*return await youtubeAudioViaYtDlp\(videoId, quality, \{ refresh \}\);[\s\S]*return await youtubeAudioViaInnertube\(videoId, quality, \{ refresh \}\);/);
