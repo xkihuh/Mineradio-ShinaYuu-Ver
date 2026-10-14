@@ -26,14 +26,13 @@ test('2.1.4 waits for Castlabs/Widevine instead of failing a single startup prob
   assert.match(player, /CASTLABS\|WIDEVINE\|COMPONENTS/);
 });
 
-test('2.1.4 activates the SDK device and confirms delayed starts through Web API state', () => {
+test('2.2.2 Spotify startup confirms playback from live SDK state and guards delayed starts', () => {
   const player = read('public/spotify-direct-player.js');
-  assert.match(player, /async function ensureSpotifyDeviceActivated\(device, requestId, force\)/);
-  assert.match(player, /\/api\/spotify\/player\/transfer/);
-  assert.match(player, /await ensureSpotifyDeviceActivated\(device, requestId, false\)/);
-  assert.match(player, /async function readSpotifyApiPlaybackState\(\)/);
-  assert.match(player, /web-api-playback-confirm/);
-  assert.match(player, /apiState\.isPlaying === true/);
+  assert.match(player, /function spotifySdkPlaybackMoving\(state, actualPositionMs\)/);
+  assert.match(player, /async function readSpotifySeekState\(\)/);
+  assert.match(player, /syncSpotifySdkSongMetadata\(currentTrack, state, 'playback-confirm'\)/);
+  assert.match(player, /spotifyDirectState\.isPlaying/);
+  assert.match(player, /confirmedState\.paused === false/);
 });
 
 test('2.1.4 token failures reject the pending SDK connection instead of hanging', () => {
@@ -47,11 +46,11 @@ test('2.1.4 release identity and Spotify cache-busting are synchronized', () => 
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
   const html = read('public/index.html');
-  assert.equal(pkg.version, '2.1.4');
-  assert.equal(pkg.displayVersion, '2.1.4');
-  assert.equal(pkg.build.buildVersion, '2.1.4.0');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.4');
-  assert.equal(lock.version, '2.1.4');
-  assert.equal(lock.packages[''].version, '2.1.4');
-  assert.match(html, /spotify-direct-player\.js\?v=2\.1\.4/);
+  assert.equal(pkg.version, '2.2.2');
+  assert.equal(pkg.displayVersion, '2.2.2');
+  assert.equal(pkg.build.buildVersion, '2.2.2.0');
+  assert.equal(pkg.shinayuu.displayVersion, '2.2.2');
+  assert.equal(lock.version, '2.2.2');
+  assert.equal(lock.packages[''].version, '2.2.2');
+  assert.match(html, /spotify-direct-player\.js\?v=2\.2\.2/);
 });

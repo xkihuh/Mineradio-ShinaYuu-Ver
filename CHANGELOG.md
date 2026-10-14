@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.2.2 — Video, Discord Artwork & Update Check Hotfix
+
+- Refreshes the pinned yt-dlp Windows runtime to 2026.08.19 and validates its official SHA-256.
+- Recovers video descriptors from fresh yt-dlp formats metadata when a selected stream URL or codec field is missing, and keeps youtubei.js as a compatibility recovery path.
+- Clamps Discord preview/avatar images to their containers and adds a local image picker preview plus URL/asset-key support for Rich Presence artwork.
+- Allows public HTTPS custom image URLs through Discord configuration while retaining short Developer Portal asset keys.
+- Publishes update-check entry points before UI boot, reports concrete request errors, and distinguishes an older remote release from an up-to-date source.
+- Synchronizes package/display/build identity to 2.2.2 / 2.2.2.0.
+
 ## 2.2.1 — YouTube MV Quality Update
 
 - Promotes the stable 2.2.0 source to release version 2.2.1.

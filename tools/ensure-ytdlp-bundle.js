@@ -8,9 +8,9 @@ const root = path.resolve(__dirname, '..');
 const vendorDir = path.join(root, 'vendor');
 const target = path.join(vendorDir, 'yt-dlp.exe');
 const partial = `${target}.download`;
-const version = '2026.07.04';
+const version = '2026.08.19';
 const url = `https://github.com/yt-dlp/yt-dlp/releases/download/${version}/yt-dlp.exe`;
-const sha256 = '52fe3c26dcf71fbdc85b528589020bb0b8e383155cfa81b64dd447bbe35e24b8';
+const sha256 = '66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a';
 
 function digest(file) {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');

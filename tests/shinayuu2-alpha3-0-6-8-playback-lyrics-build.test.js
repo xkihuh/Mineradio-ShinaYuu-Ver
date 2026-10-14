@@ -56,7 +56,7 @@ test('inactive Spotify host no longer suppresses fallback lyrics and active requ
 
 test('Windows build identity uses the exact ShinaYuu Music 1.1.7.4 artwork and installer resources', () => {
   const pkg = JSON.parse(read('package.json'));
-  assert.equal(pkg.version, '2.1.7');
+  assert.equal(pkg.version, '2.2.2');
   assert.equal(pkg.productName, 'ShinaYuu Music');
   assert.equal(pkg.build.win.icon, 'build/icon.ico');
   assert.equal(pkg.build.nsis.installerIcon, 'build/icon.ico');
@@ -66,7 +66,7 @@ test('Windows build identity uses the exact ShinaYuu Music 1.1.7.4 artwork and i
   assert.equal(sha256('build/icon.png'), '543dbcefad58cddb0fe15a6feff4bcca62b16043f807ffb540487a1b071655b0');
   assert.equal(sha256('build/installerHeader.bmp'), 'f7758f2d08afa46963d48de80cafdda099d125ef610317374ba31f67d279a9bc');
   assert.equal(sha256('build/installerSidebar.bmp'), 'f222063149588f7b14ffd636736b72e70250caa82d7814d029dbf5602b98baf7');
-  assert.equal(sha256('build/installer.nsh'), 'a0aed59e1793a154e2cb3bd657950633d8ee50547b24bc9c344eae8269bcdeec');
+  assert.equal(sha256('build/installer.nsh'), '365b60042f0ab28561822b9e37bbb30d361c44830b0286eabfabcff398314de8');
   assert.ok(fs.existsSync(path.join(root, 'build/icon-64.rgba')));
   assert.ok(fs.existsSync(path.join(root, 'build/preview-win.js')));
 });

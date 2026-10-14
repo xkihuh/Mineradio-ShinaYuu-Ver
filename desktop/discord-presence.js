@@ -28,12 +28,26 @@ function safeBoolean(value, fallback) {
   return !!value;
 }
 
+function normalizeImageReference(value) {
+  const raw = String(value == null ? '' : value).trim();
+  if (/^https:\/\//i.test(raw)) {
+    try {
+      const parsed = new URL(raw);
+      if (parsed.protocol === 'https:' && parsed.hostname) return parsed.toString().slice(0, 2048);
+    } catch (_) {}
+    return '';
+  }
+  // Developer Portal asset keys are short identifiers, not local file paths.
+  if (/^[a-z0-9_.-]{1,64}$/i.test(raw)) return raw;
+  return '';
+}
+
 function normalizeConfig(input = {}) {
   const rawId = String(input.applicationId || '').replace(/\D/g, '').slice(0, 24);
   return {
     enabled: safeBoolean(input.enabled, DEFAULT_CONFIG.enabled),
     applicationId: rawId,
-    largeImageKey: safeText(input.largeImageKey || '', 64),
+    largeImageKey: normalizeImageReference(input.largeImageKey || ''),
     largeImageText: safeText(input.largeImageText || DEFAULT_CONFIG.largeImageText, 128),
     smallImageKey: safeText(input.smallImageKey || '', 64),
     smallImageText: safeText(input.smallImageText || '', 128),
@@ -503,6 +517,7 @@ class DiscordPresenceManager extends EventEmitter {
 module.exports = {
   DiscordPresenceManager,
   normalizeConfig,
+  normalizeImageReference,
   normalizeUser,
   isValidApplicationId,
   probeDiscordIpc,

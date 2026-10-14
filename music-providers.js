@@ -80,9 +80,9 @@ const SPOTIFY_AUTH_TTL = 15 * 60 * 1000;
 const SPOTIFY_PROFILE_RETRY_FALLBACK = 15 * 1000;
 const SPOTIFY_REQUEST_TIMEOUT = 15 * 1000;
 
-const YTDLP_VERSION = '2026.07.04';
+const YTDLP_VERSION = '2026.08.19';
 const YTDLP_WINDOWS_URL = `https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VERSION}/yt-dlp.exe`;
-const YTDLP_WINDOWS_SHA256 = '52fe3c26dcf71fbdc85b528589020bb0b8e383155cfa81b64dd447bbe35e24b8';
+const YTDLP_WINDOWS_SHA256 = '66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a';
 const STREAM_TOKEN_TTL = 12 * 60 * 1000;
 const YOUTUBE_AUDIO_DESCRIPTOR_TTL = 8 * 60 * 1000;
 const YOUTUBE_VIDEO_DESCRIPTOR_TTL = 8 * 60 * 1000;
@@ -2457,32 +2457,60 @@ async function youtubeVideoViaYtDlp(videoId, quality = 'auto', options = {}) {
   try { info = JSON.parse(result.stdout); }
   catch (_) { throw new Error('yt-dlp returned invalid video metadata'); }
   cacheYouTubeYtDlpInfo(videoId, info);
-  const selected = Array.isArray(info.requested_downloads) && info.requested_downloads[0] || info;
+  const selected = Array.isArray(info.requested_downloads) && info.requested_downloads[0]
+    || (Array.isArray(info.requested_formats) && info.requested_formats[0])
+    || info;
   const directUrl = String(selected.url || info.url || '').trim();
-  if (!directUrl) throw new Error('yt-dlp did not return a video URL');
-  const headers = { ...(info.http_headers || {}), ...(selected.http_headers || {}) };
-  const descriptor = {
-    url: directUrl,
-    headers,
-    mimeType: String(selected.mime_type || info.mime_type || (String(selected.ext || info.ext || '').toLowerCase() === 'mp4' ? 'video/mp4' : (String(selected.ext || info.ext || '').toLowerCase() === 'webm' ? 'video/webm' : ''))),
-    bitrate: Number(selected.tbr || info.tbr || 0) * 1000,
-    width: Number(selected.width || info.width || 0),
-    height: Number(selected.height || info.height || 0),
-    availableMaxHeight: Array.isArray(info.formats) ? info.formats.reduce((best, format) => {
-      const vcodec = String(format && format.vcodec || '').toLowerCase();
-      return (!vcodec || vcodec === 'none') ? best : Math.max(best, Number(format.height || 0));
-    }, 0) : Number(selected.height || info.height || 0),
-    fps: Number(selected.fps || info.fps || 0),
-    videoQuality: String(selected.format_note || selected.format || info.format_note || ''),
-    videoId: String(videoId || ''),
-    mediaKind: 'video',
-    hasAudio: !!(selected.acodec && String(selected.acodec).toLowerCase() !== 'none'),
-    formatId: String(selected.format_id || info.format_id || ''),
-    videoCodec: String(selected.vcodec || info.vcodec || ''),
-    audioCodec: String(selected.acodec || info.acodec || ''),
-    compatibility: !!(options && options.compatibility),
-    requestedQuality: normalizeBackgroundVideoQuality(quality),
-  };
+  const selectedVideoCodec = String(selected.vcodec || info.vcodec || '').toLowerCase();
+  let descriptor = null;
+
+  // Some yt-dlp builds return the top-level video metadata without a selected
+  // direct URL (or omit the codec on that wrapper object). In that case choose
+  // a real, signed URL from the fresh video-purpose formats array instead of
+  // failing before the media element can ever load.
+  if (!directUrl || !selectedVideoCodec || selectedVideoCodec === 'none') {
+    descriptor = youtubeCachedVideoDescriptor(info, videoId, quality, options);
+  }
+
+  if (!descriptor && directUrl) {
+    const headers = { ...(info.http_headers || {}), ...(selected.http_headers || {}) };
+    descriptor = {
+      url: directUrl,
+      headers,
+      mimeType: String(selected.mime_type || info.mime_type || (String(selected.ext || info.ext || '').toLowerCase() === 'mp4' ? 'video/mp4' : (String(selected.ext || info.ext || '').toLowerCase() === 'webm' ? 'video/webm' : ''))),
+      bitrate: Number(selected.tbr || selected.vbr || info.tbr || 0) * 1000,
+      width: Number(selected.width || info.width || 0),
+      height: Number(selected.height || info.height || 0),
+      availableMaxHeight: Array.isArray(info.formats) ? info.formats.reduce((best, format) => {
+        const vcodec = String(format && format.vcodec || '').toLowerCase();
+        return (!vcodec || vcodec === 'none') ? best : Math.max(best, Number(format.height || 0));
+      }, 0) : Number(selected.height || info.height || 0),
+      fps: Number(selected.fps || info.fps || 0),
+      videoQuality: String(selected.format_note || selected.format || info.format_note || ''),
+      videoId: String(videoId || ''),
+      mediaKind: 'video',
+      hasAudio: !!(selected.acodec && String(selected.acodec).toLowerCase() !== 'none'),
+      formatId: String(selected.format_id || info.format_id || ''),
+      videoCodec: String(selected.vcodec || info.vcodec || ''),
+      audioCodec: String(selected.acodec || info.acodec || ''),
+      compatibility: !!(options && options.compatibility),
+      requestedQuality: normalizeBackgroundVideoQuality(quality),
+    };
+  }
+
+  if (!descriptor || !String(descriptor.url || '').trim()) {
+    console.warn('[YouTubeMVQuality] yt-dlp metadata had no usable video URL', JSON.stringify({
+      videoId: String(videoId || ''),
+      formatCount: Array.isArray(info.formats) ? info.formats.length : 0,
+      requestedDownloadCount: Array.isArray(info.requested_downloads) ? info.requested_downloads.length : 0,
+      requestedFormatCount: Array.isArray(info.requested_formats) ? info.requested_formats.length : 0,
+    }));
+    throw new Error('yt-dlp did not return a usable video URL');
+  }
+  descriptor.requestedQuality = normalizeBackgroundVideoQuality(quality);
+  descriptor.videoId = String(videoId || '');
+  descriptor.mediaKind = 'video';
+  descriptor.compatibility = !!(options && options.compatibility);
   cacheYouTubeVideoDescriptor(videoId, quality, descriptor, options);
   return playbackResultFromYouTubeDescriptor(descriptor, 'yt-dlp-video');
 }
@@ -5103,13 +5131,10 @@ async function resolveYouTubeVideoBackground(videoId, quality = 'auto', options 
     ytDlpError = error;
   }
 
-  if (options && options.compatibility) {
-    const authFailure = String(ytDlpError && ytDlpError.code || '').toUpperCase() === 'YOUTUBE_AUTH_REQUIRED';
-    const error = new Error(authFailure ? ytDlpError.message : `YouTube background video unavailable: ${ytDlpError && ytDlpError.message || 'yt-dlp failed'}`);
-    error.code = authFailure ? 'YOUTUBE_AUTH_REQUIRED' : 'YOUTUBE_BACKGROUND_VIDEO_UNAVAILABLE';
-    error.status = authFailure ? 401 : 503;
-    throw error;
-  }
+  // Keep a second independent source available even on compatibility retry.
+  // The renderer's recovery pass exists specifically for streams that the
+  // Chromium video element rejected, so returning an error here would suppress
+  // the only non-yt-dlp recovery path.
 
   try {
     const stream = await youtubeVideoViaInnertube(id, quality, options);

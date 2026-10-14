@@ -8,12 +8,12 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('2.2.1 keeps the pinned yt-dlp bundle and uses yt-dlp as YouTube audio authority', () => {
+test('2.2.2 keeps the pinned yt-dlp bundle and uses yt-dlp as YouTube audio authority', () => {
   const pkg = JSON.parse(read('package.json'));
   const providers = read('music-providers.js');
-  assert.equal(pkg.version, '2.2.1');
-  assert.match(providers, /const YTDLP_VERSION = '2026\.07\.04';/);
-  assert.doesNotMatch(providers, /2026\.08\.19/);
+  assert.equal(pkg.version, '2.2.2');
+  assert.match(providers, /const YTDLP_VERSION = '2026\.08\.19';/);
+  assert.doesNotMatch(providers, /2026\.07\.04/);
   assert.match(providers, /let ytDlpError = null;[\s\S]*return await youtubeAudioViaYtDlp\(videoId, quality, \{ refresh \}\);[\s\S]*return await youtubeAudioViaInnertube\(videoId, quality, \{ refresh \}\);/);
 });
 
@@ -36,7 +36,8 @@ test('YouTube MV resolution is yt-dlp-first with Innertube fallback and stream-t
   const fn = providers.slice(start, end);
   assert.ok(start >= 0 && end > start);
   assert.ok(fn.indexOf('await youtubeVideoViaYtDlp') < fn.indexOf('await youtubeVideoViaInnertube'));
-  assert.match(fn, /if \(options && options\.compatibility\)/);
+  assert.match(fn, /await youtubeVideoViaInnertube/);
+  assert.doesNotMatch(fn, /if \(options && options\.compatibility\)\s*\{\s*const authFailure/);
   assert.match(fn, /stream\.streamToken \? `\/api\/media\?stream=\$\{encodeURIComponent\(stream\.streamToken\)\}` : stream\.proxyUrl/);
 });
 

@@ -1,8 +1,8 @@
-# ShinaYuu Music 2.2.1
+# ShinaYuu Music 2.2.2
 
 Bản ổn định hợp nhất phát triển trực tiếp từ ShinaYuu Music 2.1.7, giữ nguyên YouTube/Spotify playback và bổ sung các phần ổn định cho playlist, lyrics, Discord và DPI.
 
-## YouTube MV quality (2.2.1)
+## 2.2.2 video, Discord artwork and updater hotfix
 
 - MV quality `MAX` requests the highest source formats available rather than capping selection at 4320p/60fps. Actual quality still depends on the formats YouTube exposes to the selected client and on the renderer/device decoding support.
 - MV resolution uses a dedicated yt-dlp video-client profile; metadata obtained by the audio resolver is not reused for MV format selection.
@@ -58,18 +58,18 @@ npm run release:win
 Installer dự kiến:
 
 ```text
-ShinaYuu-Music-2.2.1-Setup.exe
+ShinaYuu-Music-2.2.2-Setup.exe
 ```
 
 ## Phiên bản
 
 ```text
-Package version : 2.2.1
-Display version : 2.2.1
-Build version   : 2.2.1.0
+Package version : 2.2.2
+Display version : 2.2.2
+Build version   : 2.2.2.0
 ```
 
-## Windows release 2.2.1
+## Windows release 2.2.2
 
 ### Full installer
 
@@ -83,7 +83,7 @@ npm run release:win:skip-tests
 npm run release:win:patch -- "D:\ShinaYuu\Release-Base\ShinaYuu-Music-2.1.7-SOURCE.zip"
 ```
 
-The installer is written to `dist\ShinaYuu-Music-2.2.1-Setup.exe`. Patch files are written to `dist\updates\` and use the `2.1.7-to-2.2.1` naming pattern.
+The installer is written to `dist\ShinaYuu-Music-2.2.2-Setup.exe`. Patch files are written to `dist\updates\` and use the `2.1.7-to-2.2.2` naming pattern.
 
 ### Patch only
 

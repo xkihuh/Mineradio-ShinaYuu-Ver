@@ -13,12 +13,12 @@ const { DiscordPresenceManager, normalizeConfig } = require(path.join(root, 'des
 test('2.1.5 release identity is synchronized', () => {
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
-  assert.equal(pkg.version, '2.1.7');
-  assert.equal(pkg.displayVersion, '2.1.7');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.7');
-  assert.equal(pkg.build.buildVersion, '2.1.7.0');
-  assert.equal(lock.version, '2.1.7');
-  assert.equal(lock.packages[''].version, '2.1.7');
+  assert.equal(pkg.version, '2.2.2');
+  assert.equal(pkg.displayVersion, '2.2.2');
+  assert.equal(pkg.shinayuu.displayVersion, '2.2.2');
+  assert.equal(pkg.build.buildVersion, '2.2.2.0');
+  assert.equal(lock.version, '2.2.2');
+  assert.equal(lock.packages[''].version, '2.2.2');
 });
 
 test('Discord presence accepts legacy renderer metadata and builds track progress timestamps', () => {
@@ -51,25 +51,22 @@ test('Discord presence accepts legacy renderer metadata and builds track progres
   assert.equal(Math.round((activity.endTimestamp - activity.startTimestamp) / 1000), 240);
 });
 
-test('Discord config and inline Advanced Liquid Glass controls expose track presence settings', () => {
+test('Discord config exposes track presence and bounded custom artwork in the native modal', () => {
   assert.equal(normalizeConfig({ preferTrackCover: false }).preferTrackCover, false);
   const html = read('public/index.html');
   const renderer = read('public/js/shinayuu-v2-native.js');
-  const advanced = read('public/js/shinayuu-alpha2-features.js');
-  const css = read('public/css/shinayuu-alpha3.0.5-fixes.css');
-  assert.match(html, /discord-now-title/);
-  assert.match(html, /fx-discord-inline-panel/);
-  assert.match(html, /discord-prefer-track-cover/);
-  assert.match(html, /discord-application-id/);
-  assert.doesNotMatch(html, /id="discord-setup-btn"/);
+  const preload = read('desktop/preload.js');
+  const presence = read('desktop/discord-presence.js');
+  assert.match(html, /id="discord-advanced-card"/);
   assert.match(renderer, /discordPlaybackSnapshot/);
   assert.match(renderer, /shinayuu-playback-state/);
   assert.match(renderer, /positionSec/);
-  assert.match(advanced, /preferTrackCover/);
-  assert.match(advanced, /saveDiscordAdvancedSettings/);
-  assert.match(css, /inline Discord setup panel/);
+  assert.match(renderer, /openModal\(t\('discord'\), '', body, 'discord'\)/);
+  assert.match(renderer, /id="shinayuu-discord-cover"/);
+  assert.match(renderer, /id="shinayuu-discord-image-file"/);
+  assert.match(presence, /preferTrackCover/);
+  assert.match(preload, /configureDiscord/);
 });
-
 test('Lyrics Sync 2.0 applies authored offsets and conservative timeline drift correction', () => {
   assert.equal(lyricsSync.parseLrcOffsetSeconds('[offset:+750]\n[00:01.00]Line'), 0.75);
   assert.equal(lyricsSync.parseLrcOffsetSeconds('[offset:-250]'), -0.25);

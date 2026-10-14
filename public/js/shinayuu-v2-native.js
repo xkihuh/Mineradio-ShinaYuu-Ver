@@ -127,11 +127,12 @@
       '#shinayuu-native-modal[data-kind="discord"] .shinayuu-native-toolbar{display:none}',
       '#shinayuu-native-modal[data-kind="discord"] .shinayuu-native-body{padding:18px;overflow:auto}',
       '.shinayuu-discord-liquid{display:grid;gap:13px}.shinayuu-discord-modal-hero{display:grid;grid-template-columns:58px minmax(0,1fr) auto;align-items:center;gap:13px;padding:15px;border:1px solid rgba(255,255,255,.11);border-radius:18px;background:linear-gradient(135deg,rgba(145,108,255,.13),rgba(81,210,255,.07));box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}',
-      '.shinayuu-discord-modal-avatar{width:58px;height:58px;border-radius:17px;object-fit:cover;background:linear-gradient(145deg,#7866dc,#4daee7);box-shadow:0 12px 28px rgba(0,0,0,.25)}.shinayuu-discord-modal-avatar.fallback{display:grid;place-items:center;font:800 16px/1 Inter,sans-serif;color:#fff}',
+      '.shinayuu-discord-modal-avatar{display:block;box-sizing:border-box;flex:0 0 58px;width:58px;height:58px;min-width:0;min-height:0;max-width:100%;max-height:100%;overflow:hidden;border-radius:17px;object-fit:cover;background:linear-gradient(145deg,#7866dc,#4daee7);box-shadow:0 12px 28px rgba(0,0,0,.25)}.shinayuu-discord-modal-avatar.fallback{display:grid;place-items:center;font:800 16px/1 Inter,sans-serif;color:#fff}',
+      '.shinayuu-discord-preview{min-width:0;overflow:hidden;box-sizing:border-box}.shinayuu-discord-preview-icon{position:relative;box-sizing:border-box;display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;min-width:42px;min-height:42px;max-width:42px;max-height:42px;overflow:hidden;border-radius:12px}.shinayuu-discord-preview-icon img{display:block!important;box-sizing:border-box!important;width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;max-width:100%!important;max-height:100%!important;object-fit:contain!important;object-position:center!important;margin:0!important;padding:0!important;border:0!important;border-radius:inherit!important}',
       '.shinayuu-discord-modal-copy{min-width:0}.shinayuu-discord-kicker{display:block;margin-bottom:5px;font:750 8px/1 Inter,sans-serif;letter-spacing:.16em;color:rgba(176,202,255,.66)}.shinayuu-discord-modal-copy h3{margin:0;font:750 16px/1.2 Inter,sans-serif;color:#fff}.shinayuu-discord-modal-copy p{margin:5px 0 0;font:500 10px/1.45 Inter,sans-serif;color:rgba(255,255,255,.56)}',
       '.shinayuu-discord-status{padding:6px 9px;border:1px solid rgba(255,255,255,.1);border-radius:999px;background:rgba(255,255,255,.055);font:700 9px/1 Inter,sans-serif;color:rgba(255,255,255,.58)}.shinayuu-discord-status.online{border-color:rgba(86,237,174,.28);background:rgba(57,213,148,.11);color:#8ff3c5}',
       '.shinayuu-discord-preview{display:grid;grid-template-columns:42px minmax(0,1fr) auto;align-items:center;gap:10px;padding:11px 12px;border:1px solid rgba(255,255,255,.09);border-radius:15px;background:rgba(9,10,18,.38)}.shinayuu-discord-preview-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:linear-gradient(145deg,rgba(112,92,222,.9),rgba(71,170,226,.85));font:800 10px/1 Inter,sans-serif;color:#fff}.shinayuu-discord-preview strong,.shinayuu-discord-preview span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.shinayuu-discord-preview strong{font:700 11px/1.35 Inter,sans-serif;color:#fff}.shinayuu-discord-preview span{font:500 9.5px/1.35 Inter,sans-serif;color:rgba(255,255,255,.55)}.shinayuu-discord-preview small{font:600 8px/1 Inter,sans-serif;color:rgba(255,255,255,.35)}',
-      '.shinayuu-discord-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}.shinayuu-discord-fields label{display:grid;gap:5px;padding:11px;border:1px solid rgba(255,255,255,.09);border-radius:14px;background:rgba(255,255,255,.035)}.shinayuu-discord-fields label>span{font:700 10px/1.2 Inter,sans-serif;color:rgba(255,255,255,.84)}.shinayuu-discord-fields label>small{min-height:26px;font:500 8.5px/1.4 Inter,sans-serif;color:rgba(255,255,255,.42)}.shinayuu-discord-fields input{height:38px;padding:0 11px;border:1px solid rgba(255,255,255,.11);border-radius:11px;background:rgba(2,4,10,.34);color:#fff;outline:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.045)}.shinayuu-discord-fields input:focus{border-color:rgba(120,213,255,.42);box-shadow:0 0 0 3px rgba(95,185,255,.08),inset 0 1px 0 rgba(255,255,255,.05)}',
+      '.shinayuu-discord-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;min-width:0}.shinayuu-discord-fields label{display:grid;min-width:0;gap:5px;padding:11px;border:1px solid rgba(255,255,255,.09);border-radius:14px;background:rgba(255,255,255,.035)}.shinayuu-discord-fields label>span{font:700 10px/1.2 Inter,sans-serif;color:rgba(255,255,255,.84)}.shinayuu-discord-fields label>small{min-height:26px;font:500 8.5px/1.4 Inter,sans-serif;color:rgba(255,255,255,.42)}.shinayuu-discord-fields input{box-sizing:border-box;width:100%;min-width:0;max-width:100%;height:38px;padding:0 11px;border:1px solid rgba(255,255,255,.11);border-radius:11px;background:rgba(2,4,10,.34);color:#fff;outline:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.045)}.shinayuu-discord-fields input:focus{border-color:rgba(120,213,255,.42);box-shadow:0 0 0 3px rgba(95,185,255,.08),inset 0 1px 0 rgba(255,255,255,.05)}.shinayuu-discord-image-picker{grid-column:1/-1}.shinayuu-discord-image-picker input[type=file]{height:auto;min-height:38px;padding:7px;font-size:10px}.shinayuu-discord-image-note{display:block;grid-column:1/-1;font:500 9px/1.5 Inter,sans-serif;color:rgba(255,255,255,.46)}',
       '.shinayuu-discord-switches{display:grid;grid-template-columns:1fr 1fr;gap:10px}.shinayuu-discord-switches label{display:flex;align-items:flex-start;gap:9px;padding:11px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.03);cursor:pointer}.shinayuu-discord-switches input{margin-top:2px;accent-color:#8e7cff}.shinayuu-discord-switches strong,.shinayuu-discord-switches small{display:block}.shinayuu-discord-switches strong{font:650 9.5px/1.3 Inter,sans-serif;color:rgba(255,255,255,.8)}.shinayuu-discord-switches small{margin-top:3px;font:500 8px/1.4 Inter,sans-serif;color:rgba(255,255,255,.4)}',
       '.shinayuu-discord-diagnostic{padding:10px 11px;border:1px solid rgba(255,255,255,.075);border-radius:12px;background:rgba(0,0,0,.18);font:500 9px/1.45 Inter,sans-serif;color:rgba(255,255,255,.52)}.shinayuu-discord-actions{display:flex;justify-content:flex-end;gap:7px;flex-wrap:wrap}.shinayuu-discord-actions .primary{min-width:138px}',
       '@media(max-width:620px){.shinayuu-discord-modal-hero{grid-template-columns:48px minmax(0,1fr)}.shinayuu-discord-modal-avatar{width:48px;height:48px;border-radius:14px}.shinayuu-discord-status{grid-column:1/-1;justify-self:start}.shinayuu-discord-fields,.shinayuu-discord-switches{grid-template-columns:1fr}}',
@@ -578,10 +579,12 @@
           '<div class="shinayuu-discord-modal-copy"><span class="shinayuu-discord-kicker">DISCORD RICH PRESENCE</span><h3>' + escapeHtml(profileName) + '</h3><p>Hiển thị bài đang phát, nguồn nhạc và tiến độ của ShinaYuu Music trên Discord.</p></div>' +
           '<span class="shinayuu-discord-status ' + (state.discord.connected ? 'online' : '') + '">' + escapeHtml(status) + '</span>' +
         '</div>' +
-        '<div class="shinayuu-discord-preview"><div class="shinayuu-discord-preview-icon"><img src="assets/shinayuu-app-icon.png" alt="ShinaYuu Music"></div><div>' + nowPlaying + '</div><small>Live preview</small></div>' +
+        '<div class="shinayuu-discord-preview"><div class="shinayuu-discord-preview-icon"><img id="shinayuu-discord-preview-logo" src="' + escapeHtml(/^https:\/\//i.test(String(config.largeImageKey || '')) ? config.largeImageKey : 'assets/shinayuu-app-icon.png') + '" alt="ShinaYuu Music"></div><div>' + nowPlaying + '</div><small>Live preview</small></div>' +
         '<div class="shinayuu-discord-fields">' +
           '<label><span>' + escapeHtml(t('discordId')) + '</span><small>ID của ứng dụng trong Discord Developer Portal</small><input id="shinayuu-discord-app-id" inputmode="numeric" autocomplete="off" spellcheck="false" value="' + escapeHtml(config.applicationId || state.discord.applicationId || '') + '" placeholder="123456789012345678"></label>' +
-          '<label><span>Large Image Key</span><small>Asset dự phòng khi ảnh bìa trực tuyến không được Discord chấp nhận</small><input id="shinayuu-discord-image-key" autocomplete="off" spellcheck="false" value="' + escapeHtml(config.largeImageKey || 'shinayuu') + '" placeholder="shinayuu"></label>' +
+          '<label><span>Asset Key / URL ảnh HTTPS</span><small>Nhập key đã upload lên Developer Portal hoặc URL ảnh công khai</small><input id="shinayuu-discord-image-key" autocomplete="off" spellcheck="false" value="' + escapeHtml(config.largeImageKey || 'shinayuu') + '" placeholder="shinayuu hoặc https://..."></label>' +
+          '<label class="shinayuu-discord-image-picker"><span>Chọn ảnh tuỳ chỉnh</span><small>Chọn PNG, JPEG, WebP hoặc GIF để xem trước logo</small><input id="shinayuu-discord-image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label>' +
+          '<small class="shinayuu-discord-image-note">Lưu ý: file trên máy chỉ dùng để xem trước. Để người khác nhìn thấy ảnh trên Discord, hãy upload ảnh vào Developer Portal và nhập Asset Key, hoặc dùng URL HTTPS công khai.</small>' +
         '</div>' +
         '<div class="shinayuu-discord-switches">' +
           '<label><input id="shinayuu-discord-enabled" type="checkbox" ' + (config.enabled !== false ? 'checked' : '') + '><span><strong>Bật Discord Rich Presence</strong><small>Tự kết nối lại khi Discord được mở.</small></span></label>' +
@@ -595,18 +598,46 @@
         '</div>' +
       '</div>';
     openModal(t('discord'), '', body, 'discord');
+    var previewLogo = byId('shinayuu-discord-preview-logo');
+    var localImageSelected = false;
+    var imageKeyInput = byId('shinayuu-discord-image-key');
+    var imageFileInput = byId('shinayuu-discord-image-file');
+    if (previewLogo) previewLogo.onerror = function () { previewLogo.onerror = null; previewLogo.src = 'assets/shinayuu-app-icon.png'; };
+    if (imageKeyInput) imageKeyInput.addEventListener('input', function () {
+      var value = String(imageKeyInput.value || '').trim();
+      if (previewLogo && /^https:\/\//i.test(value)) { previewLogo.onerror = function () { previewLogo.onerror = null; previewLogo.src = 'assets/shinayuu-app-icon.png'; }; previewLogo.src = value; }
+      else if (previewLogo && !localImageSelected) previewLogo.src = 'assets/shinayuu-app-icon.png';
+    });
+    if (imageFileInput) imageFileInput.addEventListener('change', function () {
+      var file = imageFileInput.files && imageFileInput.files[0];
+      if (!file) return;
+      if (!/^image\/(png|jpeg|webp|gif)$/i.test(String(file.type || ''))) { toast('Hãy chọn ảnh PNG, JPEG, WebP hoặc GIF.'); imageFileInput.value = ''; return; }
+      if (file.size > 5 * 1024 * 1024) { toast('Ảnh phải nhỏ hơn 5 MB.'); imageFileInput.value = ''; return; }
+      var reader = new FileReader();
+      reader.onload = function () { if (previewLogo && typeof reader.result === 'string') { localImageSelected = true; previewLogo.src = reader.result; } };
+      reader.onerror = function () { toast('Không thể đọc file ảnh đã chọn.'); };
+      reader.readAsDataURL(file);
+    });
     var appInput = byId('shinayuu-discord-app-id');
     if (appInput) setTimeout(function () { try { appInput.focus(); appInput.select(); } catch (_) {} }, 40);
     var save = byId('shinayuu-discord-save');
     if (save) save.onclick = async function () {
       var id = String(byId('shinayuu-discord-app-id').value || '').replace(/\D/g, '');
       var imageKey = String(byId('shinayuu-discord-image-key').value || 'shinayuu').trim() || 'shinayuu';
+      if (/^https?:\/\//i.test(imageKey)) {
+        try { var customImageUrl = new URL(imageKey); if (customImageUrl.protocol !== 'https:') { toast('Ảnh Discord tuỳ chỉnh cần dùng URL HTTPS công khai.'); return; } }
+        catch (_) { toast('URL ảnh Discord không hợp lệ.'); return; }
+      }
+      if (imageKey.length > 2048) { toast('Asset Key / URL ảnh quá dài.'); return; }
       var enabled = !!byId('shinayuu-discord-enabled').checked;
       var preferTrackCover = !!byId('shinayuu-discord-cover').checked;
       if (enabled && !/^\d{17,24}$/.test(id)) { toast('Application ID Discord không hợp lệ.'); return; }
       if (typeof bridge.configureDiscord === 'function') state.discord = await bridge.configureDiscord({ enabled: enabled, applicationId: id, largeImageKey: imageKey, largeImageText: 'ShinaYuu Music', showTrack: true, preferTrackCover: preferTrackCover });
       updateDiscordActivity(true);
-      toast(t('saved')); closeModal(); refreshNativeStatusCards();
+      toast(localImageSelected && !/^https:\/\//i.test(imageKey)
+        ? 'Đã lưu cấu hình. Để ảnh đã chọn hiển thị trên Discord cho người khác, hãy upload ảnh lên Developer Portal và nhập Asset Key.'
+        : t('saved'));
+      closeModal(); refreshNativeStatusCards();
     };
     var reconnect = byId('shinayuu-discord-reconnect');
     if (reconnect) reconnect.onclick = async function () {
@@ -828,11 +859,26 @@
       return failed;
     }
   }
+  async function fetchUpdateJson(path, label) {
+    var controller = typeof AbortController === 'function' ? new AbortController() : null;
+    var timer = controller ? setTimeout(function () { controller.abort(); }, 15000) : null;
+    try {
+      var response = await fetch(path, { cache: 'no-store', credentials: 'same-origin', signal: controller ? controller.signal : undefined });
+      if (!response.ok) throw new Error(label + '_HTTP_' + response.status);
+      var type = String(response.headers && response.headers.get && response.headers.get('content-type') || '').toLowerCase();
+      if (type && type.indexOf('application/json') < 0) throw new Error(label + '_NOT_JSON');
+      try { return await response.json(); }
+      catch (_) { throw new Error(label + '_INVALID_JSON'); }
+    } catch (error) {
+      if (error && error.name === 'AbortError') throw new Error(label + '_TIMEOUT');
+      if (error && /^UPDATE_|^VERSION_/.test(String(error.message || ''))) throw error;
+      throw new Error(label + '_NETWORK_FAILED: ' + String(error && error.message || error || 'fetch failed'));
+    } finally { if (timer) clearTimeout(timer); }
+  }
   async function fetchUpdateSnapshot() {
-    var responses = await Promise.all([fetch('/api/app/version', { cache: 'no-store' }), fetch('/api/update/latest', { cache: 'no-store' })]);
-    if (!responses[0].ok || !responses[1].ok) throw new Error('UPDATE_HTTP_FAILED');
-    var current = await responses[0].json();
-    var latest = await responses[1].json();
+    var values = await Promise.all([fetchUpdateJson('/api/app/version', 'VERSION'), fetchUpdateJson('/api/update/latest', 'UPDATE_LATEST')]);
+    var current = values[0];
+    var latest = values[1];
     state.update.current = current || {};
     state.update.latest = latest || {};
     state.update.config = current && current.update || {};
@@ -1084,7 +1130,7 @@
       if (!document.hidden) updateMvForCurrentTrack(false);
     });
     window.addEventListener('focus', function () { syncMvPlayback(true); });
-    window.ShinaYuuV2 = {
+    window.ShinaYuuV2 = Object.assign(window.ShinaYuuV2 || {}, {
       openLocalLibrary: openLocalLibrary,
       addLocalSource: addLocalSource,
       openMediaLibrary: openMediaLibrary,
@@ -1096,8 +1142,16 @@
       checkUpdate: checkUpdate,
       openLatestUpdatePrompt: openLatestUpdatePrompt,
       startUpdateInstall: startUpdateInstall
-    };
+    });
   }
+  // Publish the critical entry points before boot() so the legacy Advanced
+  // Update button can never win a race against native-panel initialization.
+  window.ShinaYuuV2 = Object.assign(window.ShinaYuuV2 || {}, {
+    openDiscordSettings: openDiscordSettings,
+    checkUpdate: checkUpdate,
+    openLatestUpdatePrompt: openLatestUpdatePrompt,
+    startUpdateInstall: startUpdateInstall
+  });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(boot, 0); }, { once: true });
   else setTimeout(boot, 0);
 })();

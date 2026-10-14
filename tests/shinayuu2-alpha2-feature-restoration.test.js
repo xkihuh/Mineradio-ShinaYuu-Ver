@@ -96,10 +96,11 @@ test('MV background requests the highest available tier with safe fallbacks', ()
   const providers = read('music-providers.js');
   assert.match(renderer, /quality:\s*'max'/);
   assert.match(renderer, /data-shinayuu-mv-quality="max"[^>]*>MAX</);
-  assert.match(providers, /mode === 'max' \? 4320/);
-  assert.match(providers, /mode === 'max' \? 2160/);
-  assert.match(providers, /mode === 'ultra' \? '2160p' : '4320p'/);
-  assert.match(providers, /bestvideo\[height>=\$\{minimumHeight\}\]\[height<=\$\{height\}\]/);
+  assert.match(providers, /mode === 'max' \? Infinity/);
+  assert.doesNotMatch(providers, /mode === 'max' \? 4320/);
+  assert.match(providers, /mode === 'ultra' \? 2160/);
+  assert.match(providers, /requested_downloads/);
+  assert.match(providers, /youtubeCachedVideoDescriptor\(info, videoId, quality, options\)/);
 });
 
 test('environment visuals receive a clearly stronger but bounded beat signal', () => {
@@ -142,18 +143,16 @@ test('track metadata updates immediately and likely next choices are prefetched'
   assert.match(native, /addEventListener\('shinayuu-track-change'/);
 });
 
-test('Discord connection is restored inside Advanced as an inline Liquid Glass panel', () => {
+test('Discord connection uses the native Liquid Glass modal with bounded custom artwork', () => {
   const html = read('public/index.html');
-  const alpha2 = read('public/js/shinayuu-alpha2-features.js');
+  const native = read('public/js/shinayuu-v2-native.js');
+  const presence = read('desktop/discord-presence.js');
   const preload = read('desktop/preload.js');
   assert.match(html, /id="discord-advanced-card"/);
-  assert.match(html, /fx-discord-inline-panel/);
-  assert.match(html, /id="discord-application-id"/);
-  assert.match(html, /id="discord-large-image-key"/);
-  assert.match(html, /saveDiscordAdvancedSettings\(\)/);
-  assert.doesNotMatch(html, /id="discord-setup-btn"/);
-  assert.match(alpha2, /window\.saveDiscordAdvancedSettings/);
-  assert.match(alpha2, /window\.reconnectDiscordAdvanced/);
+  assert.match(native, /openModal\(t\('discord'\), '', body, 'discord'\)/);
+  assert.match(native, /id="shinayuu-discord-image-file"/);
+  assert.match(native, /shinayuu-discord-preview-icon img\{display:block!important;box-sizing:border-box!important;width:100%!important;height:100%!important/);
+  assert.match(presence, /function normalizeImageReference\(value\)/);
   assert.match(preload, /getDiscordState/);
   assert.match(preload, /configureDiscord/);
   assert.match(preload, /reconnectDiscord/);

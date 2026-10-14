@@ -9,10 +9,12 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 test('2.1.5 keeps the Discord Connect card Liquid Glass without relying on one external CSS response', () => {
   const html = read('public/index.html');
   assert.match(html, /id="shinayuu-discord-critical-2-1-1"/);
-  assert.match(html, /shinayuu-alpha3\.0\.5-fixes\.css\?v=2\.1\.7/);
+  assert.match(html, /shinayuu-alpha3\.0\.5-fixes\.css\?v=2\.2\.2/);
   assert.match(html, /#discord-advanced-card #discord-application-id,[\s\S]*?all:unset!important/);
   assert.match(html, /#discord-advanced-card \.sy-discord-actions[\s\S]*?grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
-  assert.match(html, /<svg[^>]+width="14"[^>]+height="14"/);
+  const native = read('public/js/shinayuu-v2-native.js');
+  assert.match(native, /openModal\(t\('discord'\), '', body, 'discord'\)/);
+  assert.match(native, /shinayuu-discord-preview-icon img\{display:block!important;box-sizing:border-box!important;width:100%!important;height:100%!important/);
 });
 
 test('2.1.5 manual playback has no former 2.8-second AutoMix release gate', () => {
@@ -38,12 +40,12 @@ test('2.1.5 package and bundled assets use the synchronized release identity', (
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
   const html = read('public/index.html');
-  assert.equal(pkg.version, '2.1.7');
-  assert.equal(pkg.displayVersion, '2.1.7');
-  assert.equal(pkg.shinayuu.displayVersion, '2.1.7');
-  assert.equal(pkg.build.buildVersion, '2.1.7.0');
-  assert.equal(lock.version, '2.1.7');
-  assert.equal(lock.packages[''].version, '2.1.7');
-  assert.match(html, /spotify-direct-player\.js\?v=2\.1\.7/);
-  assert.match(html, /shinayuu-index-bundle\.js\?v=2\.1\.7/);
+  assert.equal(pkg.version, '2.2.2');
+  assert.equal(pkg.displayVersion, '2.2.2');
+  assert.equal(pkg.shinayuu.displayVersion, '2.2.2');
+  assert.equal(pkg.build.buildVersion, '2.2.2.0');
+  assert.equal(lock.version, '2.2.2');
+  assert.equal(lock.packages[''].version, '2.2.2');
+  assert.match(html, /spotify-direct-player\.js\?v=2\.2\.2/);
+  assert.match(html, /shinayuu-index-bundle\.js\?v=2\.2\.2/);
 });

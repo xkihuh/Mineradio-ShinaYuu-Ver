@@ -5,19 +5,16 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('2.1.5 embeds Discord Liquid Glass configuration directly in Advanced', () => {
+test('2.2.2 opens Discord configuration in native Liquid Glass with custom artwork controls', () => {
   const html = read('public/index.html');
-  const alpha = read('public/js/shinayuu-alpha2-features.js');
-  const css = read('public/css/shinayuu-alpha3.0.5-fixes.css');
-  assert.match(html, /fx-discord-inline-panel/);
-  assert.match(html, /id="discord-application-id"/);
-  assert.match(html, /id="discord-large-image-key"/);
-  assert.match(html, /saveDiscordAdvancedSettings\(\)/);
-  assert.doesNotMatch(html, /id="discord-setup-btn"/);
-  assert.match(alpha, /saveDiscordAdvancedSettings/);
-  assert.match(css, /\.fx-discord-inline-panel/);
+  const native = read('public/js/shinayuu-v2-native.js');
+  assert.match(html, /id="discord-advanced-card"/);
+  assert.match(native, /async function openDiscordSettings\(\)/);
+  assert.match(native, /openModal\(t\('discord'\), '', body, 'discord'\)/);
+  assert.match(native, /id="shinayuu-discord-image-file"/);
+  assert.match(native, /id="shinayuu-discord-image-key"/);
+  assert.match(native, /shinayuu-discord-preview-icon img\{display:block!important;box-sizing:border-box!important;width:100%!important;height:100%!important/);
 });
-
 test('2.1.5 update checker uses the real app logo, bilingual note and emoji artwork', () => {
   const html = read('public/index.html');
   const native = read('public/js/shinayuu-v2-native.js');
@@ -28,7 +25,7 @@ test('2.1.5 update checker uses the real app logo, bilingual note and emoji artw
   assert.match(native, /Có Update mới nèee/);
   assert.match(native, /No updates yet :3/);
   assert.match(native, /update-note-has-update\.webp/);
-  assert.match(css, /\.shinayuu-update-note-row/);
+  assert.match(css, /\.sy-update-check-card-v213/);
   assert.equal(fs.existsSync(path.join(root, 'public/assets/update-note-no-update.webp')), true);
   assert.equal(fs.existsSync(path.join(root, 'public/assets/update-note-has-update.webp')), true);
 });
